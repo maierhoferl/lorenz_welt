@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#4f7d33">
+<title>Lorenz' Welt</title>
+<style>
+  :root { --wood:#7a4e2a; --wood2:#a8743f; --paper:#fbf4e4; --ink:#3a2a1a; --green:#4f8a2f; --red:#d23b2b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  [hidden] { display:none !important; }
+  html,body { margin:0; height:100%; overflow:hidden; overscroll-behavior:none; background:#4f7d33;
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink);
+    -webkit-user-select:none; user-select:none; }
+  button { font:inherit; cursor:pointer; touch-action:manipulation; }
+  .screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    background: radial-gradient(ellipse at 50% 120%, #8fc75a 0%, #5d9a3a 45%, #3f6e2a 100%); overflow:auto; }
+  h1 { font-size: clamp(40px, 9vw, 76px); margin:0; color:#fff8de; text-shadow: 0 4px 0 #6b4320, 0 8px 20px rgba(0,0,0,.35); letter-spacing:1px; }
+  .sub { margin:0; color:#fff; font-size:22px; text-shadow:0 2px 3px rgba(0,0,0,.4); }
+  #plist { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; max-width:760px; }
+  .pcard { width:150px; height:170px; border:0; border-radius:22px; background:var(--paper); box-shadow:0 6px 0 #b8925f, 0 10px 20px rgba(0,0,0,.25);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:58px; transition:transform .1s; }
+  .pcard:active { transform: translateY(4px); box-shadow:0 2px 0 #b8925f; }
+  .pcard b { font-size:22px; } .pcard small { font-size:14px; opacity:.7; }
+  .pcard.add { background:#e9f5d8; font-size:48px; color:var(--green); }
+  .panel { background:var(--paper); border-radius:20px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.3); display:flex; flex-direction:column; gap:10px; min-width:min(320px, 92vw); }
+  .panel input, .panel select { font:inherit; font-size:20px; padding:10px; border-radius:12px; border:2px solid #c9b48c; }
+  .btn { border:0; border-radius:14px; padding:12px 18px; font-size:18px; font-weight:700; color:#fff; background:var(--green); box-shadow:0 4px 0 #2f5a1a; }
+  .btn:disabled { background:#aaa; box-shadow:0 4px 0 #777; }
+  .btn.alt { background:#8b7355; box-shadow:0 4px 0 #5b4630; }
+  .back { position:absolute; top:max(14px, env(safe-area-inset-top)); left:14px; border:0; background:rgba(255,255,255,.85); border-radius:50%; width:48px; height:48px; font-size:24px; }
+  .big { font-size:72px; }
+  #pin h2, #recover h2 { color:#fff; text-align:center; text-shadow:0 2px 4px rgba(0,0,0,.4); margin:0; max-width:520px; }
+  #dots { display:flex; gap:14px; } #dots i { width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.35); border:3px solid #fff; }
+  #dots i.on { background:#ffd34d; }
+  #dots.shake { animation: shake .4s; }
+  @keyframes shake { 25%{transform:translateX(-12px)} 75%{transform:translateX(12px)} }
+  #pinmsg, #recmsg { color:#fff3b0; font-weight:700; min-height:1.2em; margin:0; text-align:center; }
+  #pad { display:grid; grid-template-columns:repeat(3, 76px); gap:12px; }
+  #pad button { height:76px; border:0; border-radius:50%; font-size:30px; font-weight:700; background:var(--paper); box-shadow:0 5px 0 #b8925f; }
+  #pad button:active { transform:translateY(3px); box-shadow:0 2px 0 #b8925f; }
+  .link { background:none; border:0; color:#fff; text-decoration:underline; font-size:16px; }
+  #probs { display:flex; flex-direction:column; gap:10px; }
+  #probs label { display:flex; align-items:center; gap:12px; font-size:26px; font-weight:700; color:#fff; text-shadow:0 2px 3px rgba(0,0,0,.4); }
+  #probs input { width:120px; font:inherit; font-size:26px; padding:6px 10px; border-radius:12px; border:0; text-align:center; }
+
+  /* ---- Spiel ---- */
+  #game { padding:0; background:#4f7d33; }
+  #cv { position:fixed; inset:0; width:100%; height:100%; touch-action:none; }
+  #hud { position:fixed; top:0; left:0; right:0; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; pointer-events:none;
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
+  .chip { pointer-events:auto; background:rgba(251,244,228,.94); border-radius:16px; padding:6px 12px; box-shadow:0 3px 0 rgba(120,80,40,.5); font-weight:700; font-size:16px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #money .notes { display:flex; gap:2px; flex-wrap:wrap; max-width:180px; }
+  .note { display:inline-block; width:22px; height:12px; border-radius:2px; border:1px solid rgba(0,0,0,.25); font-size:8px; line-height:10px; text-align:center; color:rgba(0,0,0,.6); }
+  #btns { margin-left:auto; display:flex; gap:6px; pointer-events:auto; }
+  #btns button { border:0; width:46px; height:46px; border-radius:14px; background:rgba(251,244,228,.94); box-shadow:0 3px 0 rgba(120,80,40,.5); font-size:22px; }
+  #prox { position:fixed; left:50%; transform:translateX(-50%); bottom:max(14px, env(safe-area-inset-bottom)); max-width:min(560px, 94vw);
+    background:rgba(251,244,228,.96); border-radius:18px; padding:10px 14px; box-shadow:0 4px 0 rgba(120,80,40,.5); display:flex; gap:10px; align-items:center; font-size:15px; }
+  #prox b { font-size:17px; } #prox .warn { color:var(--red); font-weight:700; }
+  #prox button { border:0; border-radius:12px; background:#3e7bc4; color:#fff; padding:8px 10px; font-weight:700; white-space:nowrap; }
+  #toast { position:fixed; top:90px; left:50%; transform:translateX(-50%); pointer-events:none; display:flex; flex-direction:column; gap:6px; align-items:center; width:92vw; }
+  #toast div { background:rgba(40,30,20,.85); color:#fff; padding:10px 16px; border-radius:14px; font-weight:700; text-align:center; animation: tin .3s; max-width:520px; }
+  @keyframes tin { from { opacity:0; transform:translateY(-10px); } }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:16px; z-index:5; }
+  .box { background:var(--paper); border-radius:22px; box-shadow:0 10px 30px rgba(0,0,0,.4); width:min(720px, 100%); max-height:100%; display:flex; flex-direction:column; overflow:hidden; border:4px solid var(--wood2); }
+  .box header { background:var(--wood2); color:#fff; padding:10px 14px; display:flex; align-items:center; gap:10px; font-size:22px; font-weight:800; }
+  .box header button { margin-left:auto; border:0; background:rgba(255,255,255,.25); color:#fff; width:40px; height:40px; border-radius:50%; font-size:20px; }
+  .box .body { overflow:auto; padding:12px; -webkit-overflow-scrolling:touch; }
+  .tabs { display:flex; gap:6px; padding:8px 12px 0; flex-wrap:wrap; }
+  .tabs button { border:0; border-radius:12px 12px 0 0; padding:8px 12px; background:#e6d6b5; font-weight:700; }
+  .tabs button.on { background:#fff; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
+  .card { background:#fff; border-radius:16px; padding:10px; display:flex; flex-direction:column; gap:6px; box-shadow:0 2px 0 #e0cfa8; }
+  .card .ic { font-size:34px; } .card b { font-size:17px; } .card small { opacity:.75; font-size:13px; }
+  .card .row { display:flex; gap:6px; align-items:center; margin-top:auto; }
+  .card .price { font-weight:800; font-size:18px; margin-right:auto; }
+  .card button.k { border:0; border-radius:10px; padding:8px 12px; font-weight:800; color:#fff; background:var(--green); }
+  .card button.k:disabled { background:#bbb; }
+  .card button.i { border:0; border-radius:10px; padding:8px 10px; background:#dfeaf7; }
+  .card .more { font-size:13px; background:#f4f0e6; border-radius:10px; padding:8px; }
+  #info p { font-size:18px; line-height:1.5; margin:0 0 12px; }
+  #plan svg { display:block; }
+  #plan .box { width:min(980px, 100%); }
+  #plan .probs li { margin:4px 0; }
+  .legend { font-size:13px; display:flex; gap:14px; flex-wrap:wrap; margin:6px 0; }
+</style>
+</head>
+<body>
+
+<section id="select" class="screen">
+  <h1>Lorenz' Welt</h1>
+  <p class="sub">Wer spielt?</p>
+  <div id="plist"></div>
+  <form id="addform" class="panel" hidden>
+    <b>Neuer Spieler</b>
+    <input id="newname" maxlength="14" placeholder="Name" required autocomplete="off">
+    <label>Alter: <select id="newage"></select></label>
+    <button class="btn">Los geht's!</button>
+    <button type="button" class="btn alt" id="addcancel">Abbrechen</button>
+  </form>
+</section>
+
+<section id="pin" class="screen" hidden>
+  <button class="back" data-back>←</button>
+  <div class="big">👦🏼</div>
+  <h2 id="pintitle"></h2>
+  <div id="dots"><i></i><i></i><i></i><i></i></div>
+  <p id="pinmsg"></p>
+  <div id="pad"></div>
+  <button id="forgot" class="link">Code vergessen?</button>
+</section>
+
+<section id="recover" class="screen" hidden>
+  <button class="back" data-back>←</button>
+  <div class="big">🧮</div>
+  <h2>Code vergessen? Löse alle Rechnungen!</h2>
+  <div id="probs"></div>
+  <button id="checkprobs" class="btn">Prüfen</button>
+  <p id="recmsg"></p>
+</section>
+
+<section id="game" class="screen" hidden>
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div class="chip" id="who"></div>
+    <div class="chip" id="money"></div>
+    <div class="chip" id="bag"></div>
+    <div id="btns">
+      <button id="bplan" title="Produktions-Plan">📊</button>
+      <button id="bsound" title="Ton an/aus">🔊</button>
+      <button id="bexit" title="Spieler wechseln">🚪</button>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <div id="prox" hidden></div>
+  <div id="shop" class="modal" hidden></div>
+  <div id="plan" class="modal" hidden></div>
+  <div id="info" class="modal" hidden></div>
+</section>
+
+<script src="data.js"></script>
+<script src="audio.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
