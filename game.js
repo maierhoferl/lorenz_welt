@@ -39,13 +39,36 @@ async function hash(s) {
   return 'x' + h;
 }
 
-function renderSelect() {
+// ---- Online-Speicher (Cloudflare Worker, siehe worker/) ----
+// Ohne Internet läuft alles lokal weiter; beim nächsten Online-Start gewinnt der neuere Spielstand.
+const API = 'https://lorenz-welt.maierhofer-l.workers.dev';
+let online = false, KEY = null; // KEY = Code-Hash des angemeldeten Spielers
+async function api(path, body) {
+  const r = await fetch(API + path, body ? { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error || 'http'), { code: j.error || 'http', wait: j.wait });
+  return j;
+}
+const hasPin = p => online ? p.hasPin : !!p.pinHash;
+
+function drawSelect() {
+  $('#plist').innerHTML = profiles.map((p, i) =>
+    `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? '🔒 ' + p.age + ' Jahre' : '✨ neu'}</small></button>`).join('') +
+    (online ? `<button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>` : '');
+  $('.sub').textContent = online ? 'Wer spielt?' : 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)';
+}
+async function renderSelect() {
   show('select');
   $('#addform').hidden = true;
   $('#plist').hidden = false;
-  $('#plist').innerHTML = profiles.map((p, i) =>
-    `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${p.pinHash ? '🔒 ' + p.age + ' Jahre' : '✨ neu'}</small></button>`).join('') +
-    `<button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>`;
+  drawSelect();
+  try {
+    const list = await api('/profiles');
+    online = true;
+    profiles = list.map(p => ({ ...p, pinHash: profiles.find(l => l.id === p.id)?.pinHash }));
+    saveProfiles();
+  } catch (e) { online = false; }
+  drawSelect();
 }
 $('#plist').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -54,18 +77,20 @@ $('#plist').onclick = e => {
 };
 $('#newage').innerHTML = Array.from({ length: 12 }, (_, i) => `<option${i + 5 === 8 ? ' selected' : ''}>${i + 5}</option>`).join('');
 $('#addcancel').onclick = renderSelect;
-$('#addform').onsubmit = e => {
+$('#addform').onsubmit = async e => {
   e.preventDefault();
   const name = $('#newname').value.trim(); if (!name) return;
-  const p = { id: 'p' + Date.now(), name, age: +$('#newage').value };
-  profiles.push(p); saveProfiles(); openPin(p);
+  try {
+    const p = await api('/profiles', { name, age: +$('#newage').value });
+    profiles.push(p); saveProfiles(); openPin(p);
+  } catch (err) { alert(err.code === 'full' ? 'Es gibt schon zu viele Spieler.' : 'Hat nicht geklappt – ist das Internet an?'); }
 };
 for (const b of document.querySelectorAll('[data-back]')) b.onclick = renderSelect;
 
 let pin = null;
 $('#pad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k ? `<button>${k}</button>` : '<span></span>').join('');
 $('#pad').onclick = e => { const b = e.target.closest('button'); if (b) pinKey(b.textContent); };
-function openPin(p) { pin = { p, mode: p.pinHash ? 'enter' : 'set', buf: '', first: '' }; show('pin'); drawPin(); }
+function openPin(p) { pin = { p, mode: hasPin(p) ? 'enter' : 'set', buf: '', first: '' }; show('pin'); drawPin(); }
 function drawPin(msg = '') {
   const n = esc(pin.p.name);
   $('#pintitle').innerHTML = { enter: `Hallo ${n}! Gib deinen Geheimcode ein.`, set: `Hallo ${n}! Denk dir einen 4-stelligen Geheimcode aus.`, confirm: 'Gib den Code zur Sicherheit nochmal ein.' }[pin.mode];
@@ -79,41 +104,48 @@ async function pinKey(k) {
   if (k === '⌫') pin.buf = pin.buf.slice(0, -1); else if (/\d/.test(k) && pin.buf.length < 4) pin.buf += k;
   drawPin(); if (pin.buf.length < 4) return;
   const b = pin.buf; pin.buf = '';
+  const h = await hash(pin.p.id + b);
+  if (!pin) return;
   if (pin.mode === 'set') { pin.first = b; pin.mode = 'confirm'; drawPin(); }
   else if (pin.mode === 'confirm') {
-    if (b === pin.first) { pin.p.pinHash = await hash(pin.p.id + b); saveProfiles(); startGame(pin.p); }
-    else { pin.mode = 'set'; shakeDots(); drawPin('Die Codes waren verschieden – nochmal!'); }
-  } else if (await hash(pin.p.id + b) === pin.p.pinHash) startGame(pin.p);
-  else { shakeDots(); drawPin('Falscher Code 🙈'); }
+    if (b !== pin.first) { pin.mode = 'set'; shakeDots(); return drawPin('Die Codes waren verschieden – nochmal!'); }
+    if (online) try { await api('/setpin', { id: pin.p.id, pin: h, token: pin.token }); } catch (e) { pin.mode = 'set'; return drawPin('Hat nicht geklappt – nochmal versuchen.'); }
+    pin.p.hasPin = true; if (!online) pin.p.pinHash = h; login(h);
+  } else login(h);
+}
+async function login(h) {
+  let server = null;
+  if (online) {
+    try { server = (await api('/login', { id: pin.p.id, pin: h })).save; if (!pin) return; }
+    catch (e) {
+      if (!pin) return;
+      if (e.code) { shakeDots(); return drawPin(e.code === 'locked' ? `Zu oft falsch – warte ${e.wait} Sekunden. ⏳` : 'Falscher Code 🙈'); }
+      online = false; // Netz weg → lokal weiter
+    }
+  }
+  if (!online && pin.p.pinHash !== h) {
+    shakeDots(); return drawPin(pin.p.pinHash ? 'Falscher Code 🙈' : 'Ohne Internet kannst du dich auf diesem Gerät noch nicht anmelden.');
+  }
+  pin.p.pinHash = h; saveProfiles(); // lokale Kopie für Offline-Anmeldung
+  startGame(pin.p, h, server);
 }
 addEventListener('keydown', e => { if (!$('#pin').hidden && /^[0-9]$|^Backspace$/.test(e.key)) pinKey(e.key === 'Backspace' ? '⌫' : e.key); });
 
-// Wiederherstellung über schwierige Rechnungen (Schwierigkeit nach Alter)
-function makeProblems(age) {
-  const r = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-  const L = [];
-  if (age <= 8) {
-    let x = r(27, 89), y = r(15, 69); L.push([`${x} + ${y}`, x + y]);
-    x = r(52, 99); y = r(17, x - 10); L.push([`${x} − ${y}`, x - y]);
-    x = r(6, 9); y = r(6, 9); L.push([`${x} × ${y}`, x * y]);
-    x = r(3, 9); L.push([`${x * 7} : 7`, x]);
-  } else {
-    let x = r(13, 39), y = r(4, 9); L.push([`${x} × ${y}`, x * y]);
-    y = r(6, 12); x = r(12, 25); L.push([`${x * y} : ${y}`, x]);
-    x = r(234, 689); y = r(178, 299); L.push([`${x} + ${y}`, x + y]);
-    x = r(501, 900); y = r(167, 489); L.push([`${x} − ${y}`, x - y]);
-  }
-  return L;
+// Wiederherstellung über schwierige Rechnungen – Aufgaben und Prüfung am Server
+async function loadProblems(msg = '') {
+  try {
+    const { problems } = await api('/recover/start', { id: pin.p.id });
+    show('recover'); $('#recmsg').textContent = msg;
+    $('#probs').innerHTML = problems.map(q => `<label>${q} = <input inputmode="numeric"></label>`).join('');
+  } catch (e) { show('pin'); drawPin('Code-Hilfe geht nur mit Internet.'); }
 }
-let probs = [];
-$('#forgot').onclick = () => {
-  probs = makeProblems(pin.p.age); show('recover'); $('#recmsg').textContent = '';
-  $('#probs').innerHTML = probs.map(([q], i) => `<label>${q} = <input inputmode="numeric" data-i="${i}"></label>`).join('');
-};
-$('#checkprobs').onclick = () => {
-  const ok = [...$('#probs').querySelectorAll('input')].every(inp => +inp.value.trim() === probs[+inp.dataset.i][1] && inp.value.trim() !== '');
-  if (!ok) { $('#recmsg').textContent = 'Leider nicht alles richtig. Rechne nochmal nach!'; return; }
-  pin.p.pinHash = null; saveProfiles(); openPin(pin.p); drawPin('Super gerechnet! Wähle einen neuen Code.');
+$('#forgot').onclick = () => loadProblems();
+$('#checkprobs').onclick = async () => {
+  const answers = [...$('#probs').querySelectorAll('input')].map(i => i.value.trim());
+  try {
+    pin.token = (await api('/recover/finish', { id: pin.p.id, answers })).token;
+    pin.mode = 'set'; show('pin'); drawPin('Super gerechnet! Wähle einen neuen Code.');
+  } catch (e) { loadProblems(e.code ? 'Leider nicht alles richtig. Hier sind neue Aufgaben!' : 'Kein Internet?'); }
 };
 
 // =================== Spielstand ===================
@@ -151,9 +183,10 @@ function newGame() {
   addThing('baum').ripe = true;
   addThing('baum').timer = 15;
 }
-function loadGame() {
+function loadGame(server) {
   newGame();
-  const s = store.get(saveKey());
+  const local = store.get(saveKey());
+  const s = (server?.savedAt || 0) > (local?.savedAt || 0) ? server : local;
   if (s) {
     const tools = G.tools;
     Object.assign(G, s);
@@ -161,18 +194,23 @@ function loadGame() {
     G.things = G.things.filter(t => THINGS[t.type]); // falls ein Typ entfernt wurde
   }
 }
-const save = () => G && store.set(saveKey(), G);
+function save(cloud) {
+  if (!G) return;
+  G.savedAt = Date.now();
+  store.set(saveKey(), G);
+  if (cloud && online && KEY) fetch(API + '/save', { method: 'POST', keepalive: true, headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ id: P.id, pin: KEY, save: G }) }).catch(() => {});
+}
 
-function startGame(p) {
-  P = p; pin = null; loadGame(); AU.init(); show('game'); resize();
+function startGame(p, key, server) {
+  P = p; KEY = key; pin = null; loadGame(server); AU.init(); show('game'); resize();
   shopDismiss = false; near = null; lastNear = null;
   hud(); toast(`Willkommen, ${P.name}! Lauf mit den Pfeiltasten ${'ontouchstart' in window ? 'oder wisch über den Bildschirm' : '(oder WASD)'}.`);
 }
-$('#bexit').onclick = () => { save(); G = null; closeModals(); renderSelect(); };
+$('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
-addEventListener('visibilitychange', save);
-addEventListener('pagehide', save);
+addEventListener('visibilitychange', () => document.hidden && save(true));
+addEventListener('pagehide', () => save(true));
 
 // =================== Eingabe ===================
 const keys = {};
@@ -233,7 +271,7 @@ function update(dt) {
   for (const f of floaters) { f.t += dt; f.y -= dt * 30; }
   for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; }
   prune(packages, k => k.t < 1); prune(floaters, f => f.t < 1.6); prune(particles, p => p.life > 0);
-  if ((acc.save += dt) > 5) { acc.save = 0; save(); }
+  if ((acc.save += dt) > 5) { acc.save = 0; acc.cloud = (acc.cloud || 0) + 1; save(acc.cloud % 6 === 0); } // lokal alle 5 s, Server alle 30 s
   AU.update(soundLevels());
 }
 const rndf = (a, b) => a + Math.random() * (b - a);

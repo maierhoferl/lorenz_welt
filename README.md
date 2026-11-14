@@ -20,7 +20,8 @@ Ein Aufbau- und Entdeckerspiel im Browser für Kinder (7–10 Jahre). Läuft auf
 **Steuerung:** Pfeiltasten / WASD. Auf iPad/iPhone: irgendwo hintippen und ziehen = Joystick.
 
 **Spieler:** Lorenz und Adrian sind angelegt, weitere können dazukommen. Beim ersten Start legt jeder einen 4-stelligen Code fest. Code vergessen → Rechenaufgaben lösen (Schwierigkeit nach Alter).
-Spielstände liegen im Browser (localStorage) – pro Gerät.
+Spielstände werden online gespeichert (Cloudflare Worker + D1, Ordner `worker/`) und sind auf jedem Gerät verfügbar: lokal alle 5 s, Server alle 30 s und beim Verlassen. Ohne Internet läuft das Spiel lokal weiter; der neuere Stand gewinnt.
+Der Code wird am Server geprüft (5 Fehlversuche → 2 Min. Sperre), die Rechenaufgaben zur Wiederherstellung stellt und prüft ebenfalls der Server.
 
 ## Neue Produktionskette hinzufügen
 Alles Inhaltliche steht in `data.js`:
@@ -38,3 +39,12 @@ Laden, Diagramm, Transport und Warnungen funktionieren dann automatisch.
 
 ## Hosting
 Statische Dateien → GitHub Pages (Branch `main`, Ordner `/`). Funktioniert genauso auf Cloudflare Pages (kein Build-Befehl, Ausgabeordner `/`).
+
+### Server (Cloudflare)
+```
+cd worker
+npx wrangler@4 login
+npx wrangler@4 d1 execute lorenz-welt --remote --file=schema.sql   # nur beim ersten Mal
+npx wrangler@4 deploy
+```
+Adresse steht in `game.js` → `API`. Einen Code zurücksetzen (Notfall): `npx wrangler@4 d1 execute lorenz-welt --remote --command "SELECT v FROM kv WHERE k='profiles'"` und `pinHash` des Spielers entfernen.

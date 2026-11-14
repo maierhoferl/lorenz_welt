@@ -1,0 +1,8 @@
+name = "lorenz-welt"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lorenz-welt"
+database_id = "ab072613-4ffe-429b-8501-e29fd6731643"
