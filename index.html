@@ -84,7 +84,12 @@
   #info p { font-size:18px; line-height:1.5; margin:0 0 12px; }
   #plan svg { display:block; }
   #plan .box { width:min(980px, 100%); }
-  #plan .probs li { margin:4px 0; }
+  #plan h3 { margin:12px 0 4px; }
+  #plan .probs { list-style:none; padding:0; margin:0 0 8px; }
+  #plan .probs li { display:grid; grid-template-columns:26px 1fr 88px; gap:8px; align-items:center; margin:4px 0; padding:6px 8px; background:rgba(255,255,255,.6); border-radius:10px; }
+  #plan .probs .rk { width:24px; height:24px; border-radius:50%; background:#a8743f; color:#fff; display:grid; place-items:center; font-size:13px; }
+  #plan .probs .imp { font-size:12px; font-weight:800; text-align:right; white-space:nowrap; }
+  #plan .probs .imp i { display:block; height:6px; margin:0 0 3px auto; border-radius:3px; background:#3d8b2f; }
   .legend { font-size:13px; display:flex; gap:14px; flex-wrap:wrap; margin:6px 0; }
 </style>
 </head>
@@ -129,6 +134,8 @@
     <div class="chip" id="money"></div>
     <div class="chip" id="bag"></div>
     <div id="btns">
+      <button id="bzout" title="Rauszoomen (−)">➖</button>
+      <button id="bzin" title="Reinzoomen (+)">➕</button>
       <button id="bplan" title="Produktions-Plan">📊</button>
       <button id="bsound" title="Ton an/aus">🔊</button>
       <button id="bexit" title="Spieler wechseln">🚪</button>

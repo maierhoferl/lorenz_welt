@@ -106,6 +106,8 @@ const STAGES = [
 ];
 
 // Wege (Kacheln) für die Optik
+// Weg ins Neuland im Süden (erscheint, sobald dort Plätze liegen)
+const PATHS_SOUTH = [[[32, 30], [32, 44]], [[4, 44], [56, 44]]];
 const PATHS = [
   [[29, 13], [29, 18], [23, 18], [23, 24]],
   [[29, 18], [36, 18], [36, 24]],

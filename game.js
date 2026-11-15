@@ -5,7 +5,15 @@ let W = 0, H = 0, DPR = 1, ZOOM = 1;
 function resize() {
   DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
   cv.width = W * DPR | 0; cv.height = H * DPR | 0;
-  ZOOM = Math.max(0.6, Math.min(1.15, Math.min(W, H) / 620));
+}
+// Zoom: Grundzoom passt sich dem Bildschirm an, der Spieler kann rein-/rauszoomen (bis die ganze Welt sichtbar ist)
+let zoomU = 1;
+try { zoomU = +localStorage.getItem('lw_zoom') || 1; } catch (e) {}
+function setZoom(f) { zoomU = clamp(zoomU * f, 0.05, 2); try { localStorage.setItem('lw_zoom', zoomU); } catch (e) {} }
+function calcZoom() {
+  const fit = Math.min(W / (WORLD.w * T), H / (WORLD.h * T)), z = Math.max(0.6, Math.min(1.15, Math.min(W, H) / 620)) * zoomU;
+  if (z < fit) zoomU *= fit / z; // nicht weiter raus als die ganze Welt
+  ZOOM = Math.max(z, fit);
 }
 addEventListener('resize', resize); resize();
 
@@ -216,6 +224,9 @@ function startGame(p, key, server) {
 $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
+$('#bzin').onclick = () => setZoom(1.25);
+$('#bzout').onclick = () => setZoom(0.8);
+cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(Math.exp(-e.deltaY * 0.002)); }, { passive: false });
 addEventListener('visibilitychange', () => document.hidden && save(true));
 addEventListener('pagehide', () => save(true));
 
@@ -227,6 +238,7 @@ addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault();
   if (e.key === 'Escape') closeModals();
+  if (e.key === '+' || e.key === '-') setZoom(e.key === '+' ? 1.25 : 0.8);
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -239,6 +251,7 @@ cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', j
 // =================== Spiellogik ===================
 let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, face = 1, faceS = 1, amp = 0, time = 0;
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
+let trH = 0; // Fahrtrichtung des Traktors (Bogenmaß)
 const packages = [], floaters = [], particles = [];
 let acc = { tr: 0, w: 0, save: 0, hud: 0 };
 
@@ -256,6 +269,11 @@ function update(dt) {
   moving = ml > 0.1;
   if (moving) { walk += dt * 11; if (Math.abs(mx) > 0.2) face = Math.sign(mx); }
   amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 10); // Schritt weich ein-/ausblenden
+  if (!onTractor()) trH = face > 0 ? 0 : Math.PI;
+  else if (moving) { // lenkt mit begrenzter Drehgeschwindigkeit in die Fahrtrichtung
+    const d = Math.atan2(my, mx) - trH; trH += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -5 * dt, 5 * dt);
+    const c = Math.cos(trH); if (Math.abs(c) > 0.2) face = Math.sign(c);
+  }
   faceS += (face - faceS) * Math.min(1, dt * 14);         // Umdrehen statt Umklappen
   trailCart();
 
@@ -514,7 +532,7 @@ function shopList() {
   tabs[3].push({
     icon: '🗺️', name: `Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrößern. Bauern kaufen oder pachten Land von Nachbarn.',
-    buy: () => { G.land++; toast('🗺️ Deine Welt ist größer geworden! Neue Plätze sind gestrichelt markiert.'); },
+    buy: () => { G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist größer geworden! Neue Plätze sind gestrichelt markiert.'); },
   });
   return tabs;
 }
@@ -559,7 +577,6 @@ function openPlan() {
     edges += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="${dash ? 2 : 3.5}" ${dash ? 'stroke-dasharray="6 5"' : ''} marker-end="url(#ar)"/>`;
     if (label) edges += `<text x="${mx}" y="${(y1 + y2) / 2 - 5}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${label}</text>`;
   };
-  const probs = [];
   for (const k of types) {
     const d = THINGS[k], it = d.item;
     const consumers = types.filter(f => THINGS[f].in?.[it]);
@@ -571,14 +588,43 @@ function openPlan() {
     }
     if (cnt[k] && !consumers.some(f => cnt[f])) edge(k, 'haendler', it, '#3e7bc4', true, `${ITEMS[it].icon} du trägst`);
   }
-  for (const it in dem) {
-    if (!dem[it]) continue;
-    const s = sup[it] || 0, nm = ITEMS[it].name;
-    if (s < dem[it] * 0.9) probs.push(`🔴 Zu wenig <b>${nm}</b>: gebraucht ${r(dem[it])}/min, hergestellt ${r(s)}/min. ${s ? `Kauf mehr ${makers(it).map(k => THINGS[k].name).join(' / ')}.` : `Niemand macht ${nm}!`}`);
-    else if (s > dem[it] * 1.8) probs.push(`🟠 Mehr <b>${nm}</b> als gebraucht (${r(s)} statt ${r(dem[it])}/min). Den Rest musst du selbst verkaufen – oder baue noch eine Verarbeitung.`);
-    const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
-    if (manual.length) probs.push(`✋ <b>${nm}</b> wird von Hand geerntet – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
+  // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ € in den nächsten M Minuten
+  const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
+  const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
+  const unitVal = f => eur(THINGS[f].item) * THINGS[f].n / Object.values(THINGS[f].in).reduce((a, b) => a + b); // Wert je Zutat nach Verarbeitung
+  const bestUser = (it, built) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f])).sort((a, b) => unitVal(b) - unitVal(a))[0];
+  let blocked = 0; // was gerade auf eine freie Tasche wartet
+  for (const k of types) {
+    const d = THINGS[k], it = d.item, fld = d.kind === 'grow' ? 'store' : 'out', cap = d.kind === 'grow' ? storeCap(d) : OUT_CAP;
+    const ts = G.things.filter(t => t.type === k && t[fld] > 0);
+    if (ts.length && surplus(it)) { // nur Überschuss lässt sich abholen
+      const n = ts.reduce((a, t) => a + t[fld], 0), full = ts.filter(t => t[fld] + d.n > cap).length, v = n * eur(it) + full * perMin(d) * eur(it) * M;
+      blocked += v;
+      tip(v, `📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name}${full ? ` (bei ${full} ist das Lager voll, dort steht die Arbeit!)` : ''} – und verkauf es beim Händler.`);
+    }
+    const ripe = G.things.filter(t => t.type === k && t.ripe && !isAuto(t)).length;
+    if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, `✨ <b>${ripe}× ${d.name} ${ripe > 1 ? 'sind' : 'ist'} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`); }
   }
+  for (const [it, n] of Object.entries(G.inv)) {
+    const f = G.things.find(t => THINGS[t.type].in?.[it] && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
+    if (f) tip(n * unitVal(f.type), `🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
+    else tip(n * eur(it), `💶 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} €).`);
+  }
+  if (bagCount() >= bagCap()) tip(blocked + 1, `🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
+  for (const it in ITEMS) {
+    const s = sup[it] || 0, dm = dem[it] || 0, makes = makers(it).map(k => THINGS[k].name).join(' / ');
+    if (dm && s < dm * 0.9) {
+      const f = bestUser(it, true);
+      tip((dm - s) * unitVal(f) * M, `🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min. ${s ? `Kauf mehr ${makes}.` : `Niemand macht ${ITEMS[it].name} – kauf ${makes}!`}`);
+    }
+    if (!s) continue;
+    const bu = bestUser(it, true), best = bestUser(it, false);
+    if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, `🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
+    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, `🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} €): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
+    const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
+    if (dm && manual.length) tip(s * eur(it) * M * 0.5, `✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
+  }
+  tips.sort((a, b) => b.v - a.v);
   for (const k of types.concat('haendler')) {
     const p = posn[k], d = THINGS[k] || FIXED.find(f => f.type === k), on = k === 'haendler' || cnt[k] > 0;
     const warn = G.things.some(t => t.type === k && t.warn);
@@ -591,7 +637,7 @@ function openPlan() {
   }
   const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${edges}${nodes}</svg>`;
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ passt</span><span style="color:#d23b2b">━ zu wenig</span><span style="color:#e39b1c">━ zu viel</span><span style="color:#3e7bc4">┅ du musst tragen</span><span style="opacity:.5">▢ noch nicht gebaut</span></div>`;
-  modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><ul class="probs">${probs.map(p => `<li>${p}</li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ul><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
+  modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><h3>Was jetzt am meisten bringt</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="geschätzter Nutzen in den nächsten ${M} Minuten"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} €</span></li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ol><small>≈ € = geschätzter Nutzen in den nächsten ${M} Minuten. </small><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
   $('#plan').querySelectorAll('[data-k]').forEach(g => g.onclick = () => showInfo(THINGS[g.dataset.k] ? { type: g.dataset.k } : FIXED.find(f => f.type === g.dataset.k)));
 }
 
@@ -820,11 +866,7 @@ function wheel(x, y, r) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x,
 function line(c, w, ...pts) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[0], pts[1]); ctx.stroke(); }
 // Lokale Koordinaten: Ursprung an den Füßen, +x = Blickrichtung, y nach oben negativ
 function gearBack(D) {
-  const ht = harvTool(), top = D.lift + D.legL + D.torso + D.headR * 2;
-  if (onTractor()) { // Kabine (Anhänger zeichnet drawCart)
-    ctx.fillStyle = '#3c3c3c'; ctx.fillRect(-15, -top - 6, 2.5, top - 22); ctx.fillRect(10, -top - 6, 2.5, top - 22);
-    ctx.fillStyle = '#2f8f4e'; ctx.fillRect(-18, -top - 8, 34, 5);
-  }
+  const ht = harvTool();
   if (ht === 'obst' && G.tools.obst === 2) { // Obstleiter mit drei Beinen
     line('#9b7040', 2.5, 8, 0, 14, -78); line('#9b7040', 2.5, 20, 0, 18, -78); line('#7d5a33', 2, 34, 0, 16, -78);
     for (let y = -10; y > -76; y -= 11) line('#9b7040', 2, 8 - y * 0.077, y, 20 + y * 0.026, y);
@@ -876,12 +918,6 @@ function gearFront(D) {
       ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx + 15, -20); ctx.quadraticCurveTo(hx + 22, hy - 6, hx + 2, hy); ctx.stroke();
     }
   }
-  if (onTractor()) { // Traktor-Rumpf vor den Beinen (Rahmen ohne Hub)
-    ctx.save(); ctx.translate(0, D.lift);
-    ctx.fillStyle = '#2f8f4e'; ctx.fillRect(-18, -30, 50, 16); ctx.fillRect(14, -40, 22, 12);
-    line('#333', 2.5, 28, -40, 28, -50 - Math.abs(a) * 2);
-    wheel(-6, -12, 12); wheel(28, -7, 7); ctx.restore();
-  }
 }
 
 // Gezogener Wagen folgt der Deichsel wie ein echter Anhänger (Schleppkurve):
@@ -891,9 +927,10 @@ const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1;
 function cartDims(s) { const t = onTractor(); return { k: (t ? 18 : 6) * s, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
 function trailCart() {
   if (!hasCart()) { cart.on = false; return; }
-  const c = cartDims(0.85 + G.stage * 0.09), hx = G.px - faceS * c.k, hy = G.py;
+  const c = cartDims(0.85 + G.stage * 0.09), [ux, uy] = c.t ? [Math.cos(trH), Math.sin(trH)] : [face, 0];
+  const hx = G.px - (c.t ? ux : faceS) * c.k, hy = G.py - uy * c.k;
   if (!cart.on || Math.hypot(hx - cart.fx, hy - cart.fy) > 150) // neu angehängt: gerade hinter die Figur
-    Object.assign(cart, { on: true, fx: hx - face * c.rope, fy: hy, bx: hx - face * (c.rope + c.L), by: hy });
+    Object.assign(cart, { on: true, fx: hx - ux * c.rope, fy: hy - uy * c.rope, bx: hx - ux * (c.rope + c.L), by: hy - uy * (c.rope + c.L) });
   [cart.fx, cart.fy] = follow(cart.fx, cart.fy, hx, hy, c.rope);
   [cart.bx, cart.by] = follow(cart.bx, cart.by, cart.fx, cart.fy, c.L);
 }
@@ -926,6 +963,26 @@ function drawCart(ax, ay, s) {
   wheels.slice(2).forEach(([x, y]) => wheelE(x, y, c.r, ux, uy));
   line(c.t ? '#555' : '#6b4a2b', 2, cart.fx, cart.fy - c.h, ax, ay); // Deichsel
 }
+// Traktor in Fahrtrichtung: a = längs (vorne +), b = quer (in der Tiefe gestaucht), z = Höhe.
+// Liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
+function tractorParts(x, y, s) {
+  const ux = Math.cos(trH), uy = Math.sin(trH);
+  const P = (a, b, z = 0) => [x + (ux * a - uy * b) * s, y + (uy * a + ux * b * 0.5) * s - z * s];
+  const box = (a0, a1, b, z0, h, top, side) => {
+    const C = [[a1, b], [a1, -b], [a0, -b], [a0, b]], ring = z => C.map(([a, q]) => P(a, q, z)), lo = ring(z0), hi = ring(z0 + h);
+    [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
+    poly(hi, top);
+  };
+  const part = (a, b, d) => ({ y: P(a, b)[1], d });
+  const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * s, ux, uy); });
+  const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * s, ...P(a, b, 15), ...P(a, b, 58)));
+  const shadow = { y: -Infinity, d: () => { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-14, 15], [38, 12], [38, -12], [-14, -15]]) ctx.lineTo(...P(a, b)); ctx.fill(); } };
+  return [shadow, whl(0, 13, 12), whl(0, -13, 12), whl(30, 9, 7), whl(30, -9, 7),
+    part(0, 0, () => box(-9, 7, 9, 8, 7, '#38a35b', '#2f8f4e')), // Sitzkasten
+    part(21, 0, () => { box(6, 36, 6, 8, 13, '#38a35b', '#2f8f4e'); line('#333', 2.5 * s, ...P(30, 0, 21), ...P(30, 0, 31 + Math.abs(Math.sin(time * 12)) * 2)); }), // Motorhaube + Auspuff
+    post(-8, 9), post(-8, -9), post(6, 9), post(6, -9),
+    { y: Infinity, d: () => box(-10, 8, 11, 58, 3, '#38a35b', '#26794a') }]; // Dach
+}
 // Bein mit Knie (2-Glied-IK): Fuß schwingt nach vorn und hebt dabei ab, Standbein bleibt am Boden
 function legDraw(p, L, drop, hipX, col, am) {
   const a = Math.sin(p) * 0.5 * am, fx = hipX + L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
@@ -937,16 +994,17 @@ function drawPlayer() {
   const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09;
   const sx = Math.sign(faceS) * Math.max(0.2, Math.abs(faceS)); // beim Umdrehen kurz schmal (Profil dreht)
   const am = onTractor() ? 0 : amp, sw = Math.sin(walk) * am, leg = -sw * 4; // Arme gegengleich zu den Beinen
-  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = liftH();
+  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, tr = onTractor(), lift = tr ? 15 - legL : liftH(); // auf dem Traktor sitzt der Rumpf auf dem Sitz
   const drop = legL * (1 - Math.cos(sw * 0.5)); // Hüfte sinkt bei gespreizten Beinen
   const D = { legL, torso, sh, headR, lift, hx: sh + 3 + leg * 0.5, hy: -legL - 1, bx: -sh - 3 - leg * 0.5 };
-  const anchor = () => onTractor() ? [x - sx * 18 * s, y - 16 * s] : [x + sx * D.bx * s, y + (D.hy + drop) * s];
+  const anchor = () => tr ? [x - Math.cos(trH) * 18 * s, y - (Math.sin(trH) * 18 + 8) * s] : [x + sx * D.bx * s, y + (D.hy + drop) * s];
   const cartBack = cart.on && (cart.fy + cart.by) / 2 <= y;
-  ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
+  if (!tr) ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
   if (cartBack) drawCart(...anchor(), s);
+  const fig = () => {
   ctx.save(); ctx.translate(x, y); ctx.scale(s * sx, s);
   gearBack(D); ctx.translate(0, -lift);
-  legDraw(walk + Math.PI, legL, drop, -2, '#28406a', am); legDraw(walk, legL, drop, 2, '#34507f', am);
+  if (!tr) { legDraw(walk + Math.PI, legL, drop, -2, '#28406a', am); legDraw(walk, legL, drop, 2, '#34507f', am); }
   ctx.translate(0, drop);
   const shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st];
   ctx.fillStyle = shirt; rrect(-sh, -legL - torso, sh * 2, torso + 2, 4); ctx.fill();
@@ -966,6 +1024,9 @@ function drawPlayer() {
   if (st >= 4) { ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(2, hy + 3, headR - 2, 0.1, Math.PI - 0.1); ctx.fill(); }
   gearFront(D);
   ctx.restore();
+  };
+  if (tr) [...tractorParts(x, y, s), { y: y + 0.01, d: fig }].sort((a, b) => a.y - b.y).forEach(p => p.d());
+  else fig();
   if (cart.on && !cartBack) drawCart(...anchor(), s);
   const items = Object.keys(G.inv);
   if (items.length && !cart.on) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * sx, y - (legL + 6 + liftH()) * s); }
@@ -973,8 +1034,9 @@ function drawPlayer() {
 
 function render() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const vw = W / ZOOM, vh = H / ZOOM;
-  const camX = clamp(G.px - vw / 2, 0, Math.max(0, WORLD.w * T - vw)), camY = clamp(G.py - vh / 2 - 30, 0, Math.max(0, WORLD.h * T - vh));
+  calcZoom();
+  const vw = W / ZOOM, vh = H / ZOOM, cam = (p, v, w) => v >= w ? (w - v) / 2 : clamp(p - v / 2, 0, w - v); // kleiner als Bildschirm: mittig
+  const camX = cam(G.px, vw, WORLD.w * T), camY = cam(G.py - 30, vh, WORLD.h * T);
   ctx.fillStyle = '#3f6e2a'; ctx.fillRect(0, 0, W, H);
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
@@ -982,7 +1044,7 @@ function render() {
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
     ctx.strokeStyle = c; ctx.lineWidth = w;
-    for (const p of PATHS) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+    for (const p of WORLD.h > WORLD_H0 ? PATHS.concat(PATHS_SOUTH) : PATHS) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
   // Weide-Zaun
   const pa = { x: PASTURE.x * T, y: PASTURE.y * T, w: PASTURE.w * T, h: PASTURE.h * T };
