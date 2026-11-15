@@ -886,19 +886,19 @@ function openPlan() {
   for (const k of vis) {
     const it = THINGS[k].item;
     users(k).forEach(f => {
-      const on = cnt[k] && cnt[f], use = cnt[f] ? cnt[f] * THINGS[f].in[it] / THINGS[f].time * 60 : 0;
+      const on = cnt[k] && cnt[f];
       const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.1 ? '#e39b1c' : '#3d8b2f';
-      E.push({ a: k, b: f, color, use, label: cnt[k] ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon, long: col[f] - col[k] > 1 });
+      E.push({ a: k, b: f, color, label: cnt[k] ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon, long: col[f] - col[k] > 1 });
     });
   }
   E.filter(e => e.long).forEach((e, i) => e.lane = Hd + 4 + i * 10);
   Hd += E.filter(e => e.long).length * 10;
   const mid = k => posn[k].y + NH / 2;
   // ponytail: Abstand 8px, ab 8 Pfeilen an einer Kästchenseite wird es eng. Ein-Anschlüsse 4px versetzt → nie gleiche Höhe wie Aus-Anschlüsse.
-  const ports = (k, list, toward, shift, gap = 8) => list.sort((e, f) => toward(e) - toward(f)).forEach((e, i) => e[shift ? 'y2' : 'y1'] = mid(k) + shift + gap * (i - Math.floor((list.length - 1) / 2)));
+  const ports = (k, list, toward, shift) => list.sort((e, f) => toward(e) - toward(f)).forEach((e, i) => e[shift ? 'y2' : 'y1'] = mid(k) + shift + 8 * (i - Math.floor((list.length - 1) / 2)));
   for (const k of vis) {
     ports(k, E.filter(e => e.a === k), e => e.long ? 1e9 : mid(e.b), 0);
-    ports(k, E.filter(e => e.b === k), e => e.long ? 1e9 : mid(e.a), 4, 14); // 14px: Platz für die Rate über jedem ankommenden Pfeil
+    ports(k, E.filter(e => e.b === k), e => e.long ? 1e9 : mid(e.a), 4);
   }
   // senkrechte Spuren je Lücke: oben startende Abwärts-Pfeile nach rechts, so kreuzen sie sich am wenigsten
   const gaps = {};
@@ -924,8 +924,6 @@ function openPlan() {
     d += ` L${pts.at(-1)}`;
     edges += `<g data-e="${e.a}>${e.b}"><path d="${d}" fill="none" stroke="${e.color}" stroke-width="3.5" marker-end="url(#ar)"/></g>`;
     if (e.y1 === Math.min(...E.filter(f => f.a === e.a).map(f => f.y1))) labels += `<g data-e="${e.a}>${e.b}"><text x="${x1 + 6}" y="${e.y1 - 6}" font-size="12" font-weight="700" fill="${e.color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${e.label}</text></g>`;
-    // mehrere gebaute Abnehmer: jeder Pfeil zeigt zusätzlich, wie viel dieser Abnehmer braucht
-    if (e.use && E.filter(f => f.a === e.a && f.use).length > 1) labels += `<g data-e="${e.a}>${e.b}"><text x="${x2 - 12}" y="${e.y2 - 3}" text-anchor="end" font-size="11" font-weight="700" fill="${e.color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${r(e.use)}/min</text></g>`;
   }
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
@@ -971,7 +969,6 @@ function openPlan() {
     const rate = on ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : $t`${d.price} Fr. im Laden`;
     const extra = Object.keys(d.in || {}).filter(it => !vis.some(m => THINGS[m].item === it)).map(it => ITEMS[it].icon).join(''); // Zutaten aus anderen Reitern
     const awayF = types.filter(f => cnt[f] && !vis.includes(f) && THINGS[f].in?.[d.item]), away = [...new Set(awayF.map(f => THINGS[f].icon))].join(''); // ponytail: nur gebaute Abnehmer, sonst zu viele Symbole (Mehl)
-    const awayR = awayF.reduce((a, f) => a + cnt[f] * THINGS[f].in[d.item] / THINGS[f].time * 60, 0);
     const sell = !types.some(f => THINGS[f].in?.[d.item] && cnt[f]) ? `→ 💰${on ? ' ' + (d.kind === 'factory' && G.tools.spedition ? '🚚' : '🎒') : ''}` : '';
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
       <text x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
@@ -981,7 +978,8 @@ function openPlan() {
       ${warn ? `<circle cx="${p.x + NW - 4}" cy="${p.y + 4}" r="11" fill="#d23b2b"/><text x="${p.x + NW - 4}" y="${p.y + 9}" text-anchor="middle" fill="#fff" font-weight="900" font-size="15">!</text>` : ''}</g>`;
     const sy = p.y + NH - 12, stub = (x1, x2, ic, tx) => `<g opacity="${on ? 1 : 0.45}"><path d="M${x1},${sy} L${x2},${sy}" stroke="#3e7bc4" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#ab)"/><text x="${tx}" y="${sy - 5}" font-size="12">${ic}</text></g>`; // Pfeil-Stummel: von/zu anderem Reiter
     if (extra) nodes += stub(p.x - 40, p.x, extra, p.x - 40);
-    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away} ${r(awayR)}/min`, p.x + NW + 4);
+    // Rate (Summe aller Abnehmer, auch anderer Reiter) steht nur 1×: am obersten Pfeil, sonst am Stummel
+    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${r(sup[d.item])}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
   }
   const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
   const head = `<div class="tabs">${cats.map(c => `<button data-cat="${c}" class="${c === planCat ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}</button>`).join('')}</div>`;
