@@ -157,11 +157,18 @@ const bagCount = () => Object.values(G.inv).reduce((a, b) => a + b, 0);
 const isAuto = t => { const d = THINGS[t.type]; return d.kind === 'grow' && !!toolLv(d.tool).auto; };
 const storeCap = d => d.n * 3;
 const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
+const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
 
-function slotsAvail(area) { const a = AREAS[area]; return Math.min(a.cols * a.rows, a.base + a.per * G.land); }
-function slotPos(area, i) { const a = AREAS[area]; return { x: (a.x + (i % a.cols) * a.dx) * T, y: (a.y + Math.floor(i / a.cols) * a.dy) * T }; }
+function slotsAvail(area) { const a = AREAS[area]; return a.base + a.per * G.land; }
+function slotPos(area, i) {
+  const a = AREAS[area], j = i - a.cols * a.rows;
+  if (j < 0) return { x: (a.x + (i % a.cols) * a.dx) * T, y: (a.y + Math.floor(i / a.cols) * a.dy) * T };
+  return { x: (a.ex + (j % a.ec) * a.dx) * T, y: (WORLD_H0 + 3 + Math.floor(j / a.ec) * a.dy) * T }; // Neuland im Süden
+}
+// ponytail: Welt wächst nur nach Süden; bei sehr viel Land wird sie lang, aber nie zu eng
+function fitWorld() { WORLD.h = Math.max(WORLD_H0, ...Object.keys(AREAS).map(a => slotPos(a, slotsAvail(a) - 1).y / T + 2)); }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
   for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i)) return i;
@@ -230,7 +237,8 @@ const joyEnd = e => { if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
 
 // =================== Spiellogik ===================
-let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, face = 1, time = 0;
+let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, face = 1, faceS = 1, amp = 0, time = 0;
+const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
 const packages = [], floaters = [], particles = [];
 let acc = { tr: 0, w: 0, save: 0, hud: 0 };
 
@@ -243,9 +251,13 @@ function update(dt) {
   const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   const sp = 4.6 * T * (1 + G.stage * 0.06);
   G.px = clamp(G.px + mx * sp * dt, T, (WORLD.w - 1) * T);
+  fitWorld();
   G.py = clamp(G.py + my * sp * dt, T * 1.5, (WORLD.h - 0.5) * T);
   moving = ml > 0.1;
   if (moving) { walk += dt * 11; if (Math.abs(mx) > 0.2) face = Math.sign(mx); }
+  amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 10); // Schritt weich ein-/ausblenden
+  faceS += (face - faceS) * Math.min(1, dt * 14);         // Umdrehen statt Umklappen
+  trailCart();
 
   for (const t of G.things) {
     const d = THINGS[t.type];
@@ -328,7 +340,7 @@ function warnings() {
       continue;
     }
     if (t.out + d.n > OUT_CAP) {
-      t.warn = hasConsumer(d.item) ? `Lager voll – die nächste Station schafft nicht so viel ${ITEMS[d.item].name}.` : `Lager voll! Hol ${ITEMS[d.item].name} ab und verkauf es.`;
+      t.warn = hasConsumer(d.item) ? `Lager voll – die nächste Station schafft nicht so viel ${ITEMS[d.item].name}. Hol etwas ab und verkauf es!` : `Lager voll! Hol ${ITEMS[d.item].name} ab und verkauf es.`;
       if (hasConsumer(d.item)) t.wl = 'yellow';
       continue;
     }
@@ -389,7 +401,7 @@ function interact(dt) {
   const d = near && THINGS[near.type];
   // Ernten
   if (d && d.kind === 'grow') {
-    if (near.store > 0 && !hasConsumer(d.item)) take(near, 'store');
+    if (near.store > 0 && surplus(d.item)) take(near, 'store');
     if (near.ripe && !isAuto(near)) {
       if (bagCount() >= bagCap()) { toast('Deine Tasche ist voll! Bring alles zum Händler. 🧺', 'full'); harvest = null; }
       else {
@@ -409,7 +421,7 @@ function interact(dt) {
       const n = Math.min(G.inv[k] || 0, d.in[k] * 4 - (near.inS[k] || 0));
       if (n > 0) { G.inv[k] -= n; if (!G.inv[k]) delete G.inv[k]; near.inS[k] = (near.inS[k] || 0) + n; AU.sfx('drop'); floater(near.x, near.y - 60, `−${n} ${ITEMS[k].icon}`); }
     }
-    if (near.out > 0 && !hasConsumer(d.item)) take(near, 'out');
+    if (near.out > 0 && surplus(d.item)) take(near, 'out');
   }
   if (near?.type === 'haendler' && bagCount() > 0) {
     let sum = 0; for (const k in G.inv) sum += G.inv[k] * ITEMS[k].price;
@@ -498,12 +510,12 @@ function shopList() {
       buy: () => { G.tools[k]++; modal($('#info'), `${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>Super!</button>`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });
   }
-  const lp = LAND_PRICES[G.land];
-  tabs[3].push(lp ? {
+  const lp = LAND_PRICES[G.land] ?? LAND_PRICES.at(-1) + (G.land - LAND_PRICES.length + 1) * 2000;
+  tabs[3].push({
     icon: '🗺️', name: `Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrößern. Bauern kaufen oder pachten Land von Nachbarn.',
     buy: () => { G.land++; toast('🗺️ Deine Welt ist größer geworden! Neue Plätze sind gestrichelt markiert.'); },
-  } : { icon: '🗺️', name: 'Alles Land gehört dir!', desc: '🏆', can: false, price: 0, info: '' });
+  });
   return tabs;
 }
 function openShop() {
@@ -808,17 +820,8 @@ function wheel(x, y, r) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x,
 function line(c, w, ...pts) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[0], pts[1]); ctx.stroke(); }
 // Lokale Koordinaten: Ursprung an den Füßen, +x = Blickrichtung, y nach oben negativ
 function gearBack(D) {
-  const tr = G.tools.tragen, ht = harvTool(), top = D.lift + D.legL + D.torso + D.headR * 2;
-  if (tr === 3) { // Leiterwagen, hinten gezogen
-    line('#6b4a2b', 2, D.bx, D.hy, -26, -12);
-    ctx.fillStyle = '#b5523b'; ctx.fillRect(-64, -24, 38, 12);
-    for (let i = -60; i < -26; i += 6) line('#7a3524', 1.5, i, -24, i, -12);
-    wheel(-58, -5, 5); wheel(-32, -5, 5);
-  }
-  if (onTractor()) { // Anhänger + Kabine
-    line('#555', 2, -30, -16, -18, -16);
-    ctx.fillStyle = '#c9a24a'; ctx.fillRect(-76, -32, 46, 18); ctx.fillStyle = '#a8842f'; ctx.fillRect(-76, -32, 46, 3);
-    wheel(-53, -7, 7);
+  const ht = harvTool(), top = D.lift + D.legL + D.torso + D.headR * 2;
+  if (onTractor()) { // Kabine (Anhänger zeichnet drawCart)
     ctx.fillStyle = '#3c3c3c'; ctx.fillRect(-15, -top - 6, 2.5, top - 22); ctx.fillRect(10, -top - 6, 2.5, top - 22);
     ctx.fillStyle = '#2f8f4e'; ctx.fillRect(-18, -top - 8, 34, 5);
   }
@@ -881,16 +884,70 @@ function gearFront(D) {
   }
 }
 
+// Gezogener Wagen folgt der Deichsel wie ein echter Anhänger (Schleppkurve):
+// Vorderachse hält Abstand zur Kupplung, Hinterachse zur Vorderachse.
+const hasCart = () => G.tools.tragen === 3 || onTractor();
+const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1; return [tx - (tx - x) / l * d, ty - (ty - y) / l * d]; };
+function cartDims(s) { const t = onTractor(); return { k: (t ? 18 : 6) * s, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
+function trailCart() {
+  if (!hasCart()) { cart.on = false; return; }
+  const c = cartDims(0.85 + G.stage * 0.09), hx = G.px - faceS * c.k, hy = G.py;
+  if (!cart.on || Math.hypot(hx - cart.fx, hy - cart.fy) > 150) // neu angehängt: gerade hinter die Figur
+    Object.assign(cart, { on: true, fx: hx - face * c.rope, fy: hy, bx: hx - face * (c.rope + c.L), by: hy });
+  [cart.fx, cart.fy] = follow(cart.fx, cart.fy, hx, hy, c.rope);
+  [cart.bx, cart.by] = follow(cart.bx, cart.by, cart.fx, cart.fy, c.L);
+}
+function poly(pts, fill) {
+  ctx.fillStyle = fill; ctx.beginPath(); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
+}
+function wheelE(cx, cy, r, ux, uy) { // Rad steht parallel zur Fahrtrichtung
+  ctx.fillStyle = ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < 16; i++) { const t = i / 16 * 6.283; ctx.lineTo(cx + Math.cos(t) * r * ux, cy + Math.cos(t) * r * uy * 0.5 - Math.sin(t) * r); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+function drawCart(ax, ay, s) {
+  const c = cartDims(s), dx = cart.fx - cart.bx, dy = cart.fy - cart.by, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
+  const px = -uy * c.w, py = ux * c.w * 0.5; // Querachse, Boden in der Tiefe gestaucht
+  const C = [[cart.fx + px, cart.fy + py], [cart.fx - px, cart.fy - py], [cart.bx - px, cart.by - py], [cart.bx + px, cart.by + py]];
+  const [col, back, floor] = c.t ? ['#c9a24a', '#a8842f', '#8f6f2a'] : ['#b5523b', '#8f3f2c', '#7a3524'];
+  const mx = (cart.fx + cart.bx) / 2, my = (cart.fy + cart.by) / 2;
+  ellipse(mx, my, Math.abs(dx) / 2 + c.w, Math.abs(dy) / 2 + c.w * 0.5, 'rgba(0,0,0,.25)');
+  const wheels = C.map(([x, y]) => [x, y - c.r]).sort((a, b) => a[1] - b[1]);
+  wheels.slice(0, 2).forEach(([x, y]) => wheelE(x, y, c.r, ux, uy));
+  const up = o => C.map(([x, y]) => [x, y - o]);
+  poly(up(c.h), floor);
+  const walls = [0, 1, 2, 3].map(i => [C[i], C[(i + 1) % 4]]).sort((a, b) => a[0][1] + a[1][1] - b[0][1] - b[1][1])
+    .map(([p, q]) => [[p[0], p[1] - c.h], [q[0], q[1] - c.h], [q[0], q[1] - c.h - c.wall], [p[0], p[1] - c.h - c.wall]]);
+  walls.slice(0, 2).forEach(w => poly(w, back));
+  const items = Object.keys(G.inv); // Ladung liegt im Wagen
+  if (items.length) { ctx.font = `${11 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), mx, my - c.h - c.wall * 0.2); }
+  walls.slice(2).forEach(w => poly(w, col));
+  wheels.slice(2).forEach(([x, y]) => wheelE(x, y, c.r, ux, uy));
+  line(c.t ? '#555' : '#6b4a2b', 2, cart.fx, cart.fy - c.h, ax, ay); // Deichsel
+}
+// Bein mit Knie (2-Glied-IK): Fuß schwingt nach vorn und hebt dabei ab, Standbein bleibt am Boden
+function legDraw(p, L, drop, hipX, col, am) {
+  const a = Math.sin(p) * 0.5 * am, fx = hipX + L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
+  const vx = fx - hipX, vy = fy - hy, d = Math.hypot(vx, vy), k = Math.sqrt(Math.max(0, L * L / 4 - d * d / 4));
+  line(col, 5, hipX, hy, hipX + vx / 2 + vy / d * k, hy + vy / 2 - vx / d * k, fx, fy);
+  ctx.fillStyle = '#4a2f1e'; rrect(fx - 3, fy - 3, 8, 3.5, 1.5); ctx.fill();
+}
 function drawPlayer() {
   const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09;
-  const bob = moving ? Math.abs(Math.sin(walk)) * 2 : 0, leg = moving ? Math.sin(walk) * 4 : 0;
-  ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
-  ctx.save(); ctx.translate(x, y - bob); ctx.scale(s * face, s);
+  const sx = Math.sign(faceS) * Math.max(0.2, Math.abs(faceS)); // beim Umdrehen kurz schmal (Profil dreht)
+  const am = onTractor() ? 0 : amp, sw = Math.sin(walk) * am, leg = -sw * 4; // Arme gegengleich zu den Beinen
   const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = liftH();
+  const drop = legL * (1 - Math.cos(sw * 0.5)); // Hüfte sinkt bei gespreizten Beinen
   const D = { legL, torso, sh, headR, lift, hx: sh + 3 + leg * 0.5, hy: -legL - 1, bx: -sh - 3 - leg * 0.5 };
+  const anchor = () => onTractor() ? [x - sx * 18 * s, y - 16 * s] : [x + sx * D.bx * s, y + (D.hy + drop) * s];
+  const cartBack = cart.on && (cart.fy + cart.by) / 2 <= y;
+  ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
+  if (cartBack) drawCart(...anchor(), s);
+  ctx.save(); ctx.translate(x, y); ctx.scale(s * sx, s);
   gearBack(D); ctx.translate(0, -lift);
-  ctx.fillStyle = '#34507f'; ctx.fillRect(-sh + 2, -legL + leg * 0.3, 5, legL - leg * 0.3); ctx.fillRect(sh - 7, -legL - leg * 0.3, 5, legL + leg * 0.3);
-  ctx.fillStyle = '#4a2f1e'; ctx.fillRect(-sh + 1, -3, 7, 3); ctx.fillRect(sh - 7, -3, 7, 3);
+  legDraw(walk + Math.PI, legL, drop, -2, '#28406a', am); legDraw(walk, legL, drop, 2, '#34507f', am);
+  ctx.translate(0, drop);
   const shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st];
   ctx.fillStyle = shirt; rrect(-sh, -legL - torso, sh * 2, torso + 2, 4); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(-sh, -legL - torso + 3, sh * 2, 3);
@@ -909,8 +966,9 @@ function drawPlayer() {
   if (st >= 4) { ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(2, hy + 3, headR - 2, 0.1, Math.PI - 0.1); ctx.fill(); }
   gearFront(D);
   ctx.restore();
+  if (cart.on && !cartBack) drawCart(...anchor(), s);
   const items = Object.keys(G.inv);
-  if (items.length) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * face, y - (legL + 6 + liftH()) * s); }
+  if (items.length && !cart.on) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * sx, y - (legL + 6 + liftH()) * s); }
 }
 
 function render() {

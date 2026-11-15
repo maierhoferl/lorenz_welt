@@ -7,7 +7,8 @@
 // Alles andere (Laden, Diagramm, Warnungen, Transport) funktioniert dann automatisch.
 
 const T = 48;                      // Pixel pro Kachel
-const WORLD = { w: 60, h: 44 };    // Weltgröße in Kacheln
+const WORLD = { w: 60, h: 44 };    // Weltgröße in Kacheln (h wächst mit gekauftem Land)
+const WORLD_H0 = WORLD.h;
 const HARVEST_TIME = 3;            // Sekunden Ernte von Hand (geteilt durch Werkzeug-Tempo)
 const OUT_CAP = 10;                // Lager-Größe für fertige Waren in Gebäuden
 
@@ -72,22 +73,23 @@ const TOOLS = {
     { name: 'Melkroboter', speed: 20, price: 1100, auto: true, info: 'Die Kuh geht selbst hinein, wann sie will! Ein Roboterarm mit Laser-Kamera findet die Zitzen, putzt sie und setzt die Becher an. MELKT AUTOMATISCH!' },
   ]},
   tragen: { name: 'Transport', icon: '🎒', levels: [
-    { name: 'Hände', cap: 6, price: 0, info: 'Viel passt nicht in zwei Hände.' },
-    { name: 'Korb', cap: 12, price: 15, info: 'Ein geflochtener Korb aus Weidenruten – leicht und stabil.' },
-    { name: 'Schubkarre', cap: 25, price: 60, info: 'Ein Hebel auf Rädern! Die Last liegt nah am Rad, darum musst du nur einen Teil des Gewichts heben.' },
-    { name: 'Leiterwagen', cap: 50, price: 200, info: 'Vier Räder tragen das ganze Gewicht – du musst nur noch ziehen.' },
-    { name: 'Traktor mit Anhänger', cap: 120, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
+    { name: 'Hände', cap: 12, price: 0, info: 'Viel passt nicht in zwei Hände.' },
+    { name: 'Korb', cap: 24, price: 15, info: 'Ein geflochtener Korb aus Weidenruten – leicht und stabil.' },
+    { name: 'Schubkarre', cap: 50, price: 60, info: 'Ein Hebel auf Rädern! Die Last liegt nah am Rad, darum musst du nur einen Teil des Gewichts heben.' },
+    { name: 'Leiterwagen', cap: 100, price: 200, info: 'Vier Räder tragen das ganze Gewicht – du musst nur noch ziehen.' },
+    { name: 'Traktor mit Anhänger', cap: 240, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
   ]},
 };
 
 const LAND_PRICES = [120, 300, 700, 1500, 3000];
 
 // Bereiche in Kacheln; Plätze werden reihenweise belegt. base + per*Landstufe = freie Plätze
+// Ist das Raster voll, geht es im Neuland südlich der Welt weiter (ex = Spalte, ec = Spalten dort)
 const AREAS = {
-  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 7,   dy: 5, base: 2, per: 2 },
-  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3 },
-  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3 },
-  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2 },
+  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 7,   dy: 5, base: 2, per: 2, ex: 4,  ec: 2 },
+  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3, ex: 18, ec: 5 },
+  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3, ex: 33, ec: 3 },
+  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2, ex: 46, ec: 2 },
 };
 const PASTURE = { x: 38.5, y: 3.5, w: 17, h: 12 }; // Zaun (Kacheln)
 
