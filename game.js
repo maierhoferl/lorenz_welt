@@ -427,7 +427,7 @@ function update(dt) {
         if (t.prog >= 1) { t.prog = 0; for (const k in d.in) t.inS[k] -= d.in[k]; t.out += d.n; }
       } else t.wait += dt;
       if (t.working && t.type === 'baeckerei' && Math.random() < dt * 3) particles.push({ x: t.x + 34, y: t.y - 100, vx: rndf(-5, 5), vy: -18, life: 2.5, r: 6 });
-      if (t.type === 'muehle') t.ang = (t.ang || 0) + dt * (t.working ? 2.2 : 0.25);
+      t.ang = (t.ang || 0) + dt * (t.working ? 2.2 : t.type === 'muehle' ? 0.25 : 0); // Animation: steht still, wenn nichts zu tun
     }
   }
   for (const d of G.deco) if (d.type === 'alphorn' && Math.random() < dt * 0.7 && dist(G.px, G.py, d.x, d.y) < 9 * T) floaters.push({ x: d.x + 60 + rndf(-6, 6), y: d.y - 30, text: Math.random() < 0.5 ? '♪' : '♫', t: 0 });
@@ -1011,7 +1011,7 @@ const grassPat = (() => {
 function ellipse(x, y, rx, ry, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.fill(); }
 function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
 function label(x, y, text, size = 13) {
-  ctx.font = `800 ${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(40,25,10,.75)';
+  ctx.font = `800 ${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(40,25,10,.75)';
   ctx.strokeText(text, x, y); ctx.fillStyle = '#fff'; ctx.fillText(text, x, y);
 }
 function house(x, y, w, h, wall, roof, rh = 30) {
@@ -1032,10 +1032,10 @@ function win(x, y, w, h, lit) {
 }
 function door(x, y, w, h, c = '#6b4423') { ctx.fillStyle = c; ctx.fillRect(x - w / 2, y - h, w, h); ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(x + w / 4, y - h / 2, 2, 0, 7); ctx.fill(); }
 function sign(x, y, text) {
-  ctx.font = '800 13px system-ui'; const m = ctx.measureText(text).width, f = Math.min(13, 13 * 116 / m); // lange Namen: kleinere Schrift, Schild bleibt schmal
-  ctx.font = `800 ${f}px system-ui`; const w = m * f / 13 + 16;
-  ctx.fillStyle = '#5b3a1e'; rrect(x - w / 2, y - 11, w, 22, 5); ctx.fill();
-  ctx.fillStyle = '#fff4d6'; ctx.textAlign = 'center'; ctx.fillText(text, x, y + 5);
+  ctx.font = '800 10px system-ui'; const m = ctx.measureText(text).width, f = Math.min(10, 10 * 96 / m); // klein, damit man das Dach noch sieht; lange Namen: kleinere Schrift
+  ctx.font = `800 ${f}px system-ui`; const w = m * f / 10 + 12;
+  ctx.fillStyle = '#5b3a1e'; rrect(x - w / 2, y - 8, w, 16, 4); ctx.fill();
+  ctx.fillStyle = '#fff4d6'; ctx.textAlign = 'center'; ctx.fillText(text, x, y + 3.5);
 }
 function awning(x, y, w, c1, c2, n = 8) {
   for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? c2 : c1; ctx.beginPath(); const a = x - w / 2 + i * w / n; ctx.moveTo(a, y); ctx.lineTo(a + w / n, y); ctx.lineTo(a + w / n + 3, y + 16); ctx.lineTo(a + 3, y + 16); ctx.fill(); }
@@ -1219,6 +1219,7 @@ const DRAW = {
     for (let yy = y - 58; yy < y; yy += 7) { ctx.beginPath(); ctx.moveTo(x - 58, yy); ctx.lineTo(x + 58, yy); ctx.stroke(); }
     ctx.fillStyle = '#7d4632'; ctx.fillRect(x + 28, y - 110, 14, 30);
     win(x - 48, y - 46, 30, 22, t.working); win(x + 18, y - 46, 30, 22, t.working); door(x - 4, y, 18, 32);
+    hangSign(x + 58, y - 50, (cx, cy) => pretzel(cx, cy)); // Bretzel = altes Zeichen der Bäcker
     sign(x, y - 66, $t`BÄCKEREI 🥨`);
   },
   molkerei(x, y, t) {
@@ -1230,6 +1231,7 @@ const DRAW = {
     house(x - 22, y, 92, 58, '#f4f4ef', '#7d8a96', 26);
     win(x - 58, y - 44, 20, 16); win(x - 22, y - 44, 20, 16); door(x + 10, y, 16, 28, '#4d6a85');
     ctx.strokeStyle = '#8e9aa5'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 24, y - 40); ctx.lineTo(x + 34, y - 40); ctx.stroke();
+    for (const mx of [-74, -64]) { ctx.fillStyle = '#c3ccd4'; rrect(x + mx - 4, y - 16, 9, 16, 2); ctx.fill(); ctx.fillStyle = '#7f8a95'; ctx.fillRect(x + mx - 2, y - 19, 5, 3); } // Milchkannen
     sign(x - 22, y - 62, $t`MOLKEREI 🥛`);
   },
   kaeserei(x, y) {
@@ -1238,6 +1240,8 @@ const DRAW = {
     for (let xx = x - 50; xx < x + 52; xx += 8) { ctx.beginPath(); ctx.moveTo(xx, y - 62); ctx.lineTo(xx, y); ctx.stroke(); }
     win(x - 40, y - 46, 20, 18); win(x + 20, y - 46, 20, 18); door(x - 4, y, 18, 32);
     for (let i = 0; i < 3; i++) { ellipse(x + 64, y - 4 - i * 9, 14, 6, '#e8b830'); ellipse(x + 64, y - 6 - i * 9, 14, 5, '#f5cf4a'); }
+    for (const [hx, hy] of [[-6, -24], [4, -23], [-1, -25]]) ellipse(x + 64 + hx, y + hy, 2, 1.2, '#c8961e'); // Löcher
+    mouse(x + 72, y + 6, -1, '#f5cf4a'); // Maus mit Käsestück
     sign(x, y - 70, $t`KÄSEREI 🧀`);
   },
   fonduestube(x, y, t) { DECO_DRAW.chalet(x, y, t, t.working); sign(x, y - 66, $t`FONDUE-STÜBLI 🍲`); },
@@ -1385,8 +1389,339 @@ function kirche(x, y) { // Dorfkirche mit Turmuhr und Spitzhelm (Kauf ab Land-St
   line('#e8c35a', 2, x - 29, y - 196, x - 29, y - 212); line('#e8c35a', 2, x - 35, y - 206, x - 23, y - 206);
   ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.moveTo(x - 38, y); ctx.lineTo(x - 38, y - 22); ctx.arc(x - 29, y - 22, 9, Math.PI, 0); ctx.lineTo(x - 20, y); ctx.fill();
 }
+// ---- Thematische Gebäude: man sieht, was drin passiert – und jedes hat einen kleinen Witz ----
+const bname = t => THINGS[t.type].name.toUpperCase() + ' ' + THINGS[t.type].icon;
+const phase = t => t.ang || 0; // läuft nur, solange das Gebäude arbeitet
+function puffs(x, y, on, c = '235,235,235', big = 1) { // Rauch/Dampf
+  if (on) for (let i = 0; i < 4; i++) { const k = (time * 0.5 + i / 4) % 1; ellipse(x + Math.sin(k * 5 + i) * 4 + k * 12, y - k * 44 * big, (4 + k * 9) * big, (3 + k * 7) * big, `rgba(${c},${0.75 * (1 - k)})`); }
+}
+function chimney(x, y, h, on, c, big) { ctx.fillStyle = '#7d4632'; ctx.fillRect(x - 6, y - h, 12, h); ctx.fillStyle = '#5a3020'; ctx.fillRect(x - 8, y - h, 16, 4); puffs(x, y - h, on, c, big); }
+function person(x, y, shirt, hat, arm = -0.6) { // Männli, Füsse bei y, schaut nach rechts; arm = Winkel (0 = waagrecht)
+  line('#3a3a4a', 3, x - 2, y, x - 2, y - 9); line('#3a3a4a', 3, x + 2, y, x + 2, y - 9);
+  ctx.fillStyle = shirt; rrect(x - 5, y - 21, 10, 13, 3); ctx.fill();
+  line('#f1c9a5', 2.5, x + 3, y - 18, x + 3 + Math.cos(arm) * 9, y - 18 - Math.sin(arm) * 9);
+  ellipse(x, y - 25, 5, 5, '#f1c9a5'); ellipse(x + 2, y - 26, 0.9, 0.9, '#222');
+  if (hat === 'chef') { ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 33, 8, 5); ellipse(x, y - 34, 6, 4, '#fff'); }
+  else if (hat) { ctx.fillStyle = hat; ctx.beginPath(); ctx.arc(x, y - 27, 5.5, Math.PI, 0); ctx.fill(); }
+}
+const hand = (x, y, arm) => [x + 3 + Math.cos(arm) * 9, y - 18 - Math.sin(arm) * 9];
+function swirl(x, y, r, c1, c2) { ellipse(x, y, r, r, c1); ctx.strokeStyle = c2; ctx.lineWidth = Math.max(1, r / 6); ctx.beginPath(); for (let a = 0; a < 13; a += 0.3) { const rr = r * 0.9 * (1 - a / 13); ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.stroke(); }
+function barrel(x, y, r = 12, h = 26, c = '#9a6236') { ctx.fillStyle = c; rrect(x - r, y - h, r * 2, h, r * 0.5); ctx.fill(); for (const k of [0.25, 0.75]) line('#4a4a4a', 2, x - r + 1, y - h * k, x + r - 1, y - h * k); }
+function fish(x, y, s, c) { ellipse(x, y, 10 * s, 4.5 * s, c); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 8 * s, y); ctx.lineTo(x - 15 * s, y - 5 * s); ctx.lineTo(x - 15 * s, y + 5 * s); ctx.fill(); ellipse(x + 6 * s, y - s, 1.2 * s, 1.2 * s, '#222'); }
+function pet(x, y, c, dog) { // sitzt und wartet auf Reste, der Schwanz wedelt
+  const w = Math.sin(time * (dog ? 9 : 2.5) + x) * 4;
+  ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 5, y - 3); ctx.quadraticCurveTo(x - 15, y - 5, x - 13 + w, y - 15); ctx.stroke();
+  ellipse(x, y - 8, 7, 8, c); ellipse(x + 3, y - 19, 5.5, 5, c);
+  ctx.fillStyle = dog ? shade(c, 0.7) : c; ctx.beginPath();
+  if (dog) ctx.ellipse(x - 1, y - 17, 2.5, 5, 0.3, 0, 7);
+  else { ctx.moveTo(x - 2, y - 22); ctx.lineTo(x - 1, y - 28); ctx.lineTo(x + 3, y - 23); ctx.moveTo(x + 4, y - 23); ctx.lineTo(x + 7, y - 28); ctx.lineTo(x + 8, y - 21); }
+  ctx.fill(); ellipse(x + 5, y - 20, 1, 1, '#222'); ellipse(x + 8.5, y - 18, 1.3, 1, '#222');
+  if (dog) ellipse(x + 7, y - 14 + Math.abs(w) * 0.2, 1.6, 2.6, '#e0808e'); // Zunge
+}
+function gull(x, y) { // Möwe auf dem Dach, schaut sich um
+  const b = Math.max(0, Math.sin(time * 1.7 + x)) * 2;
+  ellipse(x, y - 6, 8, 5, '#f4f4f4'); ellipse(x - 2, y - 7, 6, 3, '#9aa3ab'); ellipse(x + 6, y - 11 - b, 4, 4, '#f4f4f4');
+  ctx.fillStyle = '#f2b01e'; ctx.beginPath(); ctx.moveTo(x + 9, y - 12 - b); ctx.lineTo(x + 15, y - 10 - b); ctx.lineTo(x + 9, y - 9 - b); ctx.fill();
+  ellipse(x + 7, y - 12 - b, 0.9, 0.9, '#222'); line('#f2b01e', 1.2, x - 1, y - 2, x - 1, y); line('#f2b01e', 1.2, x + 2, y - 2, x + 2, y);
+}
+function mouse(x, y, dir, crumb) {
+  line('#9a958c', 1, x - 6 * dir, y - 3, x - 13 * dir, y - 6); ellipse(x, y - 4, 6, 4, '#9a958c'); ellipse(x + 5 * dir, y - 6, 3.5, 3, '#9a958c');
+  ellipse(x + 3 * dir, y - 9, 2.2, 2.2, '#d8a8a8'); ellipse(x + 7 * dir, y - 7, 0.9, 0.9, '#222');
+  if (crumb) ellipse(x + 9 * dir, y - 4, 2.6, 2, crumb);
+}
+function hangSign(x, y, draw) { // Wirtshausschild am Eisenarm, schaukelt im Wind
+  line('#2a2a2a', 2.5, x, y, x + 26, y);
+  ctx.save(); ctx.translate(x + 16, y); ctx.rotate(Math.sin(time * 1.3 + x) * 0.12); line('#2a2a2a', 1, -6, 0, -6, 7); line('#2a2a2a', 1, 6, 0, 6, 7); draw(0, 16); ctx.restore();
+}
+function pretzel(x, y) {
+  ctx.strokeStyle = '#a0602a'; ctx.lineWidth = 3.5;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(x + s * 5, y - 2, 6, 0, 7); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(x - 9, y + 7); ctx.quadraticCurveTo(x, y - 8, x + 9, y + 7); ctx.stroke();
+}
+function zopf(x, y, w) { for (let i = 0; i < 7; i++) { const k = i / 6, r = 10 - Math.abs(k - 0.5) * 8; ctx.save(); ctx.translate(x - w / 2 + k * w, y); ctx.rotate(i % 2 ? 0.6 : -0.6); ellipse(0, 0, r * 1.3, r, i % 2 ? '#c8822f' : '#d9953a'); ellipse(-r * 0.3, -r * 0.4, r * 0.5, r * 0.25, 'rgba(255,240,200,.55)'); ctx.restore(); } }
+function meringue(x, y, r) {
+  ellipse(x, y, r, r * 0.55, '#f6efe4'); ellipse(x, y - r * 0.45, r * 0.7, r * 0.45, '#fffaf2');
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x - r * 0.4, y - r * 0.6); ctx.quadraticCurveTo(x, y - r * 1.1, x + r * 0.3, y - r * 1.45); ctx.lineTo(x + r * 0.4, y - r * 0.6); ctx.fill();
+}
+function cookie(x, y, r) { ellipse(x, y, r, r * 0.9, '#c98e48'); ellipse(x - r * 0.15, y - r * 0.15, r * 0.8, r * 0.7, '#dfa860'); for (const [cx, cy] of [[-0.4, -0.3], [0.3, -0.4], [0.1, 0.2], [-0.3, 0.4], [0.5, 0.2], [-0.6, 0.05]]) ellipse(x + cx * r, y + cy * r, r * 0.12, r * 0.1, '#4a2a1a'); }
+function cupcake(x, y) { // Boden bei y
+  ctx.fillStyle = '#f28aa8'; ctx.beginPath(); ctx.moveTo(x - 13, y - 17); ctx.lineTo(x + 13, y - 17); ctx.lineTo(x + 10, y); ctx.lineTo(x - 10, y); ctx.fill();
+  for (let i = -2; i <= 2; i++) line('rgba(255,255,255,.5)', 1.5, x + i * 4.5, y - 16, x + i * 3.6, y - 1);
+  ellipse(x, y - 19, 15, 6, '#6b3a20'); ellipse(x, y - 25, 11, 5, '#7d4a2a'); ellipse(x, y - 30, 7, 4, '#8a5530'); ellipse(x + 1, y - 36, 4, 4, '#d8232a');
+  ['#ffe066', '#7fd0f0', '#fff', '#a6e070', '#f5a3c7'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(x - 10 + i * 5, y - 23 - (i % 2) * 5, 3, 1.6); });
+}
+function flames(x, y, n, w) { for (let i = 0; i < n; i++) ellipse(x + (i - (n - 1) / 2) * w, y - 5 - Math.abs(Math.sin(time * 9 + i)) * 3, 3.5, 6 + Math.sin(time * 11 + i * 2) * 2, i % 2 ? '#ffb02e' : '#e8501e'); }
+function tiles(x0, y0, w, h, c, s = 8) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x0 + s; xx < x0 + w; xx += s) { ctx.moveTo(xx, y0); ctx.lineTo(xx, y0 + h); } for (let yy = y0 + s; yy < y0 + h; yy += s) { ctx.moveTo(x0, yy); ctx.lineTo(x0 + w, yy); } ctx.stroke(); }
+function bricks(x0, y0, w, h) { ctx.strokeStyle = 'rgba(255,235,220,.3)'; ctx.lineWidth = 1; ctx.beginPath(); for (let r = 0, yy = y0 + 6; yy < y0 + h; yy += 6, r++) { ctx.moveTo(x0, yy); ctx.lineTo(x0 + w, yy); for (let xx = x0 + (r % 2) * 6; xx < x0 + w; xx += 12) { ctx.moveTo(xx, yy - 6); ctx.lineTo(xx, yy); } } ctx.stroke(); }
+
+// Weinberg-Kette
+DRAW.kelterei = (x, y, t) => { // Trauben werden im Bottich gestampft – früher wirklich barfuss!
+  const a = phase(t), hop = Math.abs(Math.sin(a * 2)) * 6;
+  house(x - 24, y, 78, 56, '#efe3c8', '#7a3b2a', 26); win(x - 54, y - 42, 18, 16, t.working); door(x - 14, y, 18, 30);
+  person(x + 42, y - 18 - hop, '#6b2d6e', '#e8c35a', 1 + Math.sin(a * 4) * 0.7);
+  barrel(x + 42, y, 20, 24); ellipse(x + 42, y - 24, 17, 4, '#6b2d6e');
+  if (t.working) for (let i = 0; i < 4; i++) ellipse(x + 28 + i * 9, y - 28 - Math.abs(Math.sin(a * 2 + i)) * 10, 2, 2, '#8a3d8e'); // Spritzer
+  line('#7d7468', 3, x + 62, y - 8, x + 70, y - 8); if (t.working) line('rgba(120,40,120,.9)', 2, x + 69, y - 8, x + 69, y + 3);
+  sign(x - 16, y - 62, bname(t));
+};
+DRAW.doerrhaus = (x, y, t) => { // Trauben schrumpeln an der Sonne zu Rosinen
+  house(x - 36, y, 64, 50, '#d9b98a', '#8a5a3a', 24); door(x - 36, y, 16, 28);
+  line('#6b4423', 3, x + 8, y, x + 8, y - 44); line('#6b4423', 3, x + 72, y, x + 72, y - 44);
+  for (let r = 0; r < 3; r++) { const ry = y - 12 - r * 14; ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x + 8, ry, 64, 3); for (let i = 0; i < 8; i++) ellipse(x + 14 + i * 7.5, ry - 2, 3 - r * 0.3, 2.4 - r * 0.3, r ? '#5a3a2a' : '#7a3d7e'); }
+  const sx = x + 44, sy = y - 92 + Math.sin(time) * 2; // die Sonne macht hier Ferien 😎
+  ctx.strokeStyle = '#f5b81e'; ctx.lineWidth = 3; ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const w = i / 10 * Math.PI * 2 + time * 0.4; ctx.moveTo(sx + Math.cos(w) * 17, sy + Math.sin(w) * 17); ctx.lineTo(sx + Math.cos(w) * 24, sy + Math.sin(w) * 24); }
+  ctx.stroke(); ellipse(sx, sy, 14, 14, '#ffd23f');
+  ctx.fillStyle = '#222'; rrect(sx - 11, sy - 5, 9, 6, 2); ctx.fill(); rrect(sx + 2, sy - 5, 9, 6, 2); ctx.fill(); line('#222', 1.5, sx - 2, sy - 3, sx + 2, sy - 3);
+  ctx.strokeStyle = '#a0521e'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy + 2, 6, 0.3, Math.PI - 0.3); ctx.stroke();
+  sign(x - 22, y - 60, bname(t));
+};
+DRAW.schneckenbeck = (x, y, t) => {
+  house(x, y, 112, 60, '#f3e2c0', '#a0603a', 28); win(x - 46, y - 44, 30, 22, t.working); door(x + 22, y, 18, 32);
+  chimney(x + 38, y - 70, 24, t.working);
+  swirl(x - 12, y - 100, 16, '#e3a85a', '#9a5a22'); for (const [rx, ry] of [[-6, -4], [5, 3], [2, -9], [-9, 6]]) ellipse(x - 12 + rx, y - 100 + ry, 1.8, 1.5, '#4a2a1a'); // Riesen-Rosinenschnecke
+  const k = (time * 0.015 + t.id * 0.37) % 1, sx = x - 50 + k * 100, sy = y - 4; // und eine echte Schnecke kriecht ganz langsam vorbei
+  ellipse(sx + 2, sy, 9, 2.5, '#c9b28a'); swirl(sx - 1, sy - 6, 5.5, '#c98a4a', '#7a4a20');
+  line('#c9b28a', 1, sx + 9, sy - 1, sx + 12, sy - 8); line('#c9b28a', 1, sx + 7, sy - 1, sx + 8, sy - 8);
+  sign(x, y - 66, bname(t));
+};
+// Fischteich-Kette
+DRAW.filetiererei = (x, y, t) => {
+  house(x - 10, y, 104, 58, '#f2f6f8', '#4f7fa0', 24); tiles(x - 62, y - 58, 104, 58, 'rgba(80,120,150,.18)');
+  ctx.fillStyle = '#3a8fc4'; ctx.fillRect(x - 62, y - 24, 104, 5);
+  win(x - 52, y - 48, 22, 18, t.working); door(x + 4, y, 18, 30, '#4f7fa0');
+  fish(x - 6, y - 94 + Math.sin(time * 2) * 2, 2, '#5a8fb8');
+  pet(x + 58, y + 2, '#e08a3a'); // die Katze wartet auf Reste
+  sign(x - 10, y - 64, bname(t));
+};
+DRAW.raeucherei = (x, y, t) => {
+  house(x - 14, y, 92, 58, '#5f3a1e', '#3a2a1f', 28);
+  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x - 52; xx < x + 32; xx += 8) { ctx.moveTo(xx, y - 58); ctx.lineTo(xx, y); } ctx.stroke(); // Bretter
+  win(x - 50, y - 44, 22, 18, t.working); door(x + 10, y, 16, 28, '#2a1a0e');
+  chimney(x - 36, y - 72, 22, t.working, '120,115,110', 1.6);
+  line('#6b4423', 3, x + 40, y, x + 40, y - 50); line('#6b4423', 3, x + 72, y, x + 72, y - 50); line('#6b4423', 3, x + 38, y - 48, x + 74, y - 48);
+  for (let i = 0; i < 3; i++) { ctx.save(); ctx.translate(x + 48 + i * 10, y - 48); ctx.rotate(Math.PI / 2 + Math.sin(time * 1.5 + i) * 0.15); line('#ccc', 1, 0, 0, 5, 0); fish(20, 0, 0.9, '#c8893a'); ctx.restore(); } // Fische hängen am Gestell
+  gull(x - 4, y - 84); // die Möwe hat's auch gerochen
+  sign(x - 14, y - 64, bname(t));
+};
+DRAW.seebeiz = (x, y, t) => {
+  house(x - 24, y, 92, 58, '#f4efe4', '#2f6a8f', 26); win(x - 60, y - 44, 20, 16, t.working); door(x - 22, y, 18, 30, '#2f6a8f');
+  ctx.lineWidth = 5; for (let i = 0; i < 8; i++) { ctx.strokeStyle = i % 2 ? '#fff' : '#e8303a'; ctx.beginPath(); ctx.arc(x + 4, y - 38, 8, i * Math.PI / 4, (i + 1) * Math.PI / 4); ctx.stroke(); } // Rettungsring
+  ctx.fillStyle = '#a07a4a'; ctx.fillRect(x + 24, y - 6, 50, 6); // Terrasse
+  ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 38, y - 22, 26, 3); line('#6b4423', 2, x + 42, y - 20, x + 42, y - 6); line('#6b4423', 2, x + 60, y - 20, x + 60, y - 6);
+  ellipse(x + 46, y - 24, 6, 2, '#fff'); ellipse(x + 46, y - 26, 4, 2, '#e0a840'); // Fischknusperli
+  line('#6b4423', 2, x + 51, y - 22, x + 51, y - 52);
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#3a8fc4'; ctx.beginPath(); ctx.moveTo(x + 51, y - 48); ctx.arc(x + 51, y - 48, 24, Math.PI + i * Math.PI / 6, Math.PI + (i + 1) * Math.PI / 6); ctx.fill(); }
+  gull(x - 24, y - 84);
+  sign(x - 16, y - 64, bname(t));
+};
+// Tierhof-Kette
+DRAW.metzgerei = (x, y, t) => {
+  house(x - 10, y, 104, 60, '#f4efe4', '#8a2a22', 28);
+  ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 58, y - 50, 50, 34); ctx.fillStyle = '#cfe8f5'; ctx.fillRect(x - 56, y - 48, 46, 30); // Schaufenster
+  for (const dy of [0, 12]) for (let i = 0; i < 6; i++) { const k = i / 5; ellipse(x - 52 + k * 38, y - 44 + dy + Math.sin(k * Math.PI) * 6, 4, 3, dy ? '#d07a5a' : '#b8483a'); } // Wurstgirlanden
+  awning(x - 33, y - 58, 56, '#d52b1e', '#fff', 6); door(x + 18, y, 18, 32, '#8a2a22');
+  hangSign(x + 42, y - 50, (cx, cy) => { ellipse(cx, cy, 13, 5, '#b8483a'); ellipse(cx - 3, cy - 2, 6, 1.5, 'rgba(255,255,255,.35)'); line('#e8c35a', 1.5, cx - 13, cy, cx - 16, cy - 3); line('#e8c35a', 1.5, cx + 13, cy, cx + 16, cy - 3); });
+  pet(x + 62, y + 4, '#c8a06a', true); // der Hund hofft auf ein Wurstzipfeli
+  sign(x - 10, y - 66, bname(t));
+};
+DRAW.zopfbeck = (x, y, t) => {
+  house(x, y, 108, 60, '#f6e7c8', '#9a5a2a', 28); win(x - 46, y - 44, 26, 20, t.working); door(x + 20, y, 18, 32);
+  chimney(x + 38, y - 70, 22, t.working); zopf(x - 8, y - 98, 64);
+  person(x + 20, y, '#fff', 'chef', 1.2 + Math.sin(time * 5) * 0.5); // der Beck winkt
+  sign(x, y - 66, bname(t));
+};
+DRAW.meringuerie = (x, y, t) => { // Dach aus Meringues, und die Wolken aus dem Kamin sind auch welche
+  house(x, y, 104, 58, '#f8d8e4', '#e8a0b8', 8);
+  for (let i = 0; i < 7; i++) meringue(x - 48 + i * 16, y - 62, 10); meringue(x, y - 78, 16);
+  puffs(x + 8, y - 100, t.working, '255,255,255', 1.2);
+  win(x - 40, y - 42, 20, 16, t.working); win(x + 20, y - 42, 20, 16, t.working); door(x - 2, y, 18, 30, '#c0708a');
+  sign(x, y - 112, bname(t));
+};
+DRAW.cordonbleu_beiz = (x, y, t) => {
+  const top = alpHouse(x - 16, y, 92, 18, 42, 28);
+  for (const wx of [-52, 8]) { shutterWin(x + wx, top + 8); flowers(x + wx - 4, x + wx + 22, top + 28); }
+  door(x - 16, y, 16, 24, '#5b3a1e');
+  hangSign(x + 30, top + 12, (cx, cy) => { ellipse(cx, cy, 13, 8, '#d99a3a'); for (let i = 0; i < 6; i++) ellipse(cx - 9 + i * 3.5, cy - 3 + (i % 2) * 4, 1, 1, '#a8682a'); ctx.fillStyle = '#f5cf4a'; ctx.beginPath(); ctx.moveTo(cx + 2, cy + 6); ctx.quadraticCurveTo(cx + 4, cy + 14, cx + 6, cy + 6); ctx.fill(); }); // Käse läuft raus!
+  const a = phase(t), up = t.working ? Math.abs(Math.sin(a * 1.6)) * 22 : 0, [hx, hy] = hand(x + 56, y, 0.25);
+  person(x + 56, y, '#fff', 'chef', 0.25); line('#333', 2.5, hx, hy, hx + 8, hy); ellipse(hx + 13, hy, 7, 2.5, '#333'); // Pfanne
+  if (t.working) flames(hx + 13, hy + 2, 3, 4);
+  ctx.save(); ctx.translate(hx + 13, hy - 5 - up); ctx.rotate(up / 8); ellipse(0, 0, 6, 3, '#d99a3a'); ctx.restore(); // Cordon bleu fliegt
+  sign(x - 16, top - 10, bname(t));
+};
+// Import-Ketten
+DRAW.kakaoroesterei = (x, y, t) => {
+  house(x - 26, y, 88, 60, '#b5523a', '#4a3a30', 26); bricks(x - 70, y - 60, 88, 60);
+  win(x - 60, y - 46, 20, 16, t.working); door(x - 18, y, 18, 30); chimney(x - 50, y - 74, 20, t.working, '120,80,50');
+  const a = phase(t);
+  line('#555', 3, x + 32, y, x + 32, y - 32); line('#555', 3, x + 66, y, x + 66, y - 32);
+  if (t.working) flames(x + 49, y - 2, 4, 7);
+  ctx.fillStyle = '#6a6a6a'; rrect(x + 28, y - 48, 42, 26, 12); ctx.fill(); // Röst-Trommel, dreht sich
+  ctx.save(); rrect(x + 28, y - 48, 42, 26, 12); ctx.clip(); for (let i = 0; i < 4; i++) { const k = (a * 0.4 + i / 4) % 1; line('#454545', 2.5, x + 28 + k * 42, y - 48, x + 28 + k * 42, y - 22); } ctx.restore();
+  ellipse(x + 40, y - 42, 8, 2, 'rgba(255,255,255,.3)');
+  sack(x + 68, y + 6);
+  sign(x - 20, y - 66, bname(t));
+};
+DRAW.schoggifabrik = (x, y, t) => {
+  ellipse(x + 4, y, 78, 11, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#efe3c8'; ctx.fillRect(x - 70, y - 60, 104, 60);
+  for (let i = 0; i < 4; i++) win(x - 62 + i * 24, y - 50, 16, 14, t.working); door(x - 18, y, 20, 28, '#5a3220');
+  ctx.fillStyle = '#b5523a'; ctx.fillRect(x - 64, y - 128, 14, 50); ctx.fillStyle = '#8a3a28'; ctx.fillRect(x - 66, y - 128, 18, 5); puffs(x - 57, y - 128, t.working, '200,170,150');
+  ctx.save(); ctx.beginPath(); ctx.rect(x - 76, y - 82, 116, 24); ctx.arc(x + 40, y - 82, 11, 0, 7); ctx.clip('evenodd'); // Dach = Schoggitafel, angebissen 😋
+  ctx.fillStyle = '#5a3220'; ctx.fillRect(x - 76, y - 82, 116, 24);
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = '#6e3e26'; ctx.fillRect(x - 73 + i * 19, y - 79 + j * 11, 15, 8); }
+  ctx.restore();
+  ctx.fillStyle = '#c3ccd4'; rrect(x + 38, y - 66, 26, 34, 6); ctx.fill(); line('#7f8a95', 2, x + 40, y - 56, x + 62, y - 56); // Kessel
+  line('#7f8a95', 4, x + 60, y - 40, x + 70, y - 40);
+  if (t.working) { ctx.fillStyle = '#6b3a20'; ctx.fillRect(x + 67, y - 40, 6, 38); for (let i = 0; i < 3; i++) ellipse(x + 70, y - 40 + ((time * 1.5 + i / 3) % 1) * 38, 1.5, 4, '#8a5030'); } // Schoggi-Wasserfall
+  ellipse(x + 66, y - 1, 14, 4, '#5a3220');
+  sign(x - 18, y - 94, bname(t));
+};
+DRAW.schoggikonditorei = (x, y, t) => {
+  house(x, y, 104, 60, '#fbe3ea', '#6b3a20', 26);
+  ctx.fillStyle = '#6b3a20'; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.ellipse(x - 48 + i * 12, y - 58, 4, 5 + (i % 3) * 3, 0, 0, 7); ctx.fill(); } // Glasur tropft über die Fassade
+  win(x - 40, y - 40, 24, 18, t.working); door(x + 22, y, 18, 30, '#6b3a20');
+  cupcake(x - 4, y - 84);
+  sign(x, y - 66, bname(t));
+};
+DRAW.kaffeeroesterei = (x, y, t) => {
+  house(x - 18, y, 92, 60, '#e8dcc4', '#3e2a1e', 26); win(x - 54, y - 46, 20, 16, t.working); door(x - 6, y, 18, 30);
+  chimney(x + 14, y - 72, 20, t.working, '150,120,100');
+  ctx.save(); ctx.translate(x - 26, y - 100); ctx.rotate(0.4 + Math.sin(time) * 0.06); ellipse(0, 0, 16, 11, '#5a3220'); ellipse(-4, -4, 7, 3, 'rgba(255,255,255,.18)');
+  ctx.strokeStyle = '#2e180c'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-13, 0); ctx.bezierCurveTo(-4, -6, 4, 6, 13, 0); ctx.stroke(); ctx.restore(); // Riesen-Kaffeebohne
+  const j = t.working ? Math.sin(time * 47) * 1.5 : 0, px = x + 50 + j, [hx, hy] = hand(px, y, 0.5); // der Kaffee-Prober zittert: zu viel probiert!
+  person(px, y, '#8a5530', null, 0.5);
+  if (t.working) for (const d of [-3, 0, 3]) line('#3a2412', 1.5, px + d, y - 30, px + d * 1.6, y - 36);
+  ctx.fillStyle = '#fff'; ctx.fillRect(hx - 2, hy - 5, 6, 5); puffs(hx + 1, hy - 5, true, '255,255,255', 0.3);
+  sack(x + 70, y + 6);
+  sign(x - 18, y - 66, bname(t));
+};
+DRAW.kafistube = (x, y, t) => {
+  house(x - 22, y, 92, 58, '#f3e2c0', '#7a3b2a', 26); win(x - 58, y - 44, 20, 16, t.working); win(x - 8, y - 44, 20, 16, t.working); door(x - 24, y, 16, 28);
+  const cx = x - 22, cy = y - 96; // Riesen-Tasse auf dem Dach
+  ellipse(cx, cy + 6, 20, 4, '#e8e8e8'); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx + 14, cy - 6, 6, -1.3, 1.3); ctx.stroke();
+  ctx.fillStyle = '#fff'; rrect(cx - 14, cy - 16, 28, 21, 6); ctx.fill(); ellipse(cx, cy - 15, 13, 3, '#6b3a20'); puffs(cx, cy - 18, true, '255,255,255', 0.7);
+  ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 36, y - 18, 22, 3); line('#6b4423', 2, x + 47, y - 16, x + 47, y); // Tischli
+  ellipse(x + 42, y - 20, 3, 2, '#fff'); ellipse(x + 53, y - 20, 3, 2, '#fff');
+  person(x + 30, y, '#3d7a3a', '#c0552f', 0.1);
+  ctx.save(); ctx.translate(x + 64, 0); ctx.scale(-1, 1); person(0, y, '#d8332a', '#e8c35a', 0.1); ctx.restore();
+  ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillText(['💬', '😂', '☕'][Math.floor(time / 2 + t.id) % 3], x + 47, y - 42); // Schwatz
+  sign(x - 16, y - 64, bname(t));
+};
+// Milch, Äpfel, Pizza, Pasta, Torte
+DRAW.zentrifuge = (x, y, t) => {
+  house(x - 34, y, 74, 54, '#f4f4ef', '#7d8a96', 22); win(x - 62, y - 40, 18, 14); door(x - 26, y, 16, 28, '#4d6a85');
+  const sh = t.working ? Math.sin(time * 38) * 1.5 : 0; // rüttelt beim Schleudern
+  ctx.save(); ctx.translate(sh, 0);
+  ellipse(x + 40, y, 28, 6, 'rgba(0,0,0,.25)');
+  for (const lx of [-16, 16]) line('#7f8a95', 3, x + 40 + lx, y, x + 40 + lx, y - 12);
+  const g = ctx.createLinearGradient(x + 18, 0, x + 62, 0); g.addColorStop(0, '#eef2f5'); g.addColorStop(0.5, '#c3ccd4'); g.addColorStop(1, '#7f8a95');
+  ctx.fillStyle = g; rrect(x + 18, y - 70, 44, 60, 10); ctx.fill();
+  ctx.save(); ctx.translate(x + 40, y - 40); ctx.rotate(-phase(t) * 3); swirl(0, 0, 15, '#dfe5ea', '#4f7fa0'); ctx.restore();
+  ctx.restore();
+  if (t.working) for (const s of [-1, 1]) { ctx.strokeStyle = 'rgba(60,60,60,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x + 40, y - 40, 30, s > 0 ? -0.5 : Math.PI - 0.5, s > 0 ? 0.5 : Math.PI + 0.5); ctx.stroke(); }
+  sign(x - 26, y - 62, bname(t));
+};
+DRAW.butterei = (x, y, t) => {
+  house(x - 22, y, 92, 58, '#f8e7a0', '#c08a2a', 26); win(x - 58, y - 44, 20, 16, t.working); door(x - 8, y, 18, 30);
+  ctx.fillStyle = '#ffe27a'; rrect(x - 40, y - 100, 34, 18, 3); ctx.fill(); ctx.fillStyle = '#fff2b0'; ctx.fillRect(x - 38, y - 98, 30, 4); // Butterblock auf dem Dach …
+  ellipse(x - 34, y - 80 + ((time * 0.4) % 1) * 4, 2.5, 3.5, '#ffe27a'); // … schmilzt an der Sonne
+  const up = t.working ? Math.abs(Math.sin(phase(t) * 2)) * 12 : 0; // Butterfass, der Stössel stampft
+  barrel(x + 44, y, 11, 32, '#b07a42'); line('#6b4423', 3, x + 44, y - 30 - up, x + 44, y - 52 - up); line('#6b4423', 3, x + 36, y - 52 - up, x + 52, y - 52 - up);
+  if (t.working) for (let i = 0; i < 3; i++) ellipse(x + 38 + i * 6, y - 36 - Math.abs(Math.sin(time * 6 + i)) * 8, 2, 2, '#ffe27a');
+  pet(x + 66, y + 2, '#8a8a8a'); // die Katze schleckt heimlich mit
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.keksbaeckerei = (x, y, t) => {
+  house(x - 6, y, 104, 60, '#f3e2c0', '#b5713a', 28); win(x - 50, y - 44, 26, 20, t.working); door(x + 14, y, 18, 32);
+  chimney(x + 30, y - 70, 22, t.working); cookie(x - 16, y - 100, 17);
+  const k = Math.sin(time * 0.8 + t.id), dir = Math.cos(time * 0.8 + t.id) > 0 ? 1 : -1; // eine Maus klaut Krümel
+  mouse(x + 62 + k * 10, y + 4, dir, dir > 0 ? null : '#dfa860');
+  sign(x - 6, y - 66, bname(t));
+};
+DRAW.saftpresse = (x, y, t) => {
+  house(x - 8, y, 100, 58, '#eef0dc', '#3d7a3a', 26); win(x - 46, y - 44, 20, 16, t.working); win(x + 10, y - 44, 20, 16, t.working); door(x - 12, y, 18, 30);
+  const ax = x - 8, ay = y - 98; // Riesen-Apfel auf dem Dach – mit Wurm!
+  ellipse(ax, ay, 18, 16, '#d8332a'); ellipse(ax - 6, ay - 5, 5, 4, 'rgba(255,255,255,.35)'); line('#5a3d22', 3, ax, ay - 14, ax + 2, ay - 22); ellipse(ax + 8, ay - 20, 6, 3, '#4f8a2f');
+  ellipse(ax + 13, ay + 2, 3, 3, '#5a2a1a');
+  const w = Math.sin(time * 3) * 3; ctx.strokeStyle = '#f2a7b0'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax + 13, ay + 2); ctx.quadraticCurveTo(ax + 22, ay - 4 + w, ax + 24 + w * 0.5, ay - 12); ctx.stroke(); ctx.lineCap = 'butt';
+  ellipse(ax + 25 + w * 0.5, ay - 13, 0.9, 0.9, '#222');
+  crate(x + 60, y + 4, '#d8332a', 10);
+  sign(x - 8, y - 64, bname(t));
+};
+DRAW.essigbrauerei = (x, y, t) => {
+  house(x - 22, y, 92, 58, '#e8dcc4', '#6b4a2b', 26); win(x - 58, y - 44, 20, 16, t.working); door(x - 12, y, 18, 30);
+  barrel(x + 40, y, 13, 26); barrel(x + 68, y, 13, 26); barrel(x + 54, y - 26, 13, 26);
+  const fx = x + 54, fy = y - 40; // das Fass hat sauer probiert 😖
+  line('#2a1a0e', 1.5, fx - 7, fy - 4, fx - 3, fy - 2, fx - 7, fy); line('#2a1a0e', 1.5, fx + 7, fy - 4, fx + 3, fy - 2, fx + 7, fy);
+  line('#2a1a0e', 1.5, fx - 5, fy + 6, fx - 2.5, fy + 4, fx, fy + 6, fx + 2.5, fy + 4, fx + 5, fy + 6);
+  if (t.working) for (let i = 0; i < 3; i++) { const k = (time * 0.7 + i / 3) % 1; ctx.strokeStyle = `rgba(200,220,150,${1 - k})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(fx + Math.sin(k * 6 + i) * 3, fy - 16 - k * 26, 2 + k * 2, 0, 7); ctx.stroke(); }
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.pizzeria = (x, y, t) => {
+  house(x - 28, y, 82, 60, '#e8a86a', '#b5523a', 26); win(x - 58, y - 46, 18, 16, t.working); door(x - 22, y, 18, 32, '#3d7a3a');
+  ctx.fillStyle = '#c4704f'; ctx.beginPath(); ctx.arc(x + 30, y, 24, Math.PI, 0); ctx.fill(); // Holzofen
+  ctx.fillStyle = '#7d4632'; ctx.fillRect(x + 26, y - 34, 8, 12); puffs(x + 30, y - 34, t.working);
+  ctx.fillStyle = t.working ? '#f08a24' : '#2a1a0e'; ctx.beginPath(); ctx.arc(x + 30, y, 10, Math.PI, 0); ctx.fill();
+  if (t.working) flames(x + 30, y + 2, 2, 6);
+  const a = phase(t), h = Math.abs(Math.sin(a * 1.5)) * 30, [hx, hy] = hand(x + 62, y, 1.4); // der Pizzaiolo wirft den Teig
+  person(x + 62, y, '#fff', 'chef', 1.4); line('#3a2412', 2, x + 62, y - 22.5, x + 67, y - 22.5); // Schnauz
+  ctx.save(); ctx.translate(hx, hy - 3 - h); ctx.rotate(Math.sin(a * 3) * 0.3); ellipse(0, 0, 10, 2.5, '#f3dca0'); ctx.restore();
+  sign(x - 22, y - 66, bname(t));
+};
+DRAW.griessmuehle = (x, y, t) => { // Wassermühle
+  house(x - 24, y, 88, 60, '#ece4d4', '#5b4a3a', 26); tiles(x - 68, y - 60, 88, 60, 'rgba(90,80,70,.15)', 10);
+  win(x - 56, y - 46, 18, 16, t.working); door(x - 18, y, 18, 30);
+  const wx = x + 44, wy = y - 30;
+  ellipse(wx, y - 1, 30, 6, '#4f9ad0');
+  ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x + 30, y - 66, 36, 6); // Rinne
+  if (t.working) { ctx.fillStyle = 'rgba(90,160,220,.85)'; ctx.fillRect(x + 32, y - 60, 6, 6); ctx.fillRect(x + 62, y - 60, 6, 56); }
+  ctx.save(); ctx.translate(wx, wy); ctx.rotate(phase(t)); ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 25, 0, 7); ctx.stroke();
+  for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); line('#6b4423', 2.5, 0, 0, 25, 0); ctx.fillStyle = '#8a6a43'; ctx.fillRect(22, -3, 8, 6); }
+  ctx.restore(); ellipse(wx, wy, 4, 4, '#3a2412');
+  sign(x - 20, y - 66, bname(t));
+};
+DRAW.nudelfabrik = (x, y, t) => {
+  house(x - 20, y, 96, 62, '#f4efe4', '#b5523a', 24); for (let i = 0; i < 3; i++) win(x - 60 + i * 26, y - 48, 16, 14, t.working); door(x - 20, y, 18, 28);
+  chimney(x + 12, y - 74, 24, t.working);
+  line('#6b4423', 3, x + 34, y, x + 34, y - 50); line('#6b4423', 3, x + 70, y, x + 70, y - 50); line('#8a6a43', 3, x + 32, y - 48, x + 72, y - 48); // Trocknungsgestell
+  ctx.strokeStyle = '#f2d78a'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 11; i++) { const sx = x + 37 + i * 3, sw = Math.sin(time * 1.5 + i * 0.3) * 2; ctx.beginPath(); ctx.moveTo(sx, y - 48); ctx.quadraticCurveTo(sx + sw, y - 30, sx + sw * 1.5, y - 16 - (i % 3) * 3); ctx.stroke(); }
+  const bx = x + 70 + Math.sin(time * 3) * 2; // ein Spatz zieht an einer Spaghetti
+  ctx.beginPath(); ctx.moveTo(x + 68, y - 48); ctx.quadraticCurveTo(x + 64, y - 20, bx - 2, y - 9); ctx.stroke();
+  ellipse(bx + 5, y - 5, 6, 4.5, '#9a6a3a'); ellipse(bx + 1, y - 9, 3.5, 3.5, '#9a6a3a'); ellipse(bx, y - 10, 0.9, 0.9, '#222'); line('#9a6a3a', 1.2, bx + 4, y - 1, bx + 4, y + 1);
+  sign(x - 16, y - 70, bname(t));
+};
+DRAW.trattoria = (x, y, t) => {
+  house(x - 22, y, 92, 60, '#f0c27a', '#b5523a', 26); win(x - 58, y - 36, 20, 16, t.working); win(x - 6, y - 36, 20, 16, t.working); door(x - 22, y, 16, 28, '#3d7a3a');
+  awning(x - 22, y - 58, 92, '#d52b1e', '#fff', 10);
+  for (let i = 0; i < 9; i++) ellipse(x - 68 + Math.sin(i * 1.3) * 3, y - 4 - i * 7, 4, 3, i % 2 ? '#4f8a2f' : '#6aa23c'); // Reben an der Wand
+  const tx = x + 48; ctx.fillStyle = '#fff'; ctx.fillRect(tx - 14, y - 22, 28, 10); ctx.fillStyle = '#d52b1e';
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2) ctx.fillRect(tx - 14 + i * 4, y - 22 + j * 5, 4, 5); // karierte Tischdecke
+  line('#6b4423', 2, tx - 10, y - 12, tx - 10, y); line('#6b4423', 2, tx + 10, y - 12, tx + 10, y);
+  ctx.fillStyle = '#2f6a3a'; ctx.fillRect(tx + 4, y - 32, 5, 10); ctx.fillRect(tx + 5.5, y - 36, 2, 4); // Flasche
+  ctx.fillStyle = '#fff'; ctx.fillRect(tx - 7, y - 30, 3, 8); ellipse(tx - 5.5, y - 33 + Math.sin(time * 9) * 0.6, 1.6, 2.8, '#ffb02e'); // Kerze
+  const [hx, hy] = hand(x + 66, y, 1.45), wb = Math.sin(time * 2.3) * 0.25; // der Kellner balanciert den Teller
+  person(x + 66, y, '#222', null, 1.45); line('#3a2412', 2, x + 66, y - 22.5, x + 71, y - 22.5);
+  ctx.save(); ctx.translate(hx, hy - 2); ctx.rotate(wb); ellipse(0, 0, 9, 2.5, '#fff'); ellipse(0, -2, 5, 2, '#e8c35a'); ctx.restore();
+  sign(x - 16, y - 66, bname(t));
+};
+DRAW.tortenmeister = (x, y, t) => { // das ganze Haus ist eine Torte
+  ellipse(x + 6, y, 66, 10, 'rgba(0,0,0,.22)');
+  const tier = (w, h, by, c) => {
+    const g = ctx.createLinearGradient(x - w / 2, 0, x + w / 2, 0); g.addColorStop(0, shade(c, 1.04)); g.addColorStop(1, shade(c, 0.85));
+    ctx.fillStyle = g; ctx.fillRect(x - w / 2, by - h, w, h); ellipse(x, by - h, w / 2, 6, shade(c, 1.06));
+    const n = Math.round(w / 12); for (let i = 0; i <= n; i++) ellipse(x - w / 2 + i * w / n, by - h + 1, 4.5, 3.5, '#fffdf8'); // Rahmtupfer
+  };
+  tier(120, 40, y, '#f6d4dc'); tier(88, 34, y - 40, '#fff2e0'); tier(56, 28, y - 74, '#f6d4dc');
+  win(x - 50, y - 30, 16, 14, t.working); win(x + 34, y - 30, 16, 14, t.working); win(x - 10, y - 66, 20, 14, t.working); door(x, y, 18, 30, '#b05a7a');
+  for (const [cx, c] of [[-18, '#7fd0f0'], [0, '#ffe066'], [18, '#a6e070']]) { ctx.fillStyle = c; ctx.fillRect(x + cx - 2, y - 120, 4, 16); ellipse(x + cx, y - 124 + Math.sin(time * 10 + cx) * 0.8, 2, 3.5, '#ffb02e'); }
+  ellipse(x + 9, y - 106, 5, 5, '#d8232a'); line('#4f7a2f', 1.5, x + 9, y - 111, x + 12, y - 116);
+  sign(x, y - 140, bname(t));
+};
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
