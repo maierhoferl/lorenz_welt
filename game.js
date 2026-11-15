@@ -233,29 +233,32 @@ function checkUnlock(k) {
 }
 
 function slotsAvail(area) { const a = AREAS[area], f = a.from || 0; return G.land < f ? 0 : a.base + a.per * (G.land - f); }
-function slotPos(area, i) {
-  const a = AREAS[area], j = i - a.cols * a.rows;
-  if (j < 0) return { x: (a.x + (i % a.cols) * a.dx) * T, y: (a.y + Math.floor(i / a.cols) * a.dy) * T };
-  const h = j >> 1; // gerade: Süden, ungerade: Osten
-  if (j % 2 === 0) return { x: (a.ex + (h % a.ec) * a.dx) * T, y: (WORLD_H0 + 3 + Math.floor(h / a.ec) * a.dy) * T };
-  return { x: (ostX() + 2 + Math.floor(h / 2) * a.dx) * T, y: (a.ey + (h % 2) * a.dy) * T };
+function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
+  const a = AREAS[area];
+  return { x: (a.x + Math.floor(i / a.rows) * a.dx) * T, y: (a.y + (i % a.rows) * a.dy) * T };
 }
-// ponytail: Welt wächst nur nach Süden; bei sehr viel Land wird sie lang, aber nie zu eng
+const areaOn = a => G.land >= (a.from || 0);
+const areaEnd = k => { const a = AREAS[k]; return a.x + Math.max(0, Math.ceil(slotsAvail(k) / a.rows) - 1) * a.dx; }; // x der letzten Spalte
 // Gülle-Verteiler (ab Land-Stufe 20): sammelt Dung von den Tieren und düngt die Weizenfelder → doppelte Ernte
 const FELD_N = THINGS.feld.n, MIST = ['kuh', 'schwein', 'huhn', 'masthuhn'];
 const guelleOn = () => !!G.guelle && G.things.some(t => MIST.includes(t.type));
-// Ostrand der freigeschalteten Bereiche: dort beginnt das Neuland im Osten
-const ostX = () => Math.max(60, ...Object.values(AREAS).filter(a => G.land >= (a.from || 0)).map(a => Math.ceil(a.x + (a.cols - 1) * a.dx + 4)));
-function relayout() { // Plätze neu setzen – das Neuland im Osten rückt nach, wenn ein neuer Bereich dazukommt
+function relayout() { // Plätze neu setzen (alte Spielstände hatten ein anderes Raster)
   for (const t of G.things) {
     const p = slotPos(THINGS[t.type].area, t.slot); Object.assign(t, p);
     if (t.type === 'kuh' && dist(t.cx, t.cy, p.x, p.y) > 6 * T) Object.assign(t, { cx: p.x, cy: p.y, tx: p.x, ty: p.y });
   }
 }
-function fitWorld() {
-  const last = Object.keys(AREAS).flatMap(a => [1, 2].filter(k => slotsAvail(a) >= k).map(k => slotPos(a, slotsAvail(a) - k))); // letzter Süd- und Ost-Platz
-  WORLD.w = Math.max(ostX(), ...last.map(p => Math.ceil(p.x / T + 4)));
-  WORLD.h = Math.max(WORLD_H0, ...last.map(p => p.y / T + 2)); }
+function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun wächst mit
+  const on = Object.keys(AREAS).filter(k => areaOn(AREAS[k]));
+  PASTURE.w = Math.max(10, areaEnd('weide') - PASTURE.x + 1.6);
+  WORLD.w = Math.max(48, ...on.map(k => Math.ceil(areaEnd(k) + 3)));
+  WORLD.h = Math.max(...on.map(k => { const a = AREAS[k]; return Math.max(a.y + (a.rows - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); }));
+}
+// Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
+function paths() {
+  const on = Object.keys(AREAS).filter(k => areaOn(AREAS[k])), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
+  return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, Math.max(...L.map(l => l[0]))]]], L.map(([y, x]) => [[ROAD_X, y], [x, y]]));
+}
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
   for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i)) return i;
@@ -271,7 +274,7 @@ function addThing(type) {
   return t;
 }
 function newGame() {
-  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null };
+  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 14 * T, py: 10.2 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null };
   for (const k in TOOLS) G.tools[k] = 0;
   trucks.length = 0; // anderer Spieler: Fahrzeuge neu aufstellen
   addThing('feld').ripe = true;
@@ -291,7 +294,7 @@ function loadGame(server) {
     if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
     relayout(); fitWorld();
-    for (const d of G.deco) d.y = Math.min(d.y, (WORLD.h - 0.5) * T); // Welt kann kleiner geworden sein – Deko bleibt drin
+    fixDeco();
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
     if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
@@ -585,12 +588,25 @@ let nearDeco = null;
 function decoSpotOk(x, y) {
   if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6)) return false;
   for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
-  for (const t of G.things) {
-    if (t.type === 'feld') { if (Math.abs(x - t.x) < 2.8 * T && Math.abs(y - t.y) < 1.9 * T) return false; }
-    else if (THINGS[t.type].kind === 'factory') { if (Math.abs(x - t.x) < 2.4 * T && y < t.y + 0.7 * T && y > t.y - 1.2 * T) return false; }
-    else if (t.type !== 'kuh' && dist(x, y, t.x, t.y) < (t.type === 'baum' ? 0.9 : 1.6) * T) return false;
+  for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko
+    if (k === 'weide') continue;
+    const a = AREAS[k];
+    for (let i = 0; i < slotsAvail(k); i++) {
+      const p = slotPos(k, i);
+      if (k === 'acker' ? Math.abs(x - p.x) < 2.8 * T && Math.abs(y - p.y) < 1.9 * T : Math.abs(x - p.x) < a.dx / 2 * T && y > p.y - (k === 'dorf' ? 2.6 : 1.4) * T && y < p.y + 0.6 * T) return false;
+    }
   }
+  for (const p of paths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; if (x > (Math.min(ax, bx) - 0.8) * T && x < (Math.max(ax, bx) + 0.8) * T && y > (Math.min(ay, by) - 0.6) * T && y < (Math.max(ay, by) + 1) * T) return false; } // nicht auf den Weg
+  if (x > PASTURE.x * T - 20 && x < (PASTURE.x + PASTURE.w) * T + 20 && y > PASTURE.y * T - 20 && y < (PASTURE.y + PASTURE.h) * T + 30) return false;
   return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
+}
+// Deko, die im Weg steht (altes Layout, oder ein Band ist darüber gewachsen), zieht auf die Wiese unter dem See
+function fixDeco() {
+  const land = G.deco.filter(d => DECOS[d.type].where === 'land'); G.deco = G.deco.filter(d => !land.includes(d));
+  for (const d of land) {
+    if (!decoSpotOk(d.x, d.y)) for (let i = 0; i < 600; i++) { const x = (2.5 + (i % 12) * 1.2) * T, y = (LAKE.y + LAKE.ry + 2 + Math.floor(i / 12) * 1.3) * T; if (decoSpotOk(x, y)) { Object.assign(d, { x, y }); break; } }
+    G.deco.push(d);
+  }
 }
 function placeDeco() {
   if (!G.carry) return;
@@ -766,9 +782,9 @@ function shopList() {
     icon: '🗺️', name: $t`Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: $t`Mehr Platz für Felder, Bäume, Kühe und Gebäude`, info: $t`Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.`,
     buy: () => {
-      G.land++; fitWorld(); relayout(); toast(WORLD.h > WORLD_H0 ? $t`🗺️ Neues Land im Süden ⬇️ und Osten ➡️ – folge den Wegen! Mit ➖ siehst du die ganze Welt.` : $t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
+      G.land++; fitWorld(); relayout(); fixDeco(); toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
       const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
-      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
+      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Süden ⬇️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
   });
   if (G.land >= 20) tabs[3].push({ icon: '⛪', name: $t`Kirche`, price: 20000, can: !G.kirche, neu: !G.kirche,
@@ -971,7 +987,8 @@ function win(x, y, w, h, lit) {
 }
 function door(x, y, w, h, c = '#6b4423') { ctx.fillStyle = c; ctx.fillRect(x - w / 2, y - h, w, h); ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(x + w / 4, y - h / 2, 2, 0, 7); ctx.fill(); }
 function sign(x, y, text) {
-  ctx.font = '800 13px system-ui'; const w = ctx.measureText(text).width + 16;
+  ctx.font = '800 13px system-ui'; const m = ctx.measureText(text).width, f = Math.min(13, 13 * 116 / m); // lange Namen: kleinere Schrift, Schild bleibt schmal
+  ctx.font = `800 ${f}px system-ui`; const w = m * f / 13 + 16;
   ctx.fillStyle = '#5b3a1e'; rrect(x - w / 2, y - 11, w, 22, 5); ctx.fill();
   ctx.fillStyle = '#fff4d6'; ctx.textAlign = 'center'; ctx.fillText(text, x, y + 5);
 }
@@ -1080,7 +1097,7 @@ const DRAW = {
     const lv = hofLv(), fl = lv >= 3 ? 2 : 1;
     if (lv >= 5) kapelle(x + 190, y - 4);
     if (G.kirche) kirche(x + 300, y - 4);
-    if (G.guelle) guelle(x - 456, y + 144);
+    if (G.guelle) guelle(x + 264, y + 260); // zwischen Hof und Acker
     if (lv >= 2) speicher(x - 205, y - 4);
     if (lv >= 1) for (let i = 0; i < 4; i++) for (let j = 0; j < 5 - (i % 2); j++) { ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 4.5, 4.5, '#b07a42'); ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 2, 2, '#e3c08a'); } // Holzbeige
     // Stall mit Heuboden
@@ -1642,6 +1659,21 @@ function tanne(x, y, s = 1) {
 }
 
 // ---- See ----
+// Weinberg: sanfte Hügelkuppen, Rebreihen auf Terrassen mit Trockenmäuerchen
+function drawHill(a, end) {
+  const x0 = (ROAD_X + 0.9) * T, x1 = Math.min(Math.max(end + 2.6, ROAD_X + 16), WORLD.w) * T, [t, b] = a.hill.map(v => v * T);
+  const hill = (crest, c0, c1) => { // Kuppen mit runden Enden
+    const g = ctx.createLinearGradient(0, t, 0, b); g.addColorStop(0, c0); g.addColorStop(1, c1);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x0, b);
+    for (let x = x0; x <= x1 + 11; x += 12) { const xx = Math.min(x, x1), e = Math.min(1, (xx - x0) / (3 * T), (x1 - xx) / (3 * T)); ctx.lineTo(xx, b - (b - crest(xx)) * Math.sqrt(1 - (1 - e) ** 2)); }
+    ctx.closePath(); ctx.fill();
+  };
+  hill(x => t - 6 + 26 * Math.sin(x / 210 + 2) + 12 * Math.sin(x / 77), '#7aa94a', '#5f9338'); // hintere Hügel
+  hill(x => t + 30 + 24 * Math.sin(x / 160) + 10 * Math.sin(x / 59 + 1), '#a6cf62', '#6aa23f'); // vordere Hügel
+  ctx.save(); ctx.clip();
+  for (let r = 0; r < a.rows; r++) { const y = (a.y + r * a.dy) * T + 12; ctx.fillStyle = 'rgba(50,80,25,.3)'; ctx.fillRect(x0, y + 4, x1 - x0, 5); ctx.fillStyle = '#c9b88e'; ctx.fillRect(x0, y, x1 - x0, 5); } // Terrassen-Mäuerchen
+  ctx.restore();
+}
 function lakePath(m) {
   ctx.beginPath();
   for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, rr = LAKE.rx * lakeR(a) + m; ctx.lineTo((LAKE.x + Math.cos(a) * rr) * T, (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T); }
@@ -1906,11 +1938,12 @@ function render() {
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
   drawAlps();
+  for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
   // Wege
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
     ctx.strokeStyle = c; ctx.lineWidth = w;
-    for (const p of PATHS.concat(WORLD.h > WORLD_H0 ? PATHS_SOUTH : [], WORLD.w > ostX() ? [G.land >= 10 ? [[61, 23], [ostX(), 23], [ostX(), 2], [ostX(), WORLD.h - 1]] : [[50, 30], [ostX(), 30], [ostX(), 2], [ostX(), WORLD.h - 1]]] : [], PATHS_EAST.filter(([l]) => G.land >= l).map(([, p]) => p))) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+    for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
   drawLake(); lakeDecos();
   // Weide-Zaun
@@ -1927,7 +1960,7 @@ function render() {
       if (used.has(i)) continue;
       const p = slotPos(a, i);
       if (a === 'acker') ctx.strokeRect(p.x - 2.5 * T, p.y - 1.5 * T, 5 * T, 3 * T);
-      else if (a === 'dorf') ctx.strokeRect(p.x - 2 * T, p.y - 2 * T, 4 * T, 2.2 * T);
+      else if (a === 'dorf') ctx.strokeRect(p.x - 1.3 * T, p.y - 2 * T, 2.6 * T, 2.2 * T);
       else { ctx.beginPath(); ctx.ellipse(p.x, p.y, 20, 9, 0, 0, 7); ctx.stroke(); }
     }
   }
