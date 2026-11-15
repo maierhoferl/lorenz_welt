@@ -125,7 +125,7 @@ var TR = {
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 Lo spandiliquame è pronto – compra animali per avere letame!",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 La tua fattoria si ingrandisce: {}!', '🎉 Neu im Osten ➡️: {}! Schau im Laden.': '🎉 Novità a est ➡️: {}! Guarda nel negozio.',
     'Du stellst es hin, wo du willst': 'Lo metti dove vuoi', 'Schwimmt auf dem See': 'Galleggia sul lago', 'Fliegt über deine Welt': 'Vola sopra il tuo mondo',
-    'Fährt in die Berge': 'Sale in montagna', '✅ Schon gekauft': '✅ Già comprato', 'Stell zuerst {} ab': 'Prima metti giù {}', 'Hast du schon {}×': 'Ne hai già {}×',
+    'Fährt in die Berge': 'Sale in montagna', 'Neu': 'Nuovo', '✅ Schon gekauft': '✅ Già comprato', 'Stell zuerst {} ab': 'Prima metti giù {}', 'Hast du schon {}×': 'Ne hai già {}×',
     '🌱 Tiere & Pflanzen': '🌱 Animali & piante', '🏭 Gebäude': '🏭 Edifici', '🔧 Werkzeuge': '🔧 Attrezzi', '🗺️ Land': '🗺️ Terreno', '🏔️ Deko': '🏔️ Decorazioni',
     'Kaufen': 'Compra', '🛒 Laden': '🛒 Negozio', '– du hast {} Fr.': '– hai {} fr.', 'du trägst': 'porti tu',
     '📦 <b>Hole {} {} ab</b> – liegt bei {}× {} (bei {} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.': '📦 <b>Vai a prendere {} {}</b> – da {}× {} (in {} il magazzino è pieno, lì il lavoro è fermo!) – e vendilo al commerciante.',

@@ -125,7 +125,7 @@ var TR = {
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 The slurry spreader is ready – buy animals so there is dung!",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 Your farm is growing: {}!', '🎉 Neu im Osten ➡️: {}! Schau im Laden.': '🎉 New in the east ➡️: {}! Have a look in the shop.',
     'Du stellst es hin, wo du willst': 'You put it wherever you like', 'Schwimmt auf dem See': 'Floats on the lake', 'Fliegt über deine Welt': 'Flies over your world',
-    'Fährt in die Berge': 'Goes up into the mountains', '✅ Schon gekauft': '✅ Already bought', 'Stell zuerst {} ab': 'Put down {} first', 'Hast du schon {}×': 'You have {}× already',
+    'Fährt in die Berge': 'Goes up into the mountains', 'Neu': 'New', '✅ Schon gekauft': '✅ Already bought', 'Stell zuerst {} ab': 'Put down {} first', 'Hast du schon {}×': 'You have {}× already',
     '🌱 Tiere & Pflanzen': '🌱 Animals & plants', '🏭 Gebäude': '🏭 Buildings', '🔧 Werkzeuge': '🔧 Tools', '🗺️ Land': '🗺️ Land', '🏔️ Deko': '🏔️ Decoration',
     'Kaufen': 'Buy', '🛒 Laden': '🛒 Shop', '– du hast {} Fr.': '– you have {} CHF', 'du trägst': 'you carry',
     '📦 <b>Hole {} {} ab</b> – liegt bei {}× {} (bei {} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.': '📦 <b>Pick up {} {}</b> – waiting at {}× {} (at {} the storage is full, so work has stopped!) – and sell it to the trader.',

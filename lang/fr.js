@@ -125,7 +125,7 @@ var TR = {
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 L’épandeur est prêt – achète des animaux pour avoir du fumier !",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 Ta ferme s’agrandit : {} !', '🎉 Neu im Osten ➡️: {}! Schau im Laden.': '🎉 Nouveau à l’est ➡️ : {} ! Regarde au magasin.',
     'Du stellst es hin, wo du willst': 'Tu le poses où tu veux', 'Schwimmt auf dem See': 'Nage sur le lac', 'Fliegt über deine Welt': 'Vole au-dessus de ton monde',
-    'Fährt in die Berge': 'Monte dans les montagnes', '✅ Schon gekauft': '✅ Déjà acheté', 'Stell zuerst {} ab': 'Pose d’abord {}', 'Hast du schon {}×': 'Tu en as déjà {}×',
+    'Fährt in die Berge': 'Monte dans les montagnes', 'Neu': 'Nouveau', '✅ Schon gekauft': '✅ Déjà acheté', 'Stell zuerst {} ab': 'Pose d’abord {}', 'Hast du schon {}×': 'Tu en as déjà {}×',
     '🌱 Tiere & Pflanzen': '🌱 Animaux & plantes', '🏭 Gebäude': '🏭 Bâtiments', '🔧 Werkzeuge': '🔧 Outils', '🗺️ Land': '🗺️ Terrain', '🏔️ Deko': '🏔️ Déco',
     'Kaufen': 'Acheter', '🛒 Laden': '🛒 Magasin', '– du hast {} Fr.': '– tu as {} fr.', 'du trägst': 'tu portes',
     '📦 <b>Hole {} {} ab</b> – liegt bei {}× {} (bei {} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.': '📦 <b>Va chercher {} {}</b> – chez {}× {} (chez {} le stock est plein, le travail est bloqué !) – et vends-le au marchand.',

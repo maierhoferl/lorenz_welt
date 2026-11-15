@@ -98,7 +98,8 @@
   #plan .dim { opacity:.12; } #plan [data-info] { cursor:help; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
   .card { background:#fff; border-radius:16px; padding:10px; display:flex; flex-direction:column; gap:6px; box-shadow:0 2px 0 #e0cfa8; }
-  .card .ic { font-size:34px; } .card b { font-size:17px; } .card small { opacity:.75; font-size:13px; }
+  .card .ic { font-size:34px; position:relative; align-self:flex-start; }
+  .card .neu { position:absolute; top:-6px; right:-26px; background:#e8452c; color:#fff; font-size:11px; font-weight:800; padding:2px 6px; border-radius:8px; transform:rotate(12deg); } .card b { font-size:17px; } .card small { opacity:.75; font-size:13px; }
   .card .row { display:flex; gap:6px; align-items:center; margin-top:auto; }
   .card .price { font-weight:800; font-size:18px; margin-right:auto; }
   .card button.k { border:0; border-radius:10px; padding:8px 12px; font-weight:800; color:#fff; background:var(--green); }
