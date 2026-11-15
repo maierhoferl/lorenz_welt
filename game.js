@@ -716,10 +716,7 @@ let shopTab = 0, planCat = null;
 function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
-    if (!avail(k)) { // Vorschau: was mit mehr Land dazukommt
-      if (d.kind === 'grow') tabs[0].push({ icon: '🔒', name: d.name, price: 0, can: false, info: d.info, desc: $t`kommt ab Land-Stufe ${d.land} dazu – kauf mehr Land! 🗺️` });
-      continue;
-    }
+    if (!avail(k)) continue;
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
       icon: d.icon, name: d.name, price: d.price, info: d.info,
@@ -736,9 +733,6 @@ function shopList() {
     desc: $t`Doppelte Ernte auf allen Weizenfeldern`, note: G.guelle ? $t`✅ Schon gekauft` : $t`braucht Tiere, die Dung machen (Kühe, Säuli, Hühner)`,
     info: $t`Kuhfladen und Mist werden in einer grossen Grube gesammelt und mit Wasser zu Gülle verrührt. Der Bauer fährt sie mit dem Güllefass aufs Feld. Darin stecken Stickstoff, Phosphor und Kalium – Futter für die Pflanzen! So wächst der Weizen viel kräftiger. Es stinkt zwar, aber nur ein paar Tage.`,
     buy: () => { G.guelle = 1; toast(guelleOn() ? $t`💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!` : $t`💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!`); AU.sfx('grow'); } });
-  if (G.unlocks < UNLOCKS.length) tabs[1].push({ icon: '🔒', name: $t`Geheimes Rezept`, price: 0, can: false,
-    desc: $t`Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!`,
-    info: $t`Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.` });
   for (const [k, line] of Object.entries(TOOLS)) {
     if (G.land < (line.land || 0)) continue;
     const lv = G.tools[k], next = line.levels[lv + 1];
