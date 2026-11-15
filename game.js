@@ -816,25 +816,58 @@ function openPlan() {
   const cats = [...new Set(types.map(catOf))];
   if (!cats.includes(planCat)) planCat = cats.map(c => [c, types.filter(k => catOf(k) === c).reduce((a, k) => a + cnt[k], 0)]).sort((a, b) => b[1] - a[1])[0][0];
   const vis = types.filter(k => catOf(k) === planCat), used = [...new Set(vis.map(k => depth[k]))].sort((a, b) => a - b);
-  const NW = 180, NH = 70, GX = 70, GY = 18, posn = {}, rows = [];
-  for (const k of vis) { const c = used.indexOf(depth[k]); rows[c] = (rows[c] || 0) + 1; posn[k] = { x: 10 + c * (NW + GX), y: 10 + (rows[c] - 1) * (NH + GY) }; }
-  const Wd = 20 + used.length * (NW + GX) - GX, Hd = 20 + Math.max(...rows) * (NH + GY) - GY;
-  let edges = '', nodes = '';
+  const NW = 180, NH = 70, GX = 130, GY = 18, posn = {}, rows = [], col = {};
+  for (const k of vis) { const c = used.indexOf(depth[k]); col[k] = c; rows[c] = (rows[c] || 0) + 1; posn[k] = { x: 10 + c * (NW + GX), y: 10 + (rows[c] - 1) * (NH + GY) }; }
+  const Wd = 20 + used.length * (NW + GX) - GX;
+  let Hd = 20 + Math.max(...rows) * (NH + GY) - GY, edges = '', labels = '', nodes = '';
   const r = v => Math.round(v * 10) / 10;
-  const edge = (a, b, color, label) => {
-    const p = posn[a], q = posn[b], x1 = p.x + NW, y1 = p.y + NH / 2, x2 = q.x, y2 = q.y + NH / 2, mx = (x1 + x2) / 2;
-    edges += `<g data-e="${a}>${b}"><path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="3.5" marker-end="url(#ar)"/>`
-      + `<text x="${mx}" y="${(y1 + y2) / 2 - 5}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${label}</text></g>`;
-  };
+  // Pfeile überlagern sich nie: jeder hat eigene Anschlusspunkte, eigene senkrechte Spur pro Lücke,
+  // und Pfeile über mehrere Spalten laufen auf einer eigenen Bahn unter allen Kästchen durch.
   const users = k => vis.filter(f => THINGS[f].in?.[THINGS[k].item]), feeders = k => vis.filter(m => THINGS[k].in?.[THINGS[m].item]);
+  const E = [];
   for (const k of vis) {
     const it = THINGS[k].item;
-    users(k).forEach((f, i) => { // Menge gilt pro Ware, darum nur an der ersten Linie beschriften
+    users(k).forEach(f => {
       const on = cnt[k] && cnt[f];
       const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.8 ? '#e39b1c' : '#3d8b2f';
-      edge(k, f, color, i ? '' : on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon);
+      E.push({ a: k, b: f, color, label: on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon, long: col[f] - col[k] > 1 });
     });
   }
+  E.filter(e => e.long).forEach((e, i) => e.lane = Hd + 4 + i * 10);
+  Hd += E.filter(e => e.long).length * 10;
+  const mid = k => posn[k].y + NH / 2;
+  // ponytail: Abstand 8px, ab 8 Pfeilen an einer Kästchenseite wird es eng. Ein-Anschlüsse 4px versetzt → nie gleiche Höhe wie Aus-Anschlüsse.
+  const ports = (k, list, toward, shift) => list.sort((e, f) => toward(e) - toward(f)).forEach((e, i) => e[shift ? 'y2' : 'y1'] = mid(k) + shift + 8 * (i - Math.floor((list.length - 1) / 2)));
+  for (const k of vis) {
+    ports(k, E.filter(e => e.a === k), e => e.long ? 1e9 : mid(e.b), 0);
+    ports(k, E.filter(e => e.b === k), e => e.long ? 1e9 : mid(e.a), 4);
+  }
+  // senkrechte Spuren je Lücke: oben startende Abwärts-Pfeile nach rechts, so kreuzen sie sich am wenigsten
+  const gaps = {};
+  for (const e of E) {
+    const ya = e.long ? e.lane : e.y2;
+    (gaps[col[e.a]] ||= []).push({ e, k: 'ta', y1: e.y1, y2: ya });
+    if (e.long) (gaps[col[e.b] - 1] ||= []).push({ e, k: 'tb', y1: e.lane, y2: e.y2 });
+  }
+  for (const [c, L] of Object.entries(gaps)) {
+    L.sort((p, q) => (p.y2 >= p.y1 ? -p.y1 : p.y1 + 1e6) - (q.y2 >= q.y1 ? -q.y1 : q.y1 + 1e6));
+    L.forEach((t, j) => t.e[t.k] = 10 + (+c) * (NW + GX) + NW + GX * (j + 1) / (L.length + 1));
+  }
+  for (const e of E) {
+    const x1 = posn[e.a].x + NW, x2 = posn[e.b].x;
+    const pts = e.long ? [[x1, e.y1], [e.ta, e.y1], [e.ta, e.lane], [e.tb, e.lane], [e.tb, e.y2], [x2, e.y2]] : [[x1, e.y1], [e.ta, e.y1], [e.ta, e.y2], [x2, e.y2]];
+    let d = `M${pts[0]}`;
+    for (let i = 1; i < pts.length - 1; i++) { // Ecken abrunden
+      const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
+      const rr = Math.min(8, Math.hypot(x - px, y - py) / 2, Math.hypot(nx - x, ny - y) / 2);
+      const ux = Math.sign(x - px), uy = Math.sign(y - py), vx = Math.sign(nx - x), vy = Math.sign(ny - y);
+      d += ` L${x - ux * rr},${y - uy * rr} Q${x},${y} ${x + vx * rr},${y + vy * rr}`;
+    }
+    d += ` L${pts.at(-1)}`;
+    edges += `<g data-e="${e.a}>${e.b}"><path d="${d}" fill="none" stroke="${e.color}" stroke-width="3.5" marker-end="url(#ar)"/></g>`;
+    if (e.y1 === Math.min(...E.filter(f => f.a === e.a).map(f => f.y1))) labels += `<g data-e="${e.a}>${e.b}"><text x="${x1 + 6}" y="${e.y1 - 6}" font-size="12" font-weight="700" fill="${e.color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${e.label}</text></g>`;
+  }
+  edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
   const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
