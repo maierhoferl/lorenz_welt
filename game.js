@@ -480,7 +480,25 @@ function transfers() {
 }
 
 // Spediteur: jedes Fahrzeug startet alle <every> s beim Händler, fährt zu Gebäuden mit Endprodukten,
-// lädt bis <cap> Überschuss (surplus: kein Abnehmer hat Platz) ein und verkauft beim Händler. ponytail: Luftlinie, nicht auf den Wegen
+// lädt bis <cap> Überschuss (surplus: kein Abnehmer hat Platz) ein und verkauft beim Händler. Gefahren wird auf der Strasse (road).
+// Strassennetz = Hauptstrasse (x = ROAD_X) + Querwege. Zufahrt = kürzeste Gerade zur Strasse, die nicht durch den See geht.
+const wet = (a, b) => { for (let s = 0; s <= 1; s += 0.05) if (inLake(a.x + (b.x - a.x) * s, a.y + (b.y - a.y) * s, 0.5)) return true; return false; };
+function snap(p) { // nächster Strassenpunkt (Pixel); main = auf der Hauptstrasse, sonst auf dem Querweg in Zeile y
+  let best = null, bd = Infinity;
+  for (const pl of paths()) for (let j = 1; j < pl.length; j++) {
+    const [ax, ay] = pl[j - 1], [bx, by] = pl[j], main = ax === bx;
+    if (main && ax !== ROAD_X) continue; // Hof-Stummel
+    const q = { x: clamp(p.x, Math.min(ax, bx) * T, Math.max(ax, bx) * T), y: clamp(p.y, Math.min(ay, by) * T, Math.max(ay, by) * T), main }, d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d < bd && !wet(p, q)) { bd = d; best = q; }
+  }
+  return best;
+}
+function road(a, b) { // Wegpunkte von a nach b: Zufahrt → Querweg → Hauptstrasse → Querweg → Zufahrt
+  const sa = snap(a), sb = snap(b), R = ROAD_X * T;
+  if (!sa || !sb) return [b];
+  if (!sa.main && !sb.main && sa.y === sb.y) return [sa, sb, b]; // gleicher Querweg
+  return [sa, { x: R, y: sa.y }, { x: R, y: sb.y }, sb, b];
+}
 const fld = t => THINGS[t.type].kind === 'grow' ? 'store' : 'out'; // Lagerfeld: Ernte vs. fertige Ware
 const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
 function spedition(dt) {
@@ -511,8 +529,12 @@ function spedition(dt) {
       continue;
     }
     k.wait += dt;
-    const r = k.route[0], dx = r.x - k.x, dy = r.y - k.y, l = Math.hypot(dx, dy), v = T * 7 * dt;
-    if (l > v) { k.x += dx / l * v; k.y += dy / l * v; const d = Math.atan2(dy, dx) - k.h; k.h += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -4 * dt, 4 * dt); continue; }
+    const r = k.route[0];
+    if (!k.path?.length) k.path = road(k, r);
+    const w = k.path[0], dx = w.x - k.x, dy = w.y - k.y, l = Math.hypot(dx, dy), v = T * 7 * dt;
+    if (l > v) { k.x += dx / l * v; k.y += dy / l * v; const d = Math.atan2(dy, dx) - k.h; k.h += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -6 * dt, 6 * dt); continue; }
+    k.x = w.x; k.y = w.y; k.path.shift();
+    if (k.path.length) continue;
     k.route.shift();
     if (r.t) { // beim Gebäude einladen
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? Math.min(r.t[f], lv.cap - k.load) : 0;
