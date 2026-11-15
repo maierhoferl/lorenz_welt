@@ -888,7 +888,7 @@ function openPlan() {
     users(k).forEach(f => {
       const on = cnt[k] && cnt[f];
       const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.1 ? '#e39b1c' : '#3d8b2f';
-      E.push({ a: k, b: f, color, label: cnt[k] ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon, long: col[f] - col[k] > 1 });
+      E.push({ a: k, b: f, color, long: col[f] - col[k] > 1 });
     });
   }
   E.filter(e => e.long).forEach((e, i) => e.lane = Hd + 4 + i * 10);
@@ -923,7 +923,13 @@ function openPlan() {
     }
     d += ` L${pts.at(-1)}`;
     edges += `<g data-e="${e.a}>${e.b}"><path d="${d}" fill="none" stroke="${e.color}" stroke-width="3.5" marker-end="url(#ar)"/></g>`;
-    if (e.y1 === Math.min(...E.filter(f => f.a === e.a).map(f => f.y1))) labels += `<g data-e="${e.a}>${e.b}"><text x="${x1 + 6}" y="${e.y1 - 6}" font-size="12" font-weight="700" fill="${e.color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${e.label}</text></g>`;
+  }
+  // Σ-Label 1× pro Hersteller: ganze Produktion → ganze Abnahme (alle Abnehmer, auch anderer Reiter), über dem obersten Pfeil
+  for (const k of vis) {
+    const out = E.filter(e => e.a === k);
+    if (!out.length) continue;
+    const it = THINGS[k].item, top = Math.min(...out.map(e => e.y1)), c = out.find(e => e.color !== '#bbb')?.color || '#bbb';
+    labels += `<text x="${posn[k].x + NW + 6}" y="${top - 6}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it] || 0)}/min` : ITEMS[it].icon}</text>`;
   }
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
