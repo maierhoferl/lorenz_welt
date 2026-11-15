@@ -105,6 +105,7 @@ const AU = (() => {
   return {
     init, update,
     sfx: k => { if (ac && on) try { SFX[k](); } catch (e) {} },
-    toggle: () => { on = !on; if (master) master.gain.value = on ? 0.5 : 0; return on; },
+    toggle: () => { on = !on; if (master) master.gain.value = on ? 0.5 : 0; if (!on) speechSynthesis?.cancel(); return on; },
+    get on() { return on; },
   };
 })();

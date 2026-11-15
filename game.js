@@ -621,12 +621,25 @@ function modal(el, title, body, extraHead = '') {
   el.onclick = e => { if (e.target === el) { el.hidden = true; if (el.id === 'shop') shopDismiss = true; } };
   el.hidden = false;
 }
+// Vorlesen (Browser-Stimme in der gewählten Sprache); Info-Fenster zu oder Ton aus → Stimme aus
+const VOICE_LANG = { de: 'de-CH', fr: 'fr-CH', it: 'it-CH', en: 'en-GB' };
+function speak(html) {
+  if (!window.speechSynthesis || !AU.on) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(html.replace(/<[^>]+>/g, ' . ').replace(/\p{Extended_Pictographic}/gu, ''));
+  const vs = speechSynthesis.getVoices(), L = VOICE_LANG[LANG] || 'de-CH';
+  u.voice = vs.find(v => v.lang.replace('_', '-') === L) || vs.find(v => v.lang.startsWith(L.slice(0, 2))) || null;
+  u.lang = L; u.rate = 0.95;
+  speechSynthesis.speak(u);
+}
+new MutationObserver(() => { if ($('#info').hidden) window.speechSynthesis?.cancel(); }).observe($('#info'), { attributes: true, attributeFilter: ['hidden'] });
 function showInfo(t) {
   const d = THINGS[t.type] || t;
   let extra = '';
   if (d.kind === 'grow') { const tl = toolLv(d.tool); extra = $t`<p><b>Dein Werkzeug: ${tl.name}.</b> ${tl.info}</p><p>Ergibt ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name} alle ${d.time} Sekunden.</p>`; }
   if (d.kind === 'factory') extra = $t`<p><b>Rezept:</b> ${recipe(d)} in ${d.time} Sekunden.</p>`;
   modal($('#info'), $t`${d.icon || '💡'} ${d.name} – Wusstest du?`, `<p>${d.info}</p>${extra}<button class="btn" data-ok>${$t`Verstanden!`}</button>`);
+  speak(`${d.name}. ${d.info} ${extra}`);
   $('#info [data-ok]').onclick = () => $('#info').hidden = true;
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
@@ -665,7 +678,7 @@ function shopList() {
       icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
       desc: $t`${line.name} · jetzt: ${line.levels[lv].name}`,
       note: next.every ? $t`holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? $t`trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? $t`🤖 arbeitet automatisch!` : $t`${next.speed / line.levels[lv].speed}× schneller`,
-      buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
+      buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); speak(`${next.name}. ${next.info}`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });
   }
   const lp = LAND_PRICES[G.land] ?? LAND_PRICES.at(-1) + (G.land - LAND_PRICES.length + 1) * 2000;
