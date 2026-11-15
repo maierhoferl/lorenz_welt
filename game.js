@@ -1720,16 +1720,55 @@ function drawVoralp() {
     ctx.strokeStyle = 'rgba(240,255,200,.25)'; ctx.lineWidth = 2; ctx.beginPath();
     for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, crest(x)); ctx.stroke(); // Kuppenlinie
   }
-  // Bäche in den Lücken zwischen den Baumspalten, oben in der Wiese weit mäandernd, unter dem Weg durch
-  for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) { // nur wo der Weg drüberführt
-    const y0 = hillY(xs) + 6, P = [];
-    for (let y = y0; y <= lane; y += 6) P.push([xs + (8 + 18 * clamp((3.6 * T - y) / (2 * T), 0, 1)) * Math.sin(y / 55 + s * 1.7), y]);
-    const stroke = (col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
-    stroke('#3f7f8f', 12); stroke('#6cc0e0', 7);
+  // Bäche in den Lücken zwischen den Baumspalten: oben in der Wiese fliessen 1–2 Seitenbäche zusammen, dann unter dem Weg durch
+  const stream = (P, w) => {
+    const stroke = (col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
+    stroke('#3f7f8f', w + 5); stroke('#6cc0e0', w);
     ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30; stroke('rgba(255,255,255,.7)', 1.5); ctx.setLineDash([]); // fliessendes Glitzern
-    const r = seeded(s * 13 + 1); // Steine am Ufer und an der Quelle
-    ellipse(P[0][0] - 7, y0, 7, 4, '#9a9a92'); ellipse(P[0][0] + 6, y0 + 1, 5, 3, '#b5b4ab');
+  };
+  const source = (x, y) => { ellipse(x - 7, y, 7, 4, '#9a9a92'); ellipse(x + 6, y + 1, 5, 3, '#b5b4ab'); };
+  for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) { // nur wo der Weg drüberführt
+    const r = seeded(s * 13 + 1), f1 = 40 + r() * 30, f2 = 15 + r() * 12, p1 = r() * 7, p2 = r() * 7;
+    const wig = y => 0.65 * Math.sin(y / f1 + p1) + 0.35 * Math.sin(y / f2 + p2); // zufällig, aber fest pro Bach
+    const y0 = hillY(xs) + 6, P = [];
+    for (let y = y0; y <= lane; y += 6) P.push([xs + (8 + 20 * clamp((3.6 * T - y) / (2 * T), 0, 1)) * wig(y), y]);
+    const tribs = [], n = 1 + Math.floor(r() * 2);
+    for (let k = 0; k < n; k++) { // Seitenbach: startet seitlich am Hang, schwenkt spät in den Hauptbach ein
+      const side = (k ? -tribs[0].side : r() < 0.5 ? -1 : 1), sx = clamp(xs + side * (1.8 + r() * 2.2) * T, (a.x + 0.3) * T, (WORLD.w - 1) * T);
+      const j = P[Math.floor((1.1 * T + r() * 1.8 * T - y0) / 6)], sy = hillY(sx) + 6, Q = [], g1 = 20 + r() * 20, ph = r() * 7;
+      for (let t = 0; t <= 1.001; t += 6 / (j[1] - sy)) Q.push([sx + (j[0] - sx) * t ** 1.7 + Math.sin(Math.PI * t) * (14 * Math.sin(t * (j[1] - sy) / g1 + ph) + 6 * Math.sin(t * (j[1] - sy) / 11 + ph * 2)), sy + (j[1] - sy) * t]);
+      tribs.push({ side, Q, jy: j[1] });
+    }
+    for (const t of tribs) { stream(t.Q, 4); source(t.Q[0][0], t.Q[0][1]); }
+    const jTop = Math.min(...tribs.map(t => t.jy)), up = P.filter(p => p[1] <= jTop + 6);
+    stream(up, 5); stream(P.filter(p => p[1] >= jTop), 7); // nach dem Zusammenfluss breiter
+    source(P[0][0], y0);
     for (let i = 0; i < 10; i++) { const [x, y] = P[Math.floor(r() * P.length)]; ellipse(x + (r() < 0.5 ? -8 : 8), y, 3, 2, '#a9a79c'); }
+  }
+}
+// Fischteiche liegen im Sumpf: Moorboden, Tümpel, Schilf und Rohrkolben zwischen den Teichen
+function drawSumpf() {
+  const a = AREAS.fischerei; if (!areaOn(a)) return;
+  const rows = Math.ceil(slotsAvail('fischerei') / a.cols), x0 = (a.x - 2) * T, x1 = (a.x + (a.cols - 1) * a.dx + 2) * T, y0 = (a.y - 1.4) * T, y1 = (a.y + (rows - 1) * a.dy + 1) * T;
+  const ponds = Array.from({ length: a.cols * rows }, (_, i) => slotPos('fischerei', i)), free = (x, y, m) => ponds.every(p => ((x - p.x) / (78 + m)) ** 2 + ((y - p.y + 14) / (36 + m)) ** 2 > 1);
+  const r = seeded(77), n = Math.round((x1 - x0) * (y1 - y0) / 900);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, edge = (x, y) => clamp(1.4 - Math.hypot((x - cx) / (x1 - cx), (y - cy) / (y1 - cy)), 0, 1); // zum Rand hin ausblenden
+  for (let i = 0; i < n; i++) { const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0), e = edge(x, y); ctx.globalAlpha = e; ellipse(x, y, 30 + r() * 40, 12 + r() * 14, r() < 0.5 ? 'rgba(70,85,40,.16)' : 'rgba(110,120,55,.14)'); } // Moorboden
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < n; i++) { // Tümpel
+    const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0), w = 10 + r() * 18;
+    if (!free(x, y, w) || r() > edge(x, y)) continue;
+    ellipse(x, y, w + 3, w * 0.4 + 2, '#6b5a35'); ellipse(x, y, w, w * 0.4, '#4d7f86'); ellipse(x - w * 0.3, y - 1.5, w * 0.4, w * 0.1, 'rgba(255,255,255,.25)');
+    if (r() < 0.5) ellipse(x + w * 0.3, y + 1, 4, 2, '#5f9a3a'); // Seerosenblatt
+  }
+  for (let i = 0; i < n / 2; i++) { // Schilf & Rohrkolben in Büscheln
+    const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0);
+    if (!free(x, y, 6) || r() > edge(x, y) + 0.2) continue;
+    for (let k = 0; k < 4 + r() * 5; k++) {
+      const bx = x + (r() - 0.5) * 18, h = 18 + r() * 20, lean = (r() - 0.5) * 8 + Math.sin(time * 1.2 + bx * 0.05) * 1.5;
+      line(r() < 0.5 ? '#5c8a34' : '#7a9a3e', 1.6, bx, y, bx + lean, y - h);
+      if (r() < 0.3) ellipse(bx + lean * 0.9, y - h * 0.9, 1.8, 4.5, '#6b4423'); // Rohrkolben
+    }
   }
 }
 // ---- See ----
@@ -2013,6 +2052,7 @@ function render() {
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
   drawAlps(); drawVoralp();
   for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
+  drawSumpf();
   // Wege
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
