@@ -2,6 +2,10 @@
 // English. Keys in ui = original German text from game.js / index.html.
 var TR = {
   ui: {
+    "wird beim Händler verkauft": "sold at the trader",
+    "Spediteur": "haulier",
+    "Zutat aus einem anderen Reiter": "ingredient from another tab",
+    "Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.": "Tip: tap a box – the whole chain lights up. ℹ️ explains how it works.",
     // Avatar-Baukasten (data.js → LOOK)
     "🎨 Aussehen": "🎨 Look",
     "Wie siehst du aus, {}?": "What do you look like, {}?",

@@ -2,6 +2,10 @@
 // Italiano (Ticino). Le chiavi in ui = testo tedesco originale di game.js / index.html.
 var TR = {
   ui: {
+    "wird beim Händler verkauft": "venduto dal commerciante",
+    "Spediteur": "spedizioniere",
+    "Zutat aus einem anderen Reiter": "ingrediente da un’altra scheda",
+    "Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.": "Consiglio: tocca una casella – tutta la catena si illumina. ℹ️ spiega come funziona.",
     // Avatar-Baukasten (data.js → LOOK)
     "🎨 Aussehen": "🎨 Aspetto",
     "Wie siehst du aus, {}?": "Come sei fatto, {}?",

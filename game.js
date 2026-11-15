@@ -684,7 +684,7 @@ function showInfo(t) {
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
 
-let shopTab = 0;
+let shopTab = 0, planCat = null;
 function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
@@ -764,41 +764,32 @@ function openPlan() {
   const makers = it => types.filter(k => THINGS[k].item === it);
   const dep = k => depth[k] ?? (depth[k] = THINGS[k].kind === 'grow' ? 0 : 1 + Math.max(0, ...Object.keys(THINGS[k].in).flatMap(it => makers(it).map(dep))));
   types.forEach(dep);
-  const maxD = Math.max(...Object.values(depth)) + 1;
   const cnt = {}, sup = {}, dem = {};
   for (const k of types) cnt[k] = G.things.filter(t => t.type === k).length;
   for (const k of types) { const d = THINGS[k]; sup[d.item] = (sup[d.item] || 0) + cnt[k] * d.n / d.time * 60; if (d.in) for (const i in d.in) dem[i] = (dem[i] || 0) + cnt[k] * d.in[i] / d.time * 60; }
-  const cols = Array.from({ length: maxD + 1 }, () => []);
-  types.forEach(k => cols[depth[k]].push(k)); cols[maxD].push('haendler');
-  const NW = 170, NH = 62, GX = 70, GY = 18, LH = 26, posn = {};
-  // Kategorien = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel). Jede Kategorie ein eigenes Band.
+  // Ein Reiter pro Rohstoff. Kategorie = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel).
   const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = Object.keys(THINGS).find(f => THINGS[f].item === it); return m ? catOf(m) : it; };
-  const cats = [...new Set(types.map(catOf))], Wd = 20 + (maxD + 1) * (NW + GX) - GX;
-  let edges = '', nodes = '', bands = '', y = 10;
-  cats.forEach((c, i) => {
-    const inC = cols.slice(0, maxD).map(col => col.filter(k => catOf(k) === c)), h = LH + Math.max(...inC.map(col => col.length)) * (NH + GY);
-    bands += `<rect x="2" y="${y - 4}" width="${Wd - 4 - NW - GX / 2}" height="${h}" rx="14" fill="rgba(168,116,63,${i % 2 ? .13 : .07})"/><text x="12" y="${y + 14}" font-size="14" font-weight="800" fill="#7a5530">${ITEMS[c].icon} ${ITEMS[c].name}</text>`;
-    inC.forEach((col, ci) => col.forEach((k, ri) => { posn[k] = { x: 10 + ci * (NW + GX), y: y + LH + ri * (NH + GY) }; }));
-    y += h + 8;
-  });
-  const Hd = y;
-  posn.haendler = { x: 10 + maxD * (NW + GX), y: (Hd - NH) / 2 };
+  const cats = [...new Set(types.map(catOf))];
+  if (!cats.includes(planCat)) planCat = cats.map(c => [c, types.filter(k => catOf(k) === c).reduce((a, k) => a + cnt[k], 0)]).sort((a, b) => b[1] - a[1])[0][0];
+  const vis = types.filter(k => catOf(k) === planCat), used = [...new Set(vis.map(k => depth[k]))].sort((a, b) => a - b);
+  const NW = 180, NH = 70, GX = 70, GY = 18, posn = {}, rows = [];
+  for (const k of vis) { const c = used.indexOf(depth[k]); rows[c] = (rows[c] || 0) + 1; posn[k] = { x: 10 + c * (NW + GX), y: 10 + (rows[c] - 1) * (NH + GY) }; }
+  const Wd = 20 + used.length * (NW + GX) - GX, Hd = 20 + Math.max(...rows) * (NH + GY) - GY;
+  let edges = '', nodes = '';
   const r = v => Math.round(v * 10) / 10;
-  const edge = (a, b, it, color, dash, label) => {
+  const edge = (a, b, color, label) => {
     const p = posn[a], q = posn[b], x1 = p.x + NW, y1 = p.y + NH / 2, x2 = q.x, y2 = q.y + NH / 2, mx = (x1 + x2) / 2;
-    edges += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="${dash ? 2 : 3.5}" ${dash ? 'stroke-dasharray="6 5"' : ''} marker-end="url(#ar)"/>`;
-    if (label) edges += `<text x="${mx}" y="${(y1 + y2) / 2 - 5}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${label}</text>`;
+    edges += `<g data-e="${a}>${b}"><path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="3.5" marker-end="url(#ar)"/>`
+      + `<text x="${mx}" y="${(y1 + y2) / 2 - 5}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${label}</text></g>`;
   };
-  for (const k of types) {
-    const d = THINGS[k], it = d.item;
-    const consumers = types.filter(f => THINGS[f].in?.[it]);
-    for (const f of consumers) {
+  const users = k => vis.filter(f => THINGS[f].in?.[THINGS[k].item]), feeders = k => vis.filter(m => THINGS[k].in?.[THINGS[m].item]);
+  for (const k of vis) {
+    const it = THINGS[k].item;
+    users(k).forEach((f, i) => { // Menge gilt pro Ware, darum nur an der ersten Linie beschriften
       const on = cnt[k] && cnt[f];
-      let color = '#bbb';
-      if (on) color = sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.8 ? '#e39b1c' : '#3d8b2f';
-      edge(k, f, it, color, false, on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon);
-    }
-    if (cnt[k] && !consumers.some(f => cnt[f])) edge(k, 'haendler', it, '#3e7bc4', true, `${ITEMS[it].icon} ${d.kind === 'factory' && G.tools.spedition ? '🚚 Spediteur' : 'du trägst'}`);
+      const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.8 ? '#e39b1c' : '#3d8b2f';
+      edge(k, f, color, i ? '' : on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon);
+    });
   }
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
@@ -837,20 +828,33 @@ function openPlan() {
     if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
   }
   tips.sort((a, b) => b.v - a.v);
-  for (const k of types.concat('haendler')) {
-    const p = posn[k], d = THINGS[k] || FIXED.find(f => f.type === k), on = k === 'haendler' || cnt[k] > 0;
-    const warn = G.things.some(t => t.type === k && t.warn);
-    const rate = THINGS[k] ? (cnt[k] ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : `${d.price} Fr. im Laden`) : 'macht Geld 💰';
-    const ic = d.icon || '💰';
+  for (const k of vis) {
+    const p = posn[k], d = THINGS[k], on = cnt[k] > 0, warn = G.things.some(t => t.type === k && t.warn);
+    const rate = on ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : $t`${d.price} Fr. im Laden`;
+    const extra = Object.keys(d.in || {}).filter(it => !vis.some(m => THINGS[m].item === it)).map(it => ITEMS[it].icon).join(''); // Zutaten aus anderen Reitern
+    const sell = !types.some(f => THINGS[f].in?.[d.item] && cnt[f]) ? `→ 💰${on ? ' ' + (d.kind === 'factory' && G.tools.spedition ? '🚚' : '🎒') : ''}` : '';
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
-      <text x="${p.x + 10}" y="${p.y + 26}" font-size="16" font-weight="800">${ic} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
-      <text x="${p.x + 10}" y="${p.y + 47}" font-size="12" fill="#555">${rate}</text>
+      <text x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
+      <text x="${p.x + 10}" y="${p.y + 43}" font-size="12" fill="#555">${rate}</text>
+      <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${extra ? '+ ' + extra : ''}${extra && sell ? '  ' : ''}${sell}</text>
+      <text data-info="${k}" x="${p.x + NW - 18}" y="${p.y + NH - 8}" font-size="16">ℹ️</text>
       ${warn ? `<circle cx="${p.x + NW - 4}" cy="${p.y + 4}" r="11" fill="#d23b2b"/><text x="${p.x + NW - 4}" y="${p.y + 9}" text-anchor="middle" fill="#fff" font-weight="900" font-size="15">!</text>` : ''}</g>`;
   }
-  const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${bands}${edges}${nodes}</svg>`;
-  const legend = `<div class="legend"><span style="color:#3d8b2f">━ passt</span><span style="color:#d23b2b">━ zu wenig</span><span style="color:#e39b1c">━ zu viel</span><span style="color:#3e7bc4">┅ du musst tragen</span><span style="opacity:.5">▢ noch nicht gebaut</span></div>`;
-  modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><h3>Was jetzt am meisten bringt</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="geschätzter Nutzen in den nächsten ${M} Minuten"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} Fr.</span></li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ol><small>≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten. </small><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
-  $('#plan').querySelectorAll('[data-k]').forEach(g => g.onclick = () => showInfo(THINGS[g.dataset.k] ? { type: g.dataset.k } : FIXED.find(f => f.type === g.dataset.k)));
+  const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${edges}${nodes}</svg>`;
+  const head = `<div class="tabs">${cats.map(c => `<button data-cat="${c}" class="${c === planCat ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}</button>`).join('')}</div>`;
+  const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`wird beim Händler verkauft`} (🎒 ${$t`du trägst`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">+ ${$t`Zutat aus einem anderen Reiter`}</span><span style="opacity:.5">▢ ${$t`noch nicht gebaut`}</span></div>`;
+  modal($('#plan'), $t`📊 Dein Produktions-Plan`, `${legend}<div style="overflow:auto">${svg}</div><h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small><small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`, head);
+  const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
+  el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
+  let focus = null; // Antippen: Zulieferer und Abnehmer bleiben hell, der Rest wird blass
+  el.querySelectorAll('[data-k]').forEach(g => g.onclick = e => {
+    const k = g.dataset.k;
+    if (e.target.dataset.info) return showInfo({ type: k });
+    focus = focus === k ? null : k;
+    const keep = focus && new Set([k, ...chain(k, feeders), ...chain(k, users)]);
+    el.querySelectorAll('[data-k]').forEach(n => n.classList.toggle('dim', !!keep && !keep.has(n.dataset.k)));
+    el.querySelectorAll('[data-e]').forEach(n => { const [a, b] = n.dataset.e.split('>'); n.classList.toggle('dim', !!keep && !(keep.has(a) && keep.has(b))); });
+  });
 }
 
 // =================== Zeichnen ===================
