@@ -464,7 +464,8 @@ function transfers() {
 }
 
 // Spediteur: jedes Fahrzeug startet alle <every> s beim Händler, fährt zu Gebäuden mit Endprodukten,
-// lädt bis <cap> ein und verkauft beim Händler. ponytail: Luftlinie, nicht auf den Wegen
+// lädt bis <cap> Überschuss (surplus: kein Abnehmer hat Platz) ein und verkauft beim Händler. ponytail: Luftlinie, nicht auf den Wegen
+const fld = t => THINGS[t.type].kind === 'grow' ? 'store' : 'out'; // Lagerfeld: Ernte vs. fertige Ware
 const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
 function spedition(dt) {
   const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition'), hx = h.x + 140, hy = h.y + 20;
@@ -473,9 +474,9 @@ function spedition(dt) {
     if (!k.route.length) { // im Depot
       if ((k.wait += dt) < lv.every) continue;
       const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t)));
-      const todo = G.things.filter(t => THINGS[t.type].kind === 'factory' && t.out && !busy.has(t) && !hasConsumer(THINGS[t.type].item)).sort((a, b) => b.out - a.out);
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => b[fld(b)] - a[fld(a)]);
       let left = lv.cap;
-      for (const t of todo) { if (left <= 0) break; k.route.push({ t, x: t.x, y: t.y + 24 }); left -= t.out; }
+      for (const t of todo) { if (left <= 0) break; const p = pos(t); k.route.push({ t, x: p.x, y: p.y + 24 }); left -= t[fld(t)]; }
       if (!k.route.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
       k.wait = 0; k.route.push({ x: hx, y: hy + i * 45 }); // zurück auf den eigenen Parkplatz
       continue;
@@ -485,8 +486,8 @@ function spedition(dt) {
     if (l > v) { k.x += dx / l * v; k.y += dy / l * v; const d = Math.atan2(dy, dx) - k.h; k.h += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -4 * dt, 4 * dt); continue; }
     k.route.shift();
     if (r.t) { // beim Gebäude einladen
-      const it = THINGS[r.t.type].item, n = Math.min(r.t.out, lv.cap - k.load);
-      r.t.out -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
+      const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? Math.min(r.t[f], lv.cap - k.load) : 0;
+      r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
     } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
   }
 }

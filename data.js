@@ -258,7 +258,7 @@ const TOOLS = {
     { name: 'Gabelstapler', speed: 5, price: 7000, info: 'Zwei Gabeln fahren unter die Palette und heben sie mit Hydraulik hoch. Hinten hat der Stapler ein schweres Gegengewicht, damit er nicht nach vorne kippt.' },
     { name: 'Containerkran', speed: 20, price: 25000, auto: true, info: 'Ein riesiger Portalkran hebt ganze Container vom Zug oder Schiff – 30 Tonnen auf einmal. Ein Computer weiss genau, wo jeder Container steht. ARBEITET AUTOMATISCH!' },
   ]},
-  // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Endprodukte (Ware, die kein Gebäude weiterverarbeitet) und verkauft sie
+  // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Überschuss-Waren (kein Abnehmer hat Platz) und verkauft sie
   spedition: { name: 'Spediteur', icon: '🚚', levels: [
     { name: 'Kein Spediteur', cap: 0, price: 0, info: 'Noch trägst du alle fertigen Waren selbst zum Händler.' },
     { name: 'Bote mit Lastenrad', cap: 8, every: 30, price: 2500, info: 'Du stellst einen Boten an: Er holt fertige Waren aus deinen Gebäuden und verkauft sie für dich beim Händler. Ein Lastenrad hat vorne eine grosse Kiste – ohne Benzin, nur mit Muskelkraft. Angestellte bekommen Lohn, darum ist das teuer!' },
