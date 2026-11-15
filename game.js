@@ -245,7 +245,7 @@ function slotPos(area, i) {
 const FELD_N = THINGS.feld.n, MIST = ['kuh', 'schwein', 'huhn', 'masthuhn'];
 const guelleOn = () => !!G.guelle && G.things.some(t => MIST.includes(t.type));
 // Ostrand der freigeschalteten Bereiche: dort beginnt das Neuland im Osten
-const ostX = () => Math.max(60, ...Object.values(AREAS).filter(a => G.land >= (a.from || 0)).map(a => Math.ceil(a.x + (a.cols - 1) * a.dx + 6)));
+const ostX = () => Math.max(60, ...Object.values(AREAS).filter(a => G.land >= (a.from || 0)).map(a => Math.ceil(a.x + (a.cols - 1) * a.dx + 4)));
 function relayout() { // Plätze neu setzen – das Neuland im Osten rückt nach, wenn ein neuer Bereich dazukommt
   for (const t of G.things) {
     const p = slotPos(THINGS[t.type].area, t.slot); Object.assign(t, p);
@@ -290,7 +290,8 @@ function loadGame(server) {
     G.deco = (G.deco || []).filter(d => DECOS[d.type]);
     if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
-    relayout();
+    relayout(); fitWorld();
+    for (const d of G.deco) d.y = Math.min(d.y, (WORLD.h - 0.5) * T); // Welt kann kleiner geworden sein – Deko bleibt drin
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
     if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }

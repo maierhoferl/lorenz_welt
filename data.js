@@ -7,7 +7,7 @@
 // Alles andere (Laden, Diagramm, Warnungen, Transport) funktioniert dann automatisch.
 
 const T = 48;                      // Pixel pro Kachel
-const WORLD = { w: 60, h: 44 };    // Weltgrösse in Kacheln (h wächst mit gekauftem Land)
+const WORLD = { w: 60, h: 41 };    // Weltgrösse in Kacheln (h wächst mit gekauftem Land)
 const WORLD_H0 = WORLD.h;
 const HARVEST_TIME = 3;            // Sekunden Ernte von Hand (geteilt durch Werkzeug-Tempo)
 const OUT_CAP = 10;                // Lager-Grösse für fertige Waren in Gebäuden
@@ -321,18 +321,18 @@ const LAND_PRICES = [120, 300, 700, 1500, 3000];
 // Ist das Raster voll, geht es im Neuland weiter – abwechselnd im Süden (ex = Spalte, ec = Spalten dort)
 // und im Osten (ey = Zeile, 2 Reihen pro Bereich, wächst nach rechts ab dem Ostrand). So wird die Welt breiter UND länger.
 const AREAS = {
-  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 7,   dy: 5, base: 2, per: 2, ex: 4,  ec: 2 , ey: 4 },
-  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3, ex: 18, ec: 5 , ey: 14 },
-  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3, ex: 33, ec: 3 , ey: 20 },
-  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2, ex: 46, ec: 2 , ey: 28 },
+  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 5.8, dy: 3.8, base: 2, per: 2, ex: 4,  ec: 2 , ey: 4 },
+  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.4, dy: 2.6, base: 4, per: 3, ex: 14, ec: 5 , ey: 14 },
+  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 2.6, dy: 2.6, base: 2, per: 3, ex: 26, ec: 3 , ey: 20 },
+  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 5.5, dy: 5.5, base: 2, per: 2, ex: 35, ec: 2 , ey: 28 },
   // from = erst ab dieser Land-Stufe; liegt im Osten, die Welt wird dafür breiter
-  weinberg:  { name: 'Weinberg',    x: 63, y: 5,  cols: 3, rows: 5, dx: 4,   dy: 3.5, base: 3, per: 2, from: 10, ex: 60, ec: 2 , ey: 42 },
-  fischerei: { name: 'Fischteiche', x: 64, y: 26, cols: 3, rows: 4, dx: 4.5, dy: 4,   base: 2, per: 2, from: 20, ex: 69, ec: 2 , ey: 49 },
-  tierhof:   { name: 'Tierhof',     x: 81, y: 7,  cols: 3, rows: 4, dx: 5,   dy: 4.5, base: 3, per: 2, from: 30, ex: 78, ec: 3 , ey: 57 },
-  terminal:  { name: 'Import-Terminal', x: 98, y: 9, cols: 2, rows: 5, dx: 6,  dy: 5,   base: 2, per: 2, from: 35, ex: 93, ec: 2 , ey: 66 },
+  weinberg:  { name: 'Weinberg',    x: 63, y: 5,  cols: 3, rows: 5, dx: 3.3, dy: 2.8, base: 3, per: 2, from: 10, ex: 45, ec: 2 , ey: 42 },
+  fischerei: { name: 'Fischteiche', x: 64, y: 26, cols: 3, rows: 4, dx: 3.5, dy: 3.1, base: 2, per: 2, from: 20, ex: 52.5, ec: 2 , ey: 49 },
+  tierhof:   { name: 'Tierhof',     x: 77, y: 7,  cols: 3, rows: 4, dx: 3.6, dy: 3.4, base: 3, per: 2, from: 30, ex: 59, ec: 3 , ey: 57 },
+  terminal:  { name: 'Import-Terminal', x: 90, y: 9, cols: 2, rows: 5, dx: 4.2, dy: 3.6, base: 2, per: 2, from: 35, ex: 70.5, ec: 2 , ey: 66 },
 };
 // Die Welt wird nach Osten breiter, sobald ein östlicher Bereich dazukommt (siehe fitWorld). Wege: [ab Land-Stufe, Weg]
-const PATHS_EAST = [[10, [[50, 30], [61, 30], [61, 4]]], [30, [[61, 23], [77, 23], [77, 4]]], [35, [[77, 23], [94, 23], [94, 5]]]];
+const PATHS_EAST = [[10, [[50, 30], [61, 30], [61, 4]]], [30, [[61, 23], [74.5, 23], [74.5, 4]]], [35, [[74.5, 23], [87.5, 23], [87.5, 5]]]];
 // Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
 const HOF_LV = [2, 5, 10, 15, 20];
 const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
@@ -368,7 +368,7 @@ const STAGES = [
 
 // Wege (Kacheln) für die Optik
 // Weg ins Neuland im Süden (erscheint, sobald dort Plätze liegen)
-const PATHS_SOUTH = [[[32, 30], [32, 44]], [[4, 44], [96, 44]]];
+const PATHS_SOUTH = [[[32, 30], [32, 41]], [[4, 41], [96, 41]]];
 const PATHS = [
   [[29, 13], [29, 18], [23, 18], [23, 24]],
   [[29, 18], [36, 18], [36, 24]],
