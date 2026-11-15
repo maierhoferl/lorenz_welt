@@ -245,10 +245,12 @@ function checkUnlock(k) {
 function slotsAvail(area) { const a = AREAS[area], f = a.from || 0; return G.land < f ? 0 : a.base + a.per * (G.land - f); }
 function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
   const a = AREAS[area];
-  return { x: (a.x + Math.floor(i / a.rows) * a.dx) * T, y: (a.y + (i % a.rows) * a.dy) * T };
+  const [c, r] = a.cols ? [i % a.cols, Math.floor(i / a.cols)] : [Math.floor(i / a.rows), i % a.rows];
+  return { x: (a.x + c * a.dx) * T, y: (a.y + r * a.dy) * T };
 }
 const areaOn = a => G.land >= (a.from || 0);
-const areaEnd = k => { const a = AREAS[k]; return a.x + Math.max(0, Math.ceil(slotsAvail(k) / a.rows) - 1) * a.dx; }; // x der letzten Spalte
+const areaEnd = k => { const a = AREAS[k], n = slotsAvail(k); return a.x + Math.max(0, (a.cols ? Math.min(a.cols, n) : Math.ceil(n / a.rows)) - 1) * a.dx; }; // x der letzten Spalte
+const areaRows = k => { const a = AREAS[k]; return a.cols ? Math.max(1, Math.ceil(slotsAvail(k) / a.cols)) : a.rows; };
 // Gülle-Verteiler (ab Land-Stufe 20): sammelt Dung von den Tieren und düngt die Weizenfelder → doppelte Ernte
 const FELD_N = THINGS.feld.n, MIST = ['kuh', 'schwein', 'huhn', 'masthuhn'];
 const guelleOn = () => !!G.guelle && G.things.some(t => MIST.includes(t.type));
@@ -262,7 +264,7 @@ function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun w
   const on = Object.keys(AREAS).filter(k => areaOn(AREAS[k]));
   PASTURE.w = Math.max(10, areaEnd('weide') - PASTURE.x + 1.6);
   WORLD.w = Math.max(48, ...on.map(k => Math.ceil(areaEnd(k) + 3)));
-  WORLD.h = Math.max(...on.map(k => { const a = AREAS[k]; return Math.max(a.y + (a.rows - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); }));
+  WORLD.h = Math.max(...on.map(k => { const a = AREAS[k]; return Math.max(a.y + (areaRows(k) - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); }));
 }
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 function paths() {
@@ -1665,6 +1667,33 @@ function tanne(x, y, s = 1) {
   }
 }
 
+// Obstgarten = Voralpen: sanfte Hügelwellen (je Baumreihe eine) und Bäche, die aus der Alp herunterkommen
+function drawVoralp() {
+  const a = AREAS.obst, x0 = (ROAD_X + 0.9) * T, x1 = WORLD.w * T, lane = a.lane[0] * T;
+  for (let r = -1; r < a.rows; r++) {
+    const yb = (a.y + r * a.dy) * T + 14, top = yb - 1.6 * T;
+    const crest = x => yb - (yb - (top + 14 * Math.sin(x / 190 + r * 2) + 8 * Math.sin(x / 67 + r))) * Math.sqrt(1 - (1 - Math.min(1, (x - x0) / (2.5 * T))) ** 2); // rundes Westende
+    ctx.beginPath(); ctx.moveTo(x0, yb);
+    for (let x = x0; x <= x1 + 11; x += 12) ctx.lineTo(Math.min(x, x1), crest(Math.min(x, x1)));
+    ctx.lineTo(x1, yb + 0.7 * T); ctx.lineTo(x0, yb + 0.7 * T); ctx.closePath();
+    const g = ctx.createLinearGradient(0, top - 20, 0, yb + 0.7 * T); // Licht oben, Schatten am Fuss, weich auslaufend
+    g.addColorStop(0, 'rgba(220,245,130,.32)'); g.addColorStop(0.4, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(30,60,20,.2)'); g.addColorStop(1, 'rgba(30,60,20,0)');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(240,255,200,.25)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, crest(x)); ctx.stroke(); // Kuppenlinie
+  }
+  // Bäche in den Lücken zwischen den Baumspalten, oben in der Wiese weit mäandernd, unter dem Weg durch
+  for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) { // nur wo der Weg drüberführt
+    const y0 = hillY(xs) + 6, P = [];
+    for (let y = y0; y <= lane; y += 6) P.push([xs + (8 + 18 * clamp((3.6 * T - y) / (2 * T), 0, 1)) * Math.sin(y / 55 + s * 1.7), y]);
+    const stroke = (col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
+    stroke('#3f7f8f', 12); stroke('#6cc0e0', 7);
+    ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30; stroke('rgba(255,255,255,.7)', 1.5); ctx.setLineDash([]); // fliessendes Glitzern
+    const r = seeded(s * 13 + 1); // Steine am Ufer und an der Quelle
+    ellipse(P[0][0] - 7, y0, 7, 4, '#9a9a92'); ellipse(P[0][0] + 6, y0 + 1, 5, 3, '#b5b4ab');
+    for (let i = 0; i < 10; i++) { const [x, y] = P[Math.floor(r() * P.length)]; ellipse(x + (r() < 0.5 ? -8 : 8), y, 3, 2, '#a9a79c'); }
+  }
+}
 // ---- See ----
 // Weinberg: sanfte Hügelkuppen, Rebreihen auf Terrassen mit Trockenmäuerchen
 function drawHill(a, end) {
@@ -1944,7 +1973,7 @@ function render() {
   ctx.fillStyle = '#3f6e2a'; ctx.fillRect(0, 0, W, H);
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
-  drawAlps();
+  drawAlps(); drawVoralp();
   for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
   // Wege
   ctx.lineCap = ctx.lineJoin = 'round';

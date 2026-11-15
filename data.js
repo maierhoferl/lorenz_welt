@@ -319,6 +319,7 @@ const LAND_PRICES = [120, 300, 700, 1500, 3000];
 // Bereiche = Bänder (Kacheln). Westlich der Hauptstrasse (x = ROAD_X) liegt der Hof mit Laden, Händler und See.
 // Jedes Band füllt sich spaltenweise (rows Plätze untereinander) und wächst mit jedem Land nach Osten.
 // Bereiche mit from kommen erst ab dieser Land-Stufe dazu – als neues Band im Süden. base + per*Landstufe = freie Plätze.
+// cols = Band füllt zeilenweise (cols Plätze nebeneinander) und wächst nach Süden statt nach Osten.
 // lane = Weg-Zeile(n) des Bandes (vom Hauptweg bis ans Bandende). hill = Hügel-Landschaft darunter.
 const ROAD_X = 18;
 const AREAS = {
@@ -327,9 +328,9 @@ const AREAS = {
   weide: { name: 'Weide',      x: 20.6, y: 31.3, rows: 3, dx: 2.2, dy: 2,   base: 2, per: 3 },
   dorf:  { name: 'Dorf',       x: 20.6, y: 41,   rows: 3, dx: 3.3, dy: 5.1, base: 2, per: 2, lane: [41.9, 47, 52.1] },
   weinberg:  { name: 'Weinberg',    x: 20.4, y: 54.4, rows: 4, dx: 3.2, dy: 1.6, base: 3, per: 2, from: 10, lane: [52.1], hill: [53, 60] },
-  fischerei: { name: 'Fischteiche', x: 20.6, y: 62.2, rows: 3, dx: 3.5, dy: 1.5, base: 2, per: 2, from: 20, lane: [60.3] },
-  tierhof:   { name: 'Tierhof',     x: 20.6, y: 69,   rows: 2, dx: 3.4, dy: 1.8, base: 3, per: 2, from: 30, lane: [66.7] },
-  terminal:  { name: 'Import-Terminal', x: 20.7, y: 74.1, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, lane: [71.9] },
+  fischerei: { name: 'Fischteiche', x: 4, y: 34.4, cols: 4, dx: 3.5, dy: 1.7, base: 2, per: 2, from: 20 }, // südlich vom See, wächst nach Süden
+  tierhof:   { name: 'Tierhof',     x: 20.6, y: 62.6, rows: 2, dx: 3.4, dy: 1.8, base: 3, per: 2, from: 30, lane: [60.3] },
+  terminal:  { name: 'Import-Terminal', x: 20.7, y: 67.7, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, lane: [65.5] },
 };
 // Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
 const HOF_LV = [2, 5, 10, 15, 20];
