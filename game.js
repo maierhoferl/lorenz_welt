@@ -752,13 +752,23 @@ function showInfo(t) {
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
 
 let shopTab = 0, planCat = null;
+// Gebäude-Reiter: nach Rohstoff gruppiert (Ware → erste Zutat bis zum Rohstoff), innerhalb nach Verarbeitungsstufe
+const maker = it => Object.keys(THINGS).find(k => THINGS[k].item === it);
+const rootOf = it => { const d = THINGS[maker(it)]; return d?.in ? rootOf(Object.keys(d.in)[0]) : it; };
+const depth = it => { const d = THINGS[maker(it)]; return d?.in ? 1 + Math.max(...Object.keys(d.in).map(depth)) : 0; };
+function groupShop(L) {
+  const g = {};
+  for (const it of L) (g[it.root] ||= []).push(it);
+  const roots = Object.keys(ITEMS).filter(r => g[r]); // Reihenfolge wie in ITEMS (Weizen, Milch, Apfel, …)
+  return roots.flatMap(r => [{ head: `${ITEMS[r].icon} ${ITEMS[r].name}` }, ...g[r].sort((a, b) => a.depth - b.depth || a.price - b.price)]);
+}
 function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
     if (!avail(k)) continue;
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
-      icon: d.icon, name: d.name, price: d.price, info: d.info, neu: !G.things.some(t => t.type === k),
+      root: rootOf(d.item), depth: depth(d.item), icon: d.icon, name: d.name, price: d.price, info: d.info, neu: !G.things.some(t => t.type === k),
       desc: d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
       note: free ? $t`kommt auf: ${AREAS[d.area].name}` : $t`⚠️ Kein Platz – kauf mehr Land!`, can: free,
       buy: () => {
@@ -768,7 +778,7 @@ function shopList() {
       },
     });
   }
-  if (G.land >= 20) tabs[1].push({ icon: '💩', name: $t`Gülle-Verteiler`, price: 3000, can: !G.guelle, neu: !G.guelle,
+  if (G.land >= 20) tabs[1].push({ root: 'weizen', depth: 9, icon: '💩', name: $t`Gülle-Verteiler`, price: 3000, can: !G.guelle, neu: !G.guelle,
     desc: $t`Doppelte Ernte auf allen Weizenfeldern`, note: G.guelle ? $t`✅ Schon gekauft` : $t`braucht Tiere, die Dung machen (Kühe, Säuli, Hühner)`,
     info: $t`Kuhfladen und Mist werden in einer grossen Grube gesammelt und mit Wasser zu Gülle verrührt. Der Bauer fährt sie mit dem Güllefass aufs Feld. Darin stecken Stickstoff, Phosphor und Kalium – Futter für die Pflanzen! So wächst der Weizen viel kräftiger. Es stinkt zwar, aber nur ein paar Tage.`,
     buy: () => { G.guelle = 1; toast(guelleOn() ? $t`💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!` : $t`💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!`); AU.sfx('grow'); } });
@@ -813,7 +823,7 @@ function openShop() {
   const tabs = shopList(), names = [$t`🌱 Tiere & Pflanzen`, $t`🏭 Gebäude`, $t`🔧 Werkzeuge`, $t`🗺️ Land`, $t`🏔️ Deko`];
   const L = tabs[shopTab];
   const head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
-  const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
+  const body = `<div class="cards">${L.map((it, i) => it.head ? `<h3 class="grp">${it.head}</h3>` : `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
     <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
   modal($('#shop'), `${$t`🛒 Laden`} <small style="font-weight:600;font-size:16px">${$t`– du hast ${G.money} Fr.`}</small>`, body, head);
