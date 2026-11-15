@@ -132,6 +132,13 @@ const TOOLS = {
     { name: 'Leiterwagen', cap: 100, price: 200, info: 'Vier Räder tragen das ganze Gewicht – du musst nur noch ziehen.' },
     { name: 'Traktor mit Anhänger', cap: 240, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
   ]},
+  // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Endprodukte (Ware, die kein Gebäude weiterverarbeitet) und verkauft sie
+  spedition: { name: 'Spediteur', icon: '🚚', levels: [
+    { name: 'Kein Spediteur', cap: 0, price: 0, info: 'Noch trägst du alle fertigen Waren selbst zum Händler.' },
+    { name: 'Bote mit Lastenrad', cap: 8, every: 30, price: 2500, info: 'Du stellst einen Boten an: Er holt fertige Waren aus deinen Gebäuden und verkauft sie für dich beim Händler. Ein Lastenrad hat vorne eine große Kiste – ohne Benzin, nur mit Muskelkraft. Angestellte bekommen Lohn, darum ist das teuer!' },
+    { name: 'Lieferwagen', cap: 25, every: 25, price: 6000, info: 'Ein Lieferwagen hat hinten einen großen Laderaum ohne Fenster. Mit Kühl-Lieferwagen bleiben Joghurt, Käse und Torten auch im Sommer frisch – innen sind es nur 4 °C.' },
+    { name: 'Lastwagen', cap: 60, every: 20, price: 15000, info: 'Ein Lastwagen (LKW) darf bis zu 40 Tonnen wiegen – so viel wie 30 Autos! Der Fahrer braucht einen eigenen Führerschein und muss nach 4½ Stunden Fahrt eine Pause machen.' },
+  ]},
 };
 
 const LAND_PRICES = [120, 300, 700, 1500, 3000];

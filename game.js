@@ -275,7 +275,7 @@ let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = 
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
 let trH = 0; // Fahrtrichtung des Traktors (Bogenmaß)
 const packages = [], floaters = [], particles = [];
-let acc = { tr: 0, w: 0, save: 0, hud: 0 };
+let acc = { tr: 0, w: 0, save: 0, hud: 0, sp: 0 };
 
 function update(dt) {
   time += dt;
@@ -316,6 +316,7 @@ function update(dt) {
     }
   }
   if ((acc.tr += dt) > 0.35) { acc.tr = 0; transfers(); }
+  if ((acc.sp += dt) > (toolLv('spedition').every || 1e9)) { acc.sp = 0; spedition(); }
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); }
@@ -362,6 +363,18 @@ function transfers() {
   }
 }
 
+function spedition() { // Spediteur holt Endprodukte ab und verkauft sie beim Händler
+  const h = FIXED_E.find(f => f.type === 'haendler');
+  let left = toolLv('spedition').cap, sum = 0;
+  for (const t of G.things) {
+    const d = THINGS[t.type];
+    if (!left) break;
+    if (d.kind !== 'factory' || !t.out || hasConsumer(d.item)) continue;
+    const n = Math.min(t.out, left); t.out -= n; left -= n; sum += n * ITEMS[d.item].price;
+    packages.push({ x0: t.x, y0: t.y - 20, x1: h.x, y1: h.y - 30, t: 0, dur: 2.5, icon: '🚚' + ITEMS[d.item].icon });
+  }
+  if (sum) { G.money += sum; floater(h.x, h.y - 90, `🚚 +${sum} €`); AU.sfx('cash'); }
+}
 function warnings() {
   const sup = {}, dem = {};
   for (const t of G.things) {
@@ -554,7 +567,7 @@ function shopList() {
     tabs[2].push({
       icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
       desc: `${line.name} · jetzt: ${line.levels[lv].name}`,
-      note: next.cap ? `trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? '🤖 arbeitet automatisch!' : `${next.speed / line.levels[lv].speed}× schneller`,
+      note: next.every ? `holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? `trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? '🤖 arbeitet automatisch!' : `${next.speed / line.levels[lv].speed}× schneller`,
       buy: () => { G.tools[k]++; modal($('#info'), `${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>Super!</button>`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });
   }
@@ -616,7 +629,7 @@ function openPlan() {
       if (on) color = sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.8 ? '#e39b1c' : '#3d8b2f';
       edge(k, f, it, color, false, on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon);
     }
-    if (cnt[k] && !consumers.some(f => cnt[f])) edge(k, 'haendler', it, '#3e7bc4', true, `${ITEMS[it].icon} du trägst`);
+    if (cnt[k] && !consumers.some(f => cnt[f])) edge(k, 'haendler', it, '#3e7bc4', true, `${ITEMS[it].icon} ${d.kind === 'factory' && G.tools.spedition ? '🚚 Spediteur' : 'du trägst'}`);
   }
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ € in den nächsten M Minuten
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
