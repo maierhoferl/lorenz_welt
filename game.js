@@ -202,6 +202,7 @@ function addThing(type) {
 function newGame() {
   G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null };
   for (const k in TOOLS) G.tools[k] = 0;
+  trucks.length = 0; // anderer Spieler: Fahrzeuge neu aufstellen
   addThing('feld').ripe = true;
   addThing('baum').ripe = true;
   addThing('baum').timer = 15;
@@ -297,8 +298,8 @@ cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', j
 let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, amp = 0, time = 0;
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
 let trH = 0; // Blickrichtung von Figur und Traktor (Bogenmass, 0 = rechts)
-const packages = [], floaters = [], particles = [];
-let acc = { tr: 0, w: 0, save: 0, hud: 0, sp: 0 };
+const packages = [], floaters = [], particles = [], trucks = [];
+let acc = { tr: 0, w: 0, save: 0, hud: 0 };
 
 function update(dt) {
   time += dt;
@@ -341,7 +342,7 @@ function update(dt) {
   }
   for (const d of G.deco) if (d.type === 'alphorn' && Math.random() < dt * 0.7 && dist(G.px, G.py, d.x, d.y) < 9 * T) floaters.push({ x: d.x + 60 + rndf(-6, 6), y: d.y - 30, text: Math.random() < 0.5 ? '♪' : '♫', t: 0 });
   if ((acc.tr += dt) > 0.35) { acc.tr = 0; transfers(); }
-  if ((acc.sp += dt) > (toolLv('spedition').every || 1e9)) { acc.sp = 0; spedition(); }
+  spedition(dt);
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); }
@@ -388,17 +389,32 @@ function transfers() {
   }
 }
 
-function spedition() { // Spediteur holt Endprodukte ab und verkauft sie beim Händler
-  const h = FIXED_E.find(f => f.type === 'haendler');
-  let left = toolLv('spedition').cap, sum = 0;
-  for (const t of G.things) {
-    const d = THINGS[t.type];
-    if (!left) break;
-    if (d.kind !== 'factory' || !t.out || hasConsumer(d.item)) continue;
-    const n = Math.min(t.out, left); t.out -= n; left -= n; sum += n * ITEMS[d.item].price;
-    packages.push({ x0: t.x, y0: t.y - 20, x1: h.x, y1: h.y - 30, t: 0, dur: 2.5, icon: '🚚' + ITEMS[d.item].icon });
+// Spediteur: jedes Fahrzeug startet alle <every> s beim Händler, fährt zu Gebäuden mit Endprodukten,
+// lädt bis <cap> ein und verkauft beim Händler. ponytail: Luftlinie, nicht auf den Wegen
+const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
+function spedition(dt) {
+  const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition'), hx = h.x + 140, hy = h.y + 20;
+  while (trucks.length < truckCount()) trucks.push({ x: hx, y: hy + trucks.length * 45, h: Math.PI, wait: trucks.length * 4, route: [], load: 0, sum: 0 });
+  for (const [i, k] of trucks.entries()) {
+    if (!k.route.length) { // im Depot
+      if ((k.wait += dt) < lv.every) continue;
+      const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t)));
+      const todo = G.things.filter(t => THINGS[t.type].kind === 'factory' && t.out && !busy.has(t) && !hasConsumer(THINGS[t.type].item)).sort((a, b) => b.out - a.out);
+      let left = lv.cap;
+      for (const t of todo) { if (left <= 0) break; k.route.push({ t, x: t.x, y: t.y + 24 }); left -= t.out; }
+      if (!k.route.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
+      k.wait = 0; k.route.push({ x: hx, y: hy + i * 45 }); // zurück auf den eigenen Parkplatz
+      continue;
+    }
+    k.wait += dt;
+    const r = k.route[0], dx = r.x - k.x, dy = r.y - k.y, l = Math.hypot(dx, dy), v = T * 7 * dt;
+    if (l > v) { k.x += dx / l * v; k.y += dy / l * v; const d = Math.atan2(dy, dx) - k.h; k.h += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -4 * dt, 4 * dt); continue; }
+    k.route.shift();
+    if (r.t) { // beim Gebäude einladen
+      const it = THINGS[r.t.type].item, n = Math.min(r.t.out, lv.cap - k.load);
+      r.t.out -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
+    } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, `🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
   }
-  if (sum) { G.money += sum; floater(h.x, h.y - 90, `🚚 +${sum} Fr.`); AU.sfx('cash'); }
 }
 function warnings() {
   const sup = {}, dem = {};
@@ -436,7 +452,7 @@ function warnings() {
   }
 }
 
-function score() { return G.things.length + G.land * 3 + Object.values(G.tools).reduce((a, b) => a + b, 0) * 2; }
+function score() { return G.things.length + G.land * 3 + (G.lkw || 0) * 2 + Object.values(G.tools).reduce((a, b) => a + b, 0) * 2; }
 function checkStage() {
   let s = 0; STAGES.forEach((st, i) => { if (score() >= st.score) s = i; });
   if (s > G.stage) { G.stage = s; toast(`🎉 ${P.name} ist gewachsen! Jetzt ${age()} Jahre alt.`); AU.sfx('grow'); }
@@ -634,6 +650,9 @@ function shopList() {
     info: 'Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.' });
   for (const [k, line] of Object.entries(TOOLS)) {
     const lv = G.tools[k], next = line.levels[lv + 1];
+    if (!next && k === 'spedition') { tabs[2].push({ icon: '🚛', name: `Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
+      desc: `${line.name} · du hast ${truckCount()} Fahrzeuge`, note: 'fährt zusätzlich und holt noch mehr Waren ab',
+      buy: () => { G.lkw = (G.lkw || 0) + 1; toast(`🚛 Du hast jetzt ${truckCount()} Lastwagen!`); } }); continue; }
     if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: 'Beste Stufe erreicht! 🏆', info: line.levels[lv].info, can: false, price: 0 }); continue; }
     tabs[2].push({
       icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
@@ -1109,8 +1128,8 @@ function drawCart(ax, ay, s) {
 }
 // Pseudo-3D in Blickrichtung trH: a = längs (vorne +), b = quer (in der Tiefe gestaucht), z = Höhe.
 // P(a, b, z) → Bildschirm; P.d(a, b) = Tiefe (grösser = näher am Betrachter, später zeichnen)
-function proj(x, y, s) {
-  const ux = Math.cos(trH), uy = Math.sin(trH);
+function proj(x, y, s, h = trH) {
+  const ux = Math.cos(h), uy = Math.sin(h);
   const P = (a, b, z = 0) => [x + (ux * a - uy * b) * s, y + (uy * a + ux * b * 0.5) * s - z * s];
   return Object.assign(P, { ux, uy, d: (a, b) => uy * a + ux * b * 0.5 });
 }
@@ -1118,6 +1137,17 @@ function box3(P, a0, a1, b, z0, h, top, side) {
   const C = [[a1, b], [a1, -b], [a0, -b], [a0, b]], ring = z => C.map(([a, q]) => P(a, q, z)), lo = ring(z0), hi = ring(z0 + h);
   [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
   poly(hi, top);
+}
+// Spediteur-Fahrzeug: Lastenrad, Lieferwagen oder Lastwagen (je nach Stufe), in Fahrtrichtung k.h
+function drawTruck(k) {
+  const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
+  const L = lv === 3 ? 30 : 18, col = ['', '#e39b1c', '#f2f2f2', '#d23b2b'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e'][lv];
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-L - 6, 15], [34, 15], [34, -15], [-L - 6, -15]]) ctx.lineTo(...P(a, b)); ctx.fill();
+  const whl = (a, b) => { const [cx, cy] = P(a, b, 7); wheelE(cx, cy, 7 * s, ux, uy); };
+  const parts = [[-L + 6, 12], [-L + 6, -12], [24, 12], [24, -12]].map(([a, b]) => ({ d: P.d(a, b), f: () => whl(a, b) }));
+  parts.push({ d: 0, f: () => { box(-L - 4, 14, 13, 6, 30, '#c9a24a', '#a8842f'); box(14, 34, 12, 6, 22, col, dark); box(28, 33, 10, 18, 8, '#9fd3f0', '#7ab6d8'); } }); // Ladefläche, Kabine, Scheibe
+  parts.sort((a, b) => a.d - b.d).forEach(p => p.f());
+  if (k.icons) { ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.fillText(k.icons, ...P(-L / 2 + 5, 0, 44)); }
 }
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
 function tractorParts(x, y, s) {
@@ -1578,12 +1608,13 @@ function render() {
   for (const t of G.things) if (t.type === 'feld') drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld').map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land').map(d => [d.y, d]));
+    G.deco.filter(d => DECOS[d.type].where === 'land').map(d => [d.y, d]), trucks.map(k => [k.y, { truck: k }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, t] of list) {
     if (!t) drawPlayer();
+    else if (t.truck) drawTruck(t.truck);
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
       ctx.globalAlpha = 0.85; ellipse(t.x, t.y, 22, 8, ok ? 'rgba(80,200,80,.45)' : 'rgba(220,50,40,.5)');
