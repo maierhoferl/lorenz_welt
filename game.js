@@ -617,7 +617,7 @@ const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k 
 const ghostPos = () => ({ x: G.px + Math.cos(trH) * 46, y: G.py + 2 + Math.sin(trH) * 46 });
 let nearDeco = null;
 function decoSpotOk(x, y) {
-  if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6)) return false;
+  if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6) || nearRiver(x, y, 0.6 * T)) return false;
   for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
   for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko
     if (k === 'weide') continue;
@@ -825,6 +825,7 @@ function shopList() {
     buy: () => {
       G.land++; fitWorld(); relayout(); fixDeco(); toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
       const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
+      if (i === 1 || i === 3) setTimeout(() => toast($t`🏪 Laden und Händler ziehen in grössere Häuser!`), 2500);
       for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Süden ⬇️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
   });
@@ -1180,19 +1181,31 @@ const DRAW = {
     }
     flagPole(x + 158, y, 96, 26, 0);
   },
-  haendler(x, y) {
+  haendler(x, y) { // wächst mit der Land-Stufe (HOF_LV): Marktstand → Markthalle → Grosshandel
+    const lv = hofLv();
+    if (lv >= 4) { grosshandel(x + 6, y, lv); return; }
+    if (lv >= 2) { markthalle(x - 10, y, lv); return; }
+    if (lv >= 1) { // Waage und mehr Kisten neben dem Stand
+      crate(x - 84, y, '#7fbf4a', 9); crate(x - 84, y - 14, '#e0b54a', 9); crate(x + 82, y, '#d8332a', 10);
+      ctx.fillStyle = '#7d7468'; ctx.fillRect(x + 70, y - 34, 4, 22); line('#555', 2, x + 60, y - 34, x + 84, y - 34); ellipse(x + 60, y - 30, 7, 2.5, '#b8b0a2'); ellipse(x + 84, y - 30, 7, 2.5, '#b8b0a2'); // Waage
+    }
     ellipse(x + 6, y, 70, 10, 'rgba(0,0,0,.22)');
     ctx.fillStyle = '#6b4423'; ctx.fillRect(x - 60, y - 72, 5, 72); ctx.fillRect(x + 55, y - 72, 5, 72);
-    // Händler
-    ellipse(x, y - 52, 9, 10, '#f1c9a5'); ctx.fillStyle = '#4a3020'; ctx.beginPath(); ctx.arc(x, y - 56, 9, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = '#3f6fb0'; ctx.fillRect(x - 11, y - 42, 22, 14);
+    haendlerMann(x, y - 42);
     ctx.fillStyle = '#9b6a3a'; ctx.fillRect(x - 62, y - 30, 124, 30); ctx.fillStyle = '#7b5228'; ctx.fillRect(x - 62, y - 30, 124, 5);
     crate(x - 38, y - 30, '#d8332a', 10); crate(x - 10, y - 30, '#e0b54a', 10); crate(x + 32, y - 30, '#f5f5f0', 8);
     awning(x, y - 84, 132, '#d23b2b', '#fff', 10);
     sign(x, y - 94, $t`HÄNDLER 💰`);
     flagPole(x + 57, y - 72, 26, 16, 2);
   },
-  laden(x, y) {
+  laden(x, y) { // wächst mit der Land-Stufe (HOF_LV): Lädeli → Dorfladen → moderner Markt
+    const lv = hofLv();
+    if (lv >= 4) { supermarkt(x, y, lv); return; }
+    if (lv >= 2) { dorfladen(x, y, lv); return; }
+    if (lv >= 1) { // Gemüse-Gestell vor dem Laden
+      ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 128, y - 30, 40, 4); ctx.fillRect(x - 128, y - 16, 40, 4); ctx.fillRect(x - 128, y - 30, 3, 30); ctx.fillRect(x - 91, y - 30, 3, 30);
+      for (let i = 0; i < 4; i++) { ellipse(x - 122 + i * 10, y - 34, 4.5, 4, ['#e8483b', '#f29a2e', '#7fbf4a', '#e8483b'][i]); ellipse(x - 122 + i * 10, y - 20, 4.5, 4, ['#f2cf3b', '#7fbf4a', '#b5652a', '#f29a2e'][i]); }
+    }
     house(x, y, 140, 72, '#f0dfb2', '#3d6b8f', 32);
     ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 62, y - 56, 46, 40); ctx.fillRect(x + 16, y - 56, 46, 40);
     ctx.fillStyle = '#cfe8f5'; ctx.fillRect(x - 60, y - 54, 42, 36); ctx.fillRect(x + 18, y - 54, 42, 36);
@@ -1355,6 +1368,104 @@ function flowers(x0, x1, y) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x0, y, x1 
 function balcony(x, w, y) {
   ctx.fillStyle = '#7a4a26'; ctx.fillRect(x - w / 2 - 4, y - 2, w + 8, 4); for (let bx = x - w / 2; bx <= x + w / 2; bx += 8) ctx.fillRect(bx, y - 2, 2.5, 12); ctx.fillRect(x - w / 2 - 4, y + 8, w + 8, 2.5);
   flowers(x - w / 2, x + w / 2, y - 4);
+}
+// ---- Laden & Händler: Ausbaustufen ----
+function haendlerMann(x, y) { // y = Schultern
+  ellipse(x, y - 10, 9, 10, '#f1c9a5'); ctx.fillStyle = '#4a3020'; ctx.beginPath(); ctx.arc(x, y - 14, 9, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#3f6fb0'; ctx.fillRect(x - 11, y, 22, 14);
+}
+function shopWin(x, y, w, h, frame = '#5b3a1e') { // grosses Schaufenster mit Spiegelung
+  ctx.fillStyle = frame; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+  const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#d9eef8'); g.addColorStop(1, '#7fa9c6'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(x + w * 0.15, y); ctx.lineTo(x + w * 0.35, y); ctx.lineTo(x + w * 0.1, y + h); ctx.lineTo(x - w * 0.1 > x ? x : x, y + h); ctx.fill();
+}
+function shopCart(x, y) { // Einkaufswagen
+  ctx.strokeStyle = '#8c949c'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 9, y - 16, 18, 10);
+  for (let i = -6; i <= 6; i += 4) line('#a9b0b7', 1, x + i, y - 16, x + i, y - 6);
+  line('#8c949c', 2, x + 9, y - 16, x + 13, y - 20); line('#d52b1e', 3, x + 11, y - 20, x + 15, y - 20);
+  wheel(x - 6, y - 2, 2.5); wheel(x + 6, y - 2, 2.5);
+}
+function dorfladen(x, y, lv) { // Stufe 2–3: zweistöckiger Dorfladen mit Schaufenstern (3: Gartencenter daneben)
+  if (lv >= 3) { // Gartencenter mit Zaun, Bäumchen und Blumen
+    const gx = x - 150;
+    ctx.fillStyle = 'rgba(120,90,50,.18)'; ctx.fillRect(gx - 34, y - 34, 68, 34);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { const px = gx - 22 + i * 22, py = y - 22 + j * 16; ctx.fillStyle = '#b5652a'; ctx.fillRect(px - 5, py - 6, 10, 7); ellipse(px, py - 10, 7, 6, j ? '#5f9a3a' : ['#e8303a', '#f2cf3b', '#e870b0'][i]); }
+    ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 2; ctx.strokeRect(gx - 34, y - 34, 68, 34);
+    for (let px = gx - 34; px <= gx + 34; px += 8.5) line('#f2f2f2', 1.5, px, y, px, y - 10);
+    sign(gx, y - 46, $t`GARTEN 🌷`);
+  }
+  house(x, y, 180, 118, '#f4e6c4', '#7a3b2a', 40);
+  ctx.fillStyle = '#e3d2a8'; ctx.fillRect(x - 90, y - 52, 180, 4); // Gesims
+  shopWin(x - 82, y - 46, 52, 40); shopWin(x + 30, y - 46, 52, 40);
+  ctx.font = '15px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🧀🍞🥛', x - 56, y - 20); ctx.fillText('🔧🌱🐄', x + 56, y - 20);
+  shopWin(x - 13, y - 44, 26, 44, '#3d6b8f'); line('#3d6b8f', 2, x, y - 44, x, y); // Glastür
+  for (const wx of [-70, -20, 30]) { shutterWin(wx + x, y - 100, 18, 16); flowers(x + wx - 4, x + wx + 22, y - 80); }
+  awning(x, y - 66, 186, '#d52b1e', '#fff', 14);
+  sign(x, y - 136, $t`DORFLADEN 🛒`);
+  if (lv >= 3) { ctx.fillStyle = '#8a5a30'; ctx.fillRect(x + 96, y - 14, 30, 4); ctx.fillRect(x + 99, y - 10, 3, 10); ctx.fillRect(x + 120, y - 10, 3, 10); } // Bänkli
+}
+function supermarkt(x, y, lv) { // Stufe 4–5: moderner Markt mit Glasfront, Flachdach (5: Solardach, Parkplatz, Ladesäule)
+  const w = 250, h = 96, x0 = x - w / 2 - 10;
+  ellipse(x - 2, y, w / 2 + 20, 11, 'rgba(0,0,0,.22)');
+  const g = ctx.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, '#f4f4f0'); g.addColorStop(1, '#c9ccd0'); ctx.fillStyle = g; ctx.fillRect(x0, y - h, w, h);
+  ctx.fillStyle = '#d52b1e'; ctx.fillRect(x0 - 6, y - h - 14, w + 12, 16); // Dachrand
+  if (lv >= 5) for (let i = 0; i < 8; i++) { ctx.fillStyle = '#1f3a64'; ctx.beginPath(); const px = x0 + 6 + i * 30; ctx.moveTo(px, y - h - 14); ctx.lineTo(px + 26, y - h - 14); ctx.lineTo(px + 22, y - h - 28); ctx.lineTo(px + 4, y - h - 28); ctx.fill(); line('rgba(150,190,240,.6)', 1, px + 13, y - h - 14, px + 13, y - h - 28); } // Solarpanels
+  // Glasfront mit Sprossen
+  const gx = x0 + 16, gw = w - 32, gh = 58, gy = y - gh;
+  shopWin(gx, gy, gw, gh, '#4a4f56');
+  for (let px = gx + gw / 6; px < gx + gw - 2; px += gw / 6) line('#4a4f56', 2.5, px, gy, px, y);
+  ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ['🍎🥕', '🧀🥛', '🔧🪴', '🐄🚜', '🌳🌾'].forEach((e, i) => { if (i !== 2) ctx.fillText(e, gx + gw / 6 * (i + 0.5 + (i > 2 ? 1 : 0)), gy + 40); });
+  const o = Math.max(0, Math.sin(time * 0.8)) * 12; // Schiebetür geht auf und zu
+  ctx.fillStyle = '#2d3a46'; ctx.fillRect(x - 20, gy, 40, gh); shopWin(x - 20 - o, gy, 20, gh, '#4a4f56'); shopWin(x + o, gy, 20, gh, '#4a4f56');
+  ctx.fillStyle = '#d52b1e'; rrect(x - 66, y - h + 8, 132, 22, 6); ctx.fill(); // Leuchtschrift
+  ctx.font = '800 13px system-ui'; ctx.fillStyle = '#fff'; ctx.fillText($t`LADEN 🛒`, x, y - h + 24);
+  for (let i = 0; i < 3; i++) shopCart(x - 150 + i * 7, y + 6);
+  if (lv >= 5) { // Ladesäule fürs E-Auto
+    const ex = x - 186; ctx.fillStyle = '#e8eef2'; rrect(ex - 7, y - 40, 14, 40, 3); ctx.fill(); ctx.fillStyle = '#3fb55a'; ctx.fillRect(ex - 4, y - 34, 8, 6); line('#2a2a2a', 2, ex + 7, y - 20, ex + 14, y - 10, ex + 12, y - 2);
+  }
+  flagPole(x0 + w - 14, y - h - 14, 44, 20, 4); // auf dem Dach
+}
+function markthalle(x, y, lv) { // Stufe 2–3: offene Holz-Markthalle (3: Leiterwagen mit Säcken)
+  ellipse(x + 6, y, 104, 12, 'rgba(0,0,0,.22)');
+  for (const px of [-92, -32, 28, 88]) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x + px - 3, y - 84, 7, 84); } // Pfosten
+  ctx.fillStyle = 'rgba(60,40,20,.25)'; ctx.fillRect(x - 92, y - 84, 184, 84); // Schatten unter dem Dach
+  haendlerMann(x, y - 46);
+  ctx.fillStyle = '#9b6a3a'; ctx.fillRect(x - 96, y - 32, 192, 32); ctx.fillStyle = '#7b5228'; ctx.fillRect(x - 96, y - 32, 192, 5); // Theke
+  [['#d8332a', 10], ['#e0b54a', 10], ['#f5f5f0', 8], ['#7fbf4a', 9], ['#b5652a', 8]].forEach(([c, n], i) => crate(x - 74 + i * 36 + (i > 1 ? 12 : 0), y - 32, c, n));
+  ctx.fillStyle = '#7a3b2a'; ctx.beginPath(); ctx.moveTo(x - 116, y - 80); ctx.lineTo(x, y - 128); ctx.lineTo(x + 116, y - 80); ctx.closePath(); ctx.fill(); // Satteldach
+  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1; for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.moveTo(x - 116 + i * 19.3, y - 80 - i * 8); ctx.lineTo(x + 116 - i * 19.3, y - 80 - i * 8); ctx.stroke(); } // Ziegelreihen
+  ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 118, y - 82, 236, 6);
+  sign(x, y - 104, $t`MARKTHALLE 💰`);
+  flagPole(x + 96, y - 84, 30, 16, 2);
+  if (lv >= 3) { // Leiterwagen
+    const wx = x + 140; ctx.fillStyle = '#9b6a3a'; ctx.fillRect(wx - 26, y - 22, 52, 10); wheel(wx - 16, y - 6, 8); wheel(wx + 16, y - 6, 8);
+    for (let i = 0; i < 3; i++) ellipse(wx - 14 + i * 14, y - 28, 8, 7, '#e3d2a8'); line('#6b4423', 2.5, wx - 26, y - 16, wx - 44, y - 4);
+  }
+}
+function grosshandel(x, y, lv) { // Stufe 4–5: Lagerhalle mit Rolltor, Büro mit Glasfront und Rampe (5: Gabelstapler fährt Paletten)
+  const w = 240, h = 92, x0 = x - w / 2;
+  ellipse(x + 6, y, w / 2 + 14, 12, 'rgba(0,0,0,.22)');
+  const g = ctx.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, '#9fb3c0'); g.addColorStop(1, '#6f8594'); ctx.fillStyle = g; ctx.fillRect(x0, y - h, w, h);
+  for (let px = x0 + 4; px < x0 + w; px += 7) line('rgba(255,255,255,.18)', 1.5, px, y - h, px, y); // Wellblech
+  ctx.fillStyle = '#3f5563'; ctx.beginPath(); ctx.moveTo(x0 - 8, y - h); ctx.lineTo(x0 + 20, y - h - 22); ctx.lineTo(x0 + w - 20, y - h - 22); ctx.lineTo(x0 + w + 8, y - h); ctx.fill(); // flaches Dach
+  // Büro mit Glasfront links
+  ctx.fillStyle = '#f4f4f0'; ctx.fillRect(x0 + 8, y - 70, 78, 70); shopWin(x0 + 14, y - 64, 66, 26, '#4a4f56'); shopWin(x0 + 14, y - 32, 30, 32, '#4a4f56');
+  haendlerMann(x0 + 62, y - 26); ctx.fillStyle = '#d0c4a8'; ctx.fillRect(x0 + 46, y - 14, 34, 14); // am Schalter
+  // Rolltor und Rampe
+  const rx = x0 + 120; ctx.fillStyle = '#2f3b44'; ctx.fillRect(rx - 4, y - 68, 76, 68);
+  const op = 38 + Math.sin(time * 0.6) * 10; ctx.fillStyle = '#c9ced2'; ctx.fillRect(rx, y - 64, 68, 64 - op);
+  for (let py = y - 64 + 5; py < y - op; py += 5) line('#9aa1a7', 1, rx, py, rx + 68, py);
+  ctx.fillStyle = '#5d4630'; for (let i = 0; i < 2; i++) { ctx.fillRect(rx + 8 + i * 30, y - 8, 24, 4); crate(rx + 20 + i * 30, y - 8, ['#d8332a', '#e0b54a'][i], 9); } // Paletten im Tor
+  ctx.fillStyle = '#ffd23a'; ctx.fillRect(rx - 4, y - 6, 76, 6); for (let i = 0; i < 8; i++) { ctx.fillStyle = '#2a2a2a'; ctx.fillRect(rx - 2 + i * 10, y - 6, 5, 6); } // Rampenkante
+  ctx.fillStyle = '#d52b1e'; rrect(x - 70, y - h + 4, 140, 20, 5); ctx.fill();
+  ctx.font = '800 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText($t`GROSSHANDEL 💰`, x, y - h + 18);
+  if (lv >= 5) { // Gabelstapler pendelt vor der Halle
+    const fx = x0 + 100 + (Math.sin(time * 0.5) * 0.5 + 0.5) * 120, up = Math.max(0, Math.sin(time * 1.0)) * 10;
+    ctx.fillStyle = '#f2a51a'; ctx.fillRect(fx - 16, y - 2 - 16, 26, 16); ctx.fillStyle = '#2a2a2a'; ctx.fillRect(fx - 12, y - 30, 2, 14); ctx.fillRect(fx + 4, y - 30, 2, 14); ctx.fillRect(fx - 12, y - 30, 18, 2);
+    line('#555', 3, fx + 12, y - 2, fx + 12, y - 34); ctx.fillStyle = '#5d4630'; ctx.fillRect(fx + 12, y - 6 - up, 22, 3); crate(fx + 23, y - 6 - up, '#7fbf4a', 9);
+    wheel(fx - 10, y + 2, 5); wheel(fx + 6, y + 2, 5);
+  }
+  flagPole(x0 + w - 24, y - h - 22, 40, 20, 2); // auf dem Dach
 }
 function speicher(x, y) { // Kornspeicher auf Stelzen mit Steinplatten gegen Mäuse
   ellipse(x + 4, y, 30, 7, 'rgba(0,0,0,.22)');
@@ -2059,30 +2170,64 @@ function drawVoralp() {
     ctx.strokeStyle = 'rgba(240,255,200,.25)'; ctx.lineWidth = 2; ctx.beginPath();
     for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, crest(x)); ctx.stroke(); // Kuppenlinie
   }
-  // Bäche in den Lücken zwischen den Baumspalten: oben in der Wiese fliessen 1–2 Seitenbäche zusammen, dann unter dem Weg durch
-  const stream = (P, w) => {
-    const stroke = (col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
-    stroke('#3f7f8f', w + 5); stroke('#6cc0e0', w);
-    ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30; stroke('rgba(255,255,255,.7)', 1.5); ctx.setLineDash([]); // fliessendes Glitzern
-  };
-  const source = (x, y) => { ellipse(x - 7, y, 7, 4, '#9a9a92'); ellipse(x + 6, y + 1, 5, 3, '#b5b4ab'); };
-  for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) { // nur wo der Weg drüberführt
+  // Bäche in den Lücken zwischen den Baumspalten: oben fliessen 1–2 Seitenbäche zusammen, dann münden sie in den Fluss
+  const L = [[riverPath(), 9]]; // [Punkte, Breite] – erst alle Ufer, dann alles Wasser, so verschmelzen die Mündungen
+  const srcs = [L[0][0][0]], rocks = [];
+  for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) {
     const r = seeded(s * 13 + 1), f1 = 40 + r() * 30, f2 = 15 + r() * 12, p1 = r() * 7, p2 = r() * 7;
     const wig = y => 0.65 * Math.sin(y / f1 + p1) + 0.35 * Math.sin(y / f2 + p2); // zufällig, aber fest pro Bach
     const y0 = hillY(xs) + 6, P = [];
-    for (let y = y0; y <= lane; y += 6) P.push([xs + (8 + 20 * clamp((3.6 * T - y) / (2 * T), 0, 1)) * wig(y), y]);
+    for (let y = y0; y <= riverY(xs) + 4; y += 6) P.push([xs + 12 * wig(y), y]);
     const tribs = [], n = 1 + Math.floor(r() * 2);
     for (let k = 0; k < n; k++) { // Seitenbach: startet seitlich am Hang, schwenkt spät in den Hauptbach ein
       const side = (k ? -tribs[0].side : r() < 0.5 ? -1 : 1), sx = clamp(xs + side * (1.8 + r() * 2.2) * T, (a.x + 0.3) * T, (WORLD.w - 1) * T);
-      const j = P[Math.floor((1.1 * T + r() * 1.8 * T - y0) / 6)], sy = hillY(sx) + 6, Q = [], g1 = 20 + r() * 20, ph = r() * 7;
+      const j = P[clamp(Math.floor((0.6 * T + r() * 0.9 * T - y0) / 6), 2, P.length - 4)], sy = hillY(sx) + 6, Q = [], g1 = 20 + r() * 20, ph = r() * 7;
       for (let t = 0; t <= 1.001; t += 6 / (j[1] - sy)) Q.push([sx + (j[0] - sx) * t ** 1.7 + Math.sin(Math.PI * t) * (14 * Math.sin(t * (j[1] - sy) / g1 + ph) + 6 * Math.sin(t * (j[1] - sy) / 11 + ph * 2)), sy + (j[1] - sy) * t]);
       tribs.push({ side, Q, jy: j[1] });
     }
-    for (const t of tribs) { stream(t.Q, 4); source(t.Q[0][0], t.Q[0][1]); }
-    const jTop = Math.min(...tribs.map(t => t.jy)), up = P.filter(p => p[1] <= jTop + 6);
-    stream(up, 5); stream(P.filter(p => p[1] >= jTop), 7); // nach dem Zusammenfluss breiter
-    source(P[0][0], y0);
-    for (let i = 0; i < 10; i++) { const [x, y] = P[Math.floor(r() * P.length)]; ellipse(x + (r() < 0.5 ? -8 : 8), y, 3, 2, '#a9a79c'); }
+    for (const t of tribs) { L.push([t.Q, 4]); srcs.push(t.Q[0]); }
+    const jTop = Math.min(...tribs.map(t => t.jy));
+    L.push([P.filter(p => p[1] <= jTop + 6), 5], [P.filter(p => p[1] >= jTop), 7]); // nach dem Zusammenfluss breiter
+    srcs.push(P[0]);
+    for (let i = 0; i < 6; i++) { const [x, y] = P[Math.floor(r() * P.length)]; rocks.push([x + (r() < 0.5 ? -8 : 8), y]); }
+  }
+  const stroke = (P, col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
+  for (const [P, w] of L) stroke(P, '#3f7f8f', w + 5);
+  for (const [P, w] of L) stroke(P, '#6cc0e0', w);
+  ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30; for (const [P] of L) stroke(P, 'rgba(255,255,255,.7)', 1.5); ctx.setLineDash([]); // fliessendes Glitzern
+  for (const [x, y] of srcs) { ellipse(x - 7, y, 7, 4, '#9a9a92'); ellipse(x + 6, y + 1, 5, 3, '#b5b4ab'); } // Quellen
+  for (const [x, y] of rocks) ellipse(x, y, 3, 2, '#a9a79c');
+}
+// Fluss: Quelle am Hang östlich vom Obstgarten → Sammelbach über den Obstbäumen nach Westen → hinter dem Hof vorbei
+// → zwischen Laden und Händler unter der Steinbrücke durch → in den See. Kacheln für den West-Teil:
+const riverY = x => 2.45 * T + 9 * Math.sin(x / 83) + 5 * Math.sin(x / 31 + 1);
+const RIVER_W = [[12, 2.6], [5.6, 2.9], [3.3, 5], [3.1, 9], [4.4, 11.6], [7.4, 13], [8.8, 15.2], [8.9, 19.2], [9, 26]];
+function riverPath() { // Punkte (px) alle ~6 px, von der Quelle bis in den See
+  const xe = (areaEnd('obst') + 1.6) * T, y0 = hillY(xe + T) + 6, ye = riverY(xe), P = [];
+  for (let t = 0; t < 1; t += 6 / (ye - y0)) P.push([xe + T * (1 - t) ** 2, y0 + (ye - y0) * t]); // vom Hang herunter
+  for (let x = xe; x > 19 * T; x -= 6) P.push([x, riverY(x)]);
+  const W = [[19 * T, riverY(19 * T)], ...RIVER_W.map(([x, y]) => [x * T, y * T])], W1 = [W[0], ...W, W.at(-1)];
+  for (let i = 1; i < W1.length - 2; i++) { // Catmull-Rom: weich durch alle Punkte
+    const [p0, p1, p2, p3] = W1.slice(i - 1, i + 3), n = Math.ceil(dist(...p1, ...p2) / 6);
+    for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; P.push([0, 1].map(d => 0.5 * (2 * p1[d] + (p2[d] - p0[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (3 * p1[d] - p0[d] - 3 * p2[d] + p3[d]) * t3))); }
+  }
+  P.push(W.at(-1));
+  return P;
+}
+const nearRiver = (x, y, m) => riverPath().some(([px, py]) => Math.abs(px - x) < m && Math.abs(py - y) < m);
+function bridge(x, y) { // Steinbrücke: Pflaster, zwei Brüstungen, Bogen auf der Seeseite
+  const w = 46, r = seeded(5);
+  ctx.fillStyle = '#958e82'; ctx.fillRect(x - w, y + 30, 2 * w, 24); // Stirnmauer
+  ctx.fillStyle = '#1f3d48'; ctx.beginPath(); ctx.moveTo(x - 19, y + 54); ctx.arc(x, y + 54, 19, Math.PI, 0); ctx.fill(); // Bogen, darunter das Wasser
+  ctx.strokeStyle = '#c4bcad'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y + 54, 22, Math.PI, 0); ctx.stroke();
+  ctx.strokeStyle = '#958e82'; ctx.lineWidth = 1.2; for (let i = 1; i < 7; i++) { const a = Math.PI + i * Math.PI / 7; line('#958e82', 1.2, x + Math.cos(a) * 19, y + 54 + Math.sin(a) * 19, x + Math.cos(a) * 25, y + 54 + Math.sin(a) * 25); } // Keilsteine
+  ctx.fillStyle = '#cdc5b6'; ctx.fillRect(x - w, y - 30, 2 * w, 62); // Fahrbahn
+  for (let j = 0; j < 6; j++) for (let i = 0; i < 8; i++) { ctx.fillStyle = r() < 0.5 ? '#bdb4a3' : '#d8d1c3'; rrect(x - w + 2 + i * 11.4 + (j % 2) * 5, y - 28 + j * 10, 9, 8, 2); ctx.fill(); } // Pflastersteine
+  for (const py of [y - 36, y + 26]) { // Brüstungen
+    ctx.fillStyle = '#8a8377'; ctx.fillRect(x - w - 6, py, 2 * w + 12, 11);
+    ctx.fillStyle = '#b9b1a2'; ctx.fillRect(x - w - 6, py - 4, 2 * w + 12, 5);
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(60,50,40,.25)'; ctx.fillRect(x - w - 6 + i * 18.6 + (py > y ? 9 : 0), py + 1, 1.5, 10); }
+    for (const px of [x - w - 6, x + w - 4]) { ctx.fillStyle = '#7d766b'; ctx.fillRect(px, py - 8, 10, 19); ctx.fillStyle = '#c9c1b2'; ctx.fillRect(px - 1, py - 10, 12, 4); } // Pfeiler
   }
 }
 // Fischteiche liegen im Sumpf: Moorboden, Tümpel, Schilf und Rohrkolben zwischen den Teichen
@@ -2398,6 +2543,7 @@ function render() {
     ctx.strokeStyle = c; ctx.lineWidth = w;
     for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
+  bridge(RIVER_W[7][0] * T, RIVER_W[7][1] * T);
   drawLake(); lakeDecos();
   // Weide-Zaun
   const pa = { x: PASTURE.x * T, y: PASTURE.y * T, w: PASTURE.w * T, h: PASTURE.h * T };

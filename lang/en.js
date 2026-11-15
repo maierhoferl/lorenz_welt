@@ -146,6 +146,7 @@ var TR = {
     '📊 Dein Produktions-Plan': '📊 Your production plan', 'Was jetzt am meisten bringt': 'What earns the most right now',
     'geschätzter Nutzen in den nächsten {} Minuten': 'estimated gain in the next {} minutes', '✅ Alles läuft rund!': '✅ Everything is running smoothly!',
     '≈ Fr. = geschätzter Nutzen in den nächsten {} Minuten.': '≈ CHF = estimated gain in the next {} minutes.',
+    'DORFLADEN 🛒': 'VILLAGE SHOP 🛒', 'GARTEN 🌷': 'GARDEN 🌷', 'MARKTHALLE 💰': 'MARKET HALL 💰', 'GROSSHANDEL 💰': 'WHOLESALE 💰', '🏪 Laden und Händler ziehen in grössere Häuser!': '🏪 The shop and the trader move into bigger buildings!',
     'HÄNDLER 💰': 'TRADER 💰', 'LADEN 🛒': 'SHOP 🛒', 'BÄCKEREI 🥨': 'BAKERY 🥨', 'MOLKEREI 🥛': 'DAIRY 🥛', 'KÄSEREI 🧀': 'CHEESE DAIRY 🧀',
     'FONDUE-STÜBLI 🍲': 'FONDUE HUT 🍲', 'MÜESLI 🥗': 'MUESLI 🥗', 'KONDITOREI 🎂': 'PASTRY SHOP 🎂', '{}see': 'Lake {}', 'Alp': 'Alp',
   },

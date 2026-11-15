@@ -146,6 +146,7 @@ var TR = {
     '📊 Dein Produktions-Plan': '📊 Il tuo piano di produzione', 'Was jetzt am meisten bringt': 'Cosa rende di più adesso',
     'geschätzter Nutzen in den nächsten {} Minuten': 'guadagno stimato nei prossimi {} minuti', '✅ Alles läuft rund!': '✅ Tutto fila liscio!',
     '≈ Fr. = geschätzter Nutzen in den nächsten {} Minuten.': '≈ fr. = guadagno stimato nei prossimi {} minuti.',
+    'DORFLADEN 🛒': 'NEGOZIO DEL PAESE 🛒', 'GARTEN 🌷': 'GIARDINO 🌷', 'MARKTHALLE 💰': 'MERCATO COPERTO 💰', 'GROSSHANDEL 💰': 'INGROSSO 💰', '🏪 Laden und Händler ziehen in grössere Häuser!': '🏪 Il negozio e il commerciante si trasferiscono in edifici più grandi!',
     'HÄNDLER 💰': 'COMMERCIANTE 💰', 'LADEN 🛒': 'NEGOZIO 🛒', 'BÄCKEREI 🥨': 'PANETTERIA 🥨', 'MOLKEREI 🥛': 'LATTERIA 🥛', 'KÄSEREI 🧀': 'CASEIFICIO 🧀',
     'FONDUE-STÜBLI 🍲': 'GROTTO DELLA FONDUTA 🍲', 'MÜESLI 🥗': 'MÜESLI 🥗', 'KONDITOREI 🎂': 'PASTICCERIA 🎂', '{}see': 'Lago di {}', 'Alp': 'Alpe',
   },
