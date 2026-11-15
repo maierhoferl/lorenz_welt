@@ -854,7 +854,7 @@ function openPlan() {
   const vis = types.filter(k => catOf(k) === planCat), used = [...new Set(vis.map(k => depth[k]))].sort((a, b) => a - b);
   const NW = 180, NH = 70, GX = 130, GY = 18, posn = {}, rows = [], col = {};
   for (const k of vis) { const c = used.indexOf(depth[k]); col[k] = c; rows[c] = (rows[c] || 0) + 1; posn[k] = { x: 10 + c * (NW + GX), y: 10 + (rows[c] - 1) * (NH + GY) }; }
-  const Wd = 20 + used.length * (NW + GX) - GX;
+  const Wd = 70 + used.length * (NW + GX) - GX; // +50: Platz für ↗-Stummel ganz rechts
   let Hd = 20 + Math.max(...rows) * (NH + GY) - GY, edges = '', labels = '', nodes = '';
   const r = v => Math.round(v * 10) / 10;
   // Pfeile überlagern sich nie: jeder hat eigene Anschlusspunkte, eigene senkrechte Spur pro Lücke,
@@ -951,13 +951,16 @@ function openPlan() {
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
       <text x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
       <text x="${p.x + 10}" y="${p.y + 43}" font-size="12" fill="#555">${rate}</text>
-      <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${[extra && '+ ' + extra, away && '↗ ' + away, sell].filter(Boolean).join('  ')}</text>
+      <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${sell}</text>
       <text data-info="${k}" x="${p.x + NW - 18}" y="${p.y + NH - 8}" font-size="16">ℹ️</text>
       ${warn ? `<circle cx="${p.x + NW - 4}" cy="${p.y + 4}" r="11" fill="#d23b2b"/><text x="${p.x + NW - 4}" y="${p.y + 9}" text-anchor="middle" fill="#fff" font-weight="900" font-size="15">!</text>` : ''}</g>`;
+    const sy = p.y + NH - 12, stub = (x1, x2, ic, tx) => `<g opacity="${on ? 1 : 0.45}"><path d="M${x1},${sy} L${x2},${sy}" stroke="#3e7bc4" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#ab)"/><text x="${tx}" y="${sy - 5}" font-size="12">${ic}</text></g>`; // Pfeil-Stummel: von/zu anderem Reiter
+    if (extra) nodes += stub(p.x - 40, p.x, extra, p.x - 40);
+    if (away) nodes += stub(p.x + NW, p.x + NW + 40, away, p.x + NW + 4);
   }
-  const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${edges}${nodes}</svg>`;
+  const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
   const head = `<div class="tabs">${cats.map(c => `<button data-cat="${c}" class="${c === planCat ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}</button>`).join('')}</div>`;
-  const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`wird beim Händler verkauft`} (🎒 ${$t`du trägst`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">+ ${$t`Zutat aus einem anderen Reiter`}</span><span style="color:#3e7bc4">↗ ${$t`geht in einen anderen Reiter`}</span><span style="opacity:.5">▢ ${$t`noch nicht gebaut`}</span></div>`;
+  const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`verkauft`} (🎒 ${$t`du`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">⇢▢ ${$t`von anderem Reiter`}</span><span style="color:#3e7bc4">▢⇢ ${$t`zu anderem Reiter`}</span><span style="opacity:.5">▢ ${$t`nicht gebaut`}</span></div>`;
   modal($('#plan'), $t`📊 Dein Produktions-Plan`, `${legend}<div style="overflow:auto">${svg}</div><h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small><small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`, head);
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
