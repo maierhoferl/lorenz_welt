@@ -274,9 +274,9 @@ const joyEnd = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch =
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
 
 // =================== Spiellogik ===================
-let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, face = 1, faceS = 1, amp = 0, time = 0;
+let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, amp = 0, time = 0;
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
-let trH = 0; // Fahrtrichtung des Traktors (Bogenmass)
+let trH = 0; // Blickrichtung von Figur und Traktor (Bogenmass, 0 = rechts)
 const packages = [], floaters = [], particles = [];
 let acc = { tr: 0, w: 0, save: 0, hud: 0, sp: 0 };
 
@@ -295,14 +295,12 @@ function update(dt) {
   G.py = clamp(G.py + my * sp * dt, T * 1.5, (WORLD.h - 0.5) * T);
   if (inLake(G.px, G.py)) G.py = oy;
   moving = ml > 0.1;
-  if (moving) { walk += dt * 11; if (Math.abs(mx) > 0.2) face = Math.sign(mx); }
   amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 10); // Schritt weich ein-/ausblenden
-  if (!onTractor()) trH = face > 0 ? 0 : Math.PI;
-  else if (moving) { // lenkt mit begrenzter Drehgeschwindigkeit in die Fahrtrichtung
-    const d = Math.atan2(my, mx) - trH; trH += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -5 * dt, 5 * dt);
-    const c = Math.cos(trH); if (Math.abs(c) > 0.2) face = Math.sign(c);
+  if (moving) { // dreht sich (der Traktor langsamer) in die Laufrichtung
+    walk += dt * 11;
+    const d = Math.atan2(my, mx) - trH, r = onTractor() ? 5 : 14;
+    trH += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -r * dt, r * dt);
   }
-  faceS += (face - faceS) * Math.min(1, dt * 14);         // Umdrehen statt Umklappen
   trailCart();
 
   for (const t of G.things) {
@@ -458,7 +456,7 @@ function inLake(x, y, m = 0) {
   return Math.hypot(dx, dy) < LAKE.rx * lakeR(a) + m;
 }
 const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k ? 1 : 0);
-const ghostPos = () => ({ x: G.px + face * 46, y: G.py + 2 });
+const ghostPos = () => ({ x: G.px + Math.cos(trH) * 46, y: G.py + 2 + Math.sin(trH) * 46 });
 let nearDeco = null;
 function decoSpotOk(x, y) {
   if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6)) return false;
@@ -1045,8 +1043,8 @@ const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1;
 function cartDims(s) { const t = onTractor(); return { k: (t ? 18 : 6) * s, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
 function trailCart() {
   if (!hasCart()) { cart.on = false; return; }
-  const c = cartDims(0.85 + G.stage * 0.09), [ux, uy] = c.t ? [Math.cos(trH), Math.sin(trH)] : [face, 0];
-  const hx = G.px - (c.t ? ux : faceS) * c.k, hy = G.py - uy * c.k;
+  const c = cartDims(0.85 + G.stage * 0.09), ux = Math.cos(trH), uy = Math.sin(trH);
+  const hx = G.px - ux * c.k, hy = G.py - uy * c.k;
   if (!cart.on || Math.hypot(hx - cart.fx, hy - cart.fy) > 150) // neu angehängt: gerade hinter die Figur
     Object.assign(cart, { on: true, fx: hx - ux * c.rope, fy: hy - uy * c.rope, bx: hx - ux * (c.rope + c.L), by: hy - uy * (c.rope + c.L) });
   [cart.fx, cart.fy] = follow(cart.fx, cart.fy, hx, hy, c.rope);
@@ -1081,16 +1079,21 @@ function drawCart(ax, ay, s) {
   wheels.slice(2).forEach(([x, y]) => wheelE(x, y, c.r, ux, uy));
   line(c.t ? '#555' : '#6b4a2b', 2, cart.fx, cart.fy - c.h, ax, ay); // Deichsel
 }
-// Traktor in Fahrtrichtung: a = längs (vorne +), b = quer (in der Tiefe gestaucht), z = Höhe.
-// Liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
-function tractorParts(x, y, s) {
+// Pseudo-3D in Blickrichtung trH: a = längs (vorne +), b = quer (in der Tiefe gestaucht), z = Höhe.
+// P(a, b, z) → Bildschirm; P.d(a, b) = Tiefe (grösser = näher am Betrachter, später zeichnen)
+function proj(x, y, s) {
   const ux = Math.cos(trH), uy = Math.sin(trH);
   const P = (a, b, z = 0) => [x + (ux * a - uy * b) * s, y + (uy * a + ux * b * 0.5) * s - z * s];
-  const box = (a0, a1, b, z0, h, top, side) => {
-    const C = [[a1, b], [a1, -b], [a0, -b], [a0, b]], ring = z => C.map(([a, q]) => P(a, q, z)), lo = ring(z0), hi = ring(z0 + h);
-    [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
-    poly(hi, top);
-  };
+  return Object.assign(P, { ux, uy, d: (a, b) => uy * a + ux * b * 0.5 });
+}
+function box3(P, a0, a1, b, z0, h, top, side) {
+  const C = [[a1, b], [a1, -b], [a0, -b], [a0, b]], ring = z => C.map(([a, q]) => P(a, q, z)), lo = ring(z0), hi = ring(z0 + h);
+  [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
+  poly(hi, top);
+}
+// Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
+function tractorParts(x, y, s) {
+  const P = proj(x, y, s), { ux, uy } = P, box = (...a) => box3(P, ...a);
   const part = (a, b, d) => ({ y: P(a, b)[1], d });
   const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * s, ux, uy); });
   const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * s, ...P(a, b, 15), ...P(a, b, 58)));
@@ -1101,53 +1104,58 @@ function tractorParts(x, y, s) {
     post(-8, 9), post(-8, -9), post(6, 9), post(6, -9),
     { y: Infinity, d: () => box(-10, 8, 11, 58, 3, '#38a35b', '#26794a') }]; // Dach
 }
-// Bein mit Knie (2-Glied-IK): Fuss schwingt nach vorn und hebt dabei ab, Standbein bleibt am Boden
-function legDraw(p, L, drop, hipX, col, am) {
-  const a = Math.sin(p) * 0.5 * am, fx = hipX + L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
-  const vx = fx - hipX, vy = fy - hy, d = Math.hypot(vx, vy), k = Math.sqrt(Math.max(0, L * L / 4 - d * d / 4));
-  line(col, 5, hipX, hy, hipX + vx / 2 + vy / d * k, hy + vy / 2 - vx / d * k, fx, fy);
-  ctx.fillStyle = '#4a2f1e'; rrect(fx - 3, fy - 3, 8, 3.5, 1.5); ctx.fill();
+// Bein mit Knie (2-Glied-IK) in der Ebene quer-Versatz b: Fuss schwingt nach vorn und hebt ab, Standbein bleibt am Boden.
+// Rechnet in (vorne, unten) wie in der Seitenansicht und projiziert dann in 3D.
+function leg3(P, s, p, L, drop, b, z0, col, am) {
+  const a = Math.sin(p) * 0.5 * am, fx = L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
+  const vy = fy - hy, d = Math.hypot(fx, vy), k = Math.sqrt(Math.max(0, L * L / 4 - d * d / 4));
+  const Q = (u, v) => P(u, b, z0 - v);
+  line(col, 5 * s, ...Q(0, hy), ...Q(fx / 2 + vy / d * k, hy + vy / 2 - fx / d * k), ...Q(fx, fy));
+  line('#4a2f1e', 3.5 * s, ...Q(fx - 2, fy - 1), ...Q(fx + 5, fy - 1)); // Schuh zeigt nach vorn
 }
 function drawPlayer() {
-  const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09;
-  const sx = Math.sign(faceS) * Math.max(0.2, Math.abs(faceS)); // beim Umdrehen kurz schmal (Profil dreht)
-  const am = onTractor() ? 0 : amp, sw = Math.sin(walk) * am, leg = -sw * 4; // Arme gegengleich zu den Beinen
-  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, tr = onTractor(), lift = tr ? 15 - legL : liftH(); // auf dem Traktor sitzt der Rumpf auf dem Sitz
+  const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09, P = proj(x, y, s);
+  const tr = onTractor(), am = tr ? 0 : amp, sw = Math.sin(walk) * am, leg = -sw * 4; // Arme gegengleich zu den Beinen
+  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = tr ? 15 - legL : liftH(); // auf dem Traktor sitzt der Rumpf auf dem Sitz
   const drop = legL * (1 - Math.cos(sw * 0.5)); // Hüfte sinkt bei gespreizten Beinen
   const D = { legL, torso, sh, headR, lift, hx: sh + 3 + leg * 0.5, hy: -legL - 1, bx: -sh - 3 - leg * 0.5 };
-  const anchor = () => tr ? [x - Math.cos(trH) * 18 * s, y - (Math.sin(trH) * 18 + 8) * s] : [x + sx * D.bx * s, y + (D.hy + drop) * s];
+  const anchor = () => tr ? P(-18, 0, 8) : P(-6, 0, legL + lift - drop);
   const cartBack = cart.on && (cart.fy + cart.by) / 2 <= y;
   if (!tr) ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
   if (cartBack) drawCart(...anchor(), s);
+  const zu = lift - drop, shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st], skin = '#f2c9a2', hair = '#f2cf5b';
+  const hz = zu + legL + torso + headR - 1, shZ = zu + legL + torso - 4, handZ = zu + legL + 1;
+  const front = tr || !!harvTool() || G.tools.tragen === 2, basket = !tr && G.tools.tragen === 1; // Hände nach vorn: Lenkrad, Werkzeug, Schubkarre
+  const ball = (a, b, z, r, c) => () => { const [px, py] = P(a, b, z); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(px, py, r * s, 0, 7); ctx.fill(); };
+  // Gegenstände in der Ebene vorne/oben zeichnen (Seitenansicht-Koordinaten); ponytail: flaches Bild, darum nie ganz von der Kante
+  const plane = f => { ctx.save(); ctx.transform((Math.sign(P.ux) || 1) * Math.max(0.4, Math.abs(P.ux)) * s, P.uy * s, 0, s, x, y); f(); ctx.restore(); };
+  const parts = [];
+  const add = (a, b, f, k = 0) => parts.push({ d: P.d(a, b) + k, f });
+  for (const [b, ph, col] of [[-2.5, walk + Math.PI, '#28406a'], [2.5, walk, '#34507f']]) {
+    if (!tr) add(0, b, () => leg3(P, s, ph, legL, drop, b, lift, col, am));
+    else add(6, b, () => { line(col, 5 * s, ...P(0, b, 15), ...P(9, b, 15), ...P(10, b, 6)); line('#4a2f1e', 3.5 * s, ...P(9, b, 5), ...P(15, b, 5)); }); // sitzt
+  }
+  add(0, 0, () => box3(P, -sh * 0.6, sh * 0.6, sh, zu + legL - 2, torso + 2, shade(shirt, 1.15), shirt));
+  for (const sd of [-1, 1]) { // Arme
+    const reach = sd > 0 ? front : basket, ha = reach ? (sd > 0 ? D.hx : D.bx) : -sd * leg * 0.8, hb = reach ? sd * sh * 0.6 : sd * (sh + 2.5);
+    add(ha, hb, () => { line(shirt, 4.5 * s, ...P(0, sd * (sh + 1.5), shZ), ...P(ha, hb, handZ)); ball(ha, hb, handZ, 2.6, skin)(); }, 0.01);
+  }
+  add(1.5, 0, ball(1.5, 0, hz, headR, skin), 0.02);                // Gesicht
+  add(-2.5, 0, ball(-2.5, 0, hz + 2, headR * 0.95, hair), 0.02);    // Haare hinten/oben
+  add(headR * 0.55, 0, () => { const [px, py] = P(headR * 0.55, 0, hz + headR * 0.55); ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(px, py, headR * 0.8 * s, headR * 0.4 * s, 0, 0, 7); ctx.fill(); }, 0.03); // Stirnfransen
+  for (const b of [-2.6, 2.6]) add(headR * 0.85, b, ball(headR * 0.85, b, hz + 1, 1.4, '#2a4a7a'), 0.04); // Augen
+  add(headR * 0.9, 0, () => { const [px, py] = P(headR * 0.9, 0, hz - 3); ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.ellipse(px, py, 2.4 * s * Math.max(0.3, Math.abs(P.uy)), 2.4 * s, 0, 0.2, Math.PI - 0.2); ctx.stroke(); }, 0.04); // Mund
+  if (st >= 4) add(headR * 0.7, 0, () => { const [px, py] = P(headR * 0.7, 0, hz - 3); ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(px, py, (headR - 3) * s, 0.1, Math.PI - 0.1); ctx.fill(); }, 0.03); // Bart
   const fig = () => {
-  ctx.save(); ctx.translate(x, y); ctx.scale(s * sx, s);
-  gearBack(D); ctx.translate(0, -lift);
-  if (!tr) { legDraw(walk + Math.PI, legL, drop, -2, '#28406a', am); legDraw(walk, legL, drop, 2, '#34507f', am); }
-  ctx.translate(0, drop);
-  const shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st];
-  ctx.fillStyle = shirt; rrect(-sh, -legL - torso, sh * 2, torso + 2, 4); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(-sh, -legL - torso + 3, sh * 2, 3);
-  // Arme
-  ctx.strokeStyle = shirt; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-sh, -legL - torso + 4); ctx.lineTo(-sh - 3 - leg * 0.5, -legL - 2); ctx.moveTo(sh, -legL - torso + 4); ctx.lineTo(sh + 3 + leg * 0.5, -legL - 2); ctx.stroke();
-  ctx.fillStyle = '#f2c9a2'; ctx.beginPath(); ctx.arc(-sh - 3 - leg * 0.5, -legL - 1, 2.6, 0, 7); ctx.arc(sh + 3 + leg * 0.5, -legL - 1, 2.6, 0, 7); ctx.fill();
-  // Kopf
-  const hy = -legL - torso - headR + 1;
-  ctx.fillStyle = '#f2c9a2'; ctx.beginPath(); ctx.arc(0, hy, headR, 0, 7); ctx.fill();
-  ctx.fillStyle = '#f2cf5b'; ctx.beginPath(); ctx.arc(0, hy - 1.5, headR + 1, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-headR - 1, hy - 2); ctx.quadraticCurveTo(-2, hy - 1, 2, hy - 5); ctx.quadraticCurveTo(5, hy - 1, headR + 1, hy - 2); ctx.lineTo(headR, hy - 6); ctx.lineTo(-headR, hy - 6); ctx.fill();
-  ctx.fillStyle = '#d9a93a'; ctx.fillRect(-headR + 2, hy - headR + 1, 6, 1.5);
-  ctx.fillStyle = '#2a4a7a'; ctx.beginPath(); ctx.arc(1.5, hy + 1, 1.4, 0, 7); ctx.arc(5.5, hy + 1, 1.4, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(3.5, hy + 3.5, 2.4, 0.2, Math.PI - 0.2); ctx.stroke();
-  if (st >= 4) { ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(2, hy + 3, headR - 2, 0.1, Math.PI - 0.1); ctx.fill(); }
-  gearFront(D);
-  ctx.restore();
+    plane(() => gearBack(D));
+    parts.sort((p, q) => p.d - q.d).forEach(p => p.f());
+    plane(() => { ctx.translate(0, drop - lift); gearFront(D); });
   };
   if (tr) [...tractorParts(x, y, s), { y: y + 0.01, d: fig }].sort((a, b) => a.y - b.y).forEach(p => p.d());
   else fig();
   if (cart.on && !cartBack) drawCart(...anchor(), s);
   const items = Object.keys(G.inv);
-  if (items.length && !cart.on) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * sx, y - (legL + 6 + liftH()) * s); }
+  if (items.length && !cart.on) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s, y - (legL + 6 + liftH()) * s); }
 }
 
 // =================== Schweiz: Fahne, Alpen, See, Deko ===================
