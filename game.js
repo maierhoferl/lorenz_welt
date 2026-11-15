@@ -220,6 +220,16 @@ const isAuto = t => { const d = THINGS[t.type]; return d.kind === 'grow' && !!to
 const storeCap = d => d.n * 3;
 const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
 const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
+// Herstellung/Verbrauch pro Minute je Ware (wie im Produktions-Plan)
+function rates() {
+  const sup = {}, dem = {};
+  for (const t of G.things) {
+    const d = THINGS[t.type];
+    sup[d.item] = (sup[d.item] || 0) + d.n / d.time * 60;
+    if (d.in) for (const k in d.in) dem[k] = (dem[k] || 0) + d.in[k] / d.time * 60;
+  }
+  return { sup, dem };
+}
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
 const avail = k => G.land >= (THINGS[k].land || 0) && !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
@@ -480,7 +490,9 @@ function spedition(dt) {
       if ((k.chk = (k.chk || 0) + dt) < 0.5) continue; // ponytail: Depot nur 2× pro Sekunde prüfen, surplus() ist O(Gebäude²)
       k.chk = 0;
       const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t))), val = t => t[fld(t)] * ITEMS[THINGS[t.type].item].price;
-      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => val(b) - val(a)); // wertvollste zuerst
+      // zuerst Gebäude, deren Ware im Plan Überschuss ist (kein Abnehmer oder 🟠 zu viel: > 1.1× Bedarf), dann wertvollste
+      const { sup, dem } = rates(), over = t => { const it = THINGS[t.type].item; return !dem[it] || sup[it] > dem[it] * 1.1; };
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => over(b) - over(a) || val(b) - val(a));
       // Gebäude ohne Abnehmer: nicht auf den Takt warten, schon ab 3 Stück losfahren
       if (k.wait < lv.every && !todo.some(t => t[fld(t)] > 2 && !hasConsumer(THINGS[t.type].item))) continue;
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
@@ -508,12 +520,7 @@ function spedition(dt) {
   }
 }
 function warnings() {
-  const sup = {}, dem = {};
-  for (const t of G.things) {
-    const d = THINGS[t.type];
-    sup[d.item] = (sup[d.item] || 0) + d.n / d.time * 60;
-    if (d.in) for (const k in d.in) dem[k] = (dem[k] || 0) + d.in[k] / d.time * 60;
-  }
+  const { sup, dem } = rates();
   const r = v => Math.round(v || 0);
   for (const t of G.things) {
     const d = THINGS[t.type]; t.warn = ''; t.wl = 'red';
@@ -846,7 +853,7 @@ function openPlan() {
     const it = THINGS[k].item;
     users(k).forEach(f => {
       const on = cnt[k] && cnt[f];
-      const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.8 ? '#e39b1c' : '#3d8b2f';
+      const color = !on ? '#bbb' : sup[it] < dem[it] * 0.9 ? '#d23b2b' : sup[it] > dem[it] * 1.1 ? '#e39b1c' : '#3d8b2f';
       E.push({ a: k, b: f, color, label: on ? `${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it])}/min` : ITEMS[it].icon, long: col[f] - col[k] > 1 });
     });
   }
@@ -917,7 +924,7 @@ function openPlan() {
     }
     if (!s) continue;
     const bu = bestUser(it, true), best = bestUser(it, false);
-    if (dm && bu && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
+    if (dm && bu && s > dm * 1.1) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
     if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
     if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`);
