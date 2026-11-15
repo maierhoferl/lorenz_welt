@@ -168,7 +168,7 @@ const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
 const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
-const avail = k => !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
+const avail = k => G.land >= (THINGS[k].land || 0) && !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
 // Endstation (Ware wird nirgends weiterverarbeitet) zum ersten Mal gebaut → nächste Kette freischalten
 function checkUnlock(k) {
   const d = THINGS[k];
@@ -177,14 +177,16 @@ function checkUnlock(k) {
   return G.unlocks < UNLOCKS.length ? UNLOCKS[G.unlocks++] : null;
 }
 
-function slotsAvail(area) { const a = AREAS[area]; return a.base + a.per * G.land; }
+function slotsAvail(area) { const a = AREAS[area], f = a.from || 0; return G.land < f ? 0 : a.base + a.per * (G.land - f); }
 function slotPos(area, i) {
   const a = AREAS[area], j = i - a.cols * a.rows;
   if (j < 0) return { x: (a.x + (i % a.cols) * a.dx) * T, y: (a.y + Math.floor(i / a.cols) * a.dy) * T };
   return { x: (a.ex + (j % a.ec) * a.dx) * T, y: (WORLD_H0 + 3 + Math.floor(j / a.ec) * a.dy) * T }; // Neuland im Süden
 }
 // ponytail: Welt wächst nur nach Süden; bei sehr viel Land wird sie lang, aber nie zu eng
-function fitWorld() { WORLD.h = Math.max(WORLD_H0, ...Object.keys(AREAS).map(a => slotPos(a, slotsAvail(a) - 1).y / T + 2)); }
+function fitWorld() {
+  WORLD.w = G.land >= EAST_LAND ? WORLD_W_EAST : 60;
+  WORLD.h = Math.max(WORLD_H0, ...Object.keys(AREAS).map(a => slotPos(a, slotsAvail(a) - 1).y / T + 2)); }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
   for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i)) return i;
@@ -479,7 +481,7 @@ function reach(t) {
     const d = THINGS.feld, dx = Math.max(0, Math.abs(G.px - p.x) - d.w * T / 2), dy = Math.max(0, Math.abs(G.py - p.y) - d.h * T / 2);
     return Math.hypot(dx, dy) < T * 0.4 ? Math.hypot(dx, dy) : 1e9;
   }
-  const r = t.type === 'baum' ? 1.3 : t.type === 'kuh' ? 1.4 : 2.4;
+  const r = { baum: 1.3, kuh: 1.4, rebe: 1.6, fischteich: 1.9 }[t.type] || 2.4;
   const d = dist(G.px, G.py, p.x, p.y - (r > 2 ? T * 0.3 : 0));
   return d < r * T ? d : 1e9;
 }
@@ -500,7 +502,7 @@ function decoSpotOk(x, y) {
   for (const t of G.things) {
     if (t.type === 'feld') { if (Math.abs(x - t.x) < 2.8 * T && Math.abs(y - t.y) < 1.9 * T) return false; }
     else if (THINGS[t.type].kind === 'factory') { if (Math.abs(x - t.x) < 2.4 * T && y < t.y + 0.7 * T && y > t.y - 1.2 * T) return false; }
-    else if (t.type === 'baum' && dist(x, y, t.x, t.y) < 0.9 * T) return false;
+    else if (t.type !== 'kuh' && dist(x, y, t.x, t.y) < (t.type === 'baum' ? 0.9 : 1.6) * T) return false;
   }
   return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
 }
@@ -632,7 +634,10 @@ let shopTab = 0;
 function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
-    if (!avail(k)) continue;
+    if (!avail(k)) { // Vorschau: was mit mehr Land dazukommt
+      if (d.kind === 'grow') tabs[0].push({ icon: '🔒', name: d.name, price: 0, can: false, info: d.info, desc: `kommt ab Land-Stufe ${d.land} dazu – kauf mehr Land! 🗺️` });
+      continue;
+    }
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
       icon: d.icon, name: d.name, price: d.price, info: d.info,
@@ -649,6 +654,7 @@ function shopList() {
     desc: 'Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!',
     info: 'Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.' });
   for (const [k, line] of Object.entries(TOOLS)) {
+    if (G.land < (line.land || 0)) continue;
     const lv = G.tools[k], next = line.levels[lv + 1];
     if (!next && k === 'spedition') { tabs[2].push({ icon: '🚛', name: `Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
       desc: `${line.name} · du hast ${truckCount()} Fahrzeuge`, note: 'fährt zusätzlich und holt noch mehr Waren ab',
@@ -665,7 +671,10 @@ function shopList() {
   tabs[3].push({
     icon: '🗺️', name: `Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.',
-    buy: () => { G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.'); },
+    buy: () => {
+      G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.');
+      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast(`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
+    },
   });
   for (const [k, d] of Object.entries(DECOS)) {
     const full = d.max && decoCount(k) >= d.max, busy = d.where === 'land' && G.carry;
@@ -1017,8 +1026,34 @@ const DRAW = {
     sign(x, y - 68, 'KONDITOREI 🎂');
   },
 };
+// ---- Weinberg & Fischteich ----
+DRAW.rebe = (x, y, t) => {
+  const g = t.ripe ? 1 : t.timer / THINGS.rebe.time, r = seeded(t.id * 13 + 5);
+  ellipse(x, y, 66, 8, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#7a5a3a'; ctx.fillRect(x - 62, y - 56, 5, 56); ctx.fillRect(x + 57, y - 56, 5, 56); // Pfähle
+  line('#8a8a8a', 1, x - 60, y - 50, x + 60, y - 50); line('#8a8a8a', 1, x - 60, y - 32, x + 60, y - 32); // Drähte
+  for (let i = 0; i < 9; i++) {
+    const ax = x - 52 + i * 13;
+    line('#5a3d22', 3, ax, y, ax + 2, y - 30);
+    for (const [bx, by] of [[-6, -44], [6, -40], [0, -53], [-3, -31]]) ellipse(ax + bx + r() * 4, y + by + r() * 4, 8, 6, r() < 0.5 ? '#4f8a2f' : '#6aa23c');
+    if (g > 0.3) { const c = g < 0.75 ? '#a6c84a' : '#6b2d6e'; for (let k = 0; k < Math.round(g * 5); k++) ellipse(ax + 2 + (k % 2) * 4, y - 30 + Math.floor(k / 2) * 4, 2.6, 2.6, c); }
+  }
+  if (t.store > 0) crate(x + 72, y + 4, '#6b2d6e', Math.min(t.store, 12));
+};
+DRAW.fischteich = (x, y, t) => {
+  const g = t.ripe ? 1 : t.timer / THINGS.fischteich.time;
+  ellipse(x, y - 14, 72, 30, '#8b6a43'); ellipse(x, y - 15, 65, 26, '#3a8fc4'); ellipse(x - 12, y - 21, 38, 12, 'rgba(255,255,255,.18)');
+  for (let i = 0; i < 1 + Math.round(g * 5); i++) { // Fische schwimmen im Kreis, je reifer desto mehr
+    const a = time * (0.6 + i * 0.13) + i * 1.7, fx = x + Math.cos(a) * (16 + i * 6), fy = y - 15 + Math.sin(a) * (5 + i * 2.5), dir = -Math.sin(a) >= 0 ? 1 : -1;
+    ctx.fillStyle = 'rgba(25,55,85,.6)'; ctx.beginPath(); ctx.ellipse(fx, fy, 7, 3, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(fx - 6 * dir, fy); ctx.lineTo(fx - 11 * dir, fy - 3); ctx.lineTo(fx - 11 * dir, fy + 3); ctx.fill();
+  }
+  for (const rx of [-62, -56, -50]) line('#4f7a2f', 2, x + rx, y - 4, x + rx + 2, y - 32); // Schilf
+  ctx.fillStyle = '#a07a4a'; ctx.fillRect(x + 22, y - 6, 34, 8); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + 50, y + 2, 3, 6); // Steg
+  if (t.store > 0) crate(x + 80, y + 4, '#5a8fb8', Math.min(t.store, 12));
+};
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { rebe: 62, fischteich: 50, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
@@ -1583,7 +1618,7 @@ function render() {
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
     ctx.strokeStyle = c; ctx.lineWidth = w;
-    for (const p of WORLD.h > WORLD_H0 ? PATHS.concat(PATHS_SOUTH) : PATHS) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+    for (const p of PATHS.concat(WORLD.h > WORLD_H0 ? PATHS_SOUTH : [], G.land >= EAST_LAND ? PATHS_EAST : [])) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
   drawLake(); lakeDecos();
   // Weide-Zaun

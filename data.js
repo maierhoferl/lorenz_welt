@@ -35,6 +35,15 @@ const ITEMS = {
   // Schweizer Spezialitäten
   muesli:  { name: 'Birchermüesli', icon: '🥗', price: 34 },
   fondue:  { name: 'Käsefondue',  icon: '🍲', price: 110 },
+  // Weinberg (ab Land-Stufe 10) und Fischerei (ab Land-Stufe 20)
+  trauben:      { name: 'Trauben',        icon: '🍇', price: 5 },
+  traubensaft:  { name: 'Traubensaft',    icon: '🥤', price: 22 },
+  rosinen:      { name: 'Rosinen',        icon: '🟤', price: 24 },
+  schnecken:    { name: 'Rosinenschnecken', icon: '🥐', price: 95 },
+  fisch:        { name: 'Fisch',          icon: '🐟', price: 9 },
+  filet:        { name: 'Fischfilet',     icon: '🍣', price: 26 },
+  raeucherfisch: { name: 'Räucherfisch',  icon: '🐠', price: 45 },
+  knusperli:    { name: 'Fischknusperli', icon: '🍤', price: 120 },
 };
 
 const THINGS = {
@@ -70,6 +79,31 @@ const THINGS = {
   fonduestube: { kind: 'factory', name: 'Fondue-Stübli', icon: '🍲', area: 'dorf', price: 500,
     in: { kaese: 2, brot: 1 }, item: 'fondue', n: 1, time: 12,
     info: 'Käsefondue ist das Schweizer Nationalgericht! Geriebener Käse (oft Gruyère und Vacherin) schmilzt mit etwas Weisswein im Caquelon – einem Topf aus Ton – über einer kleinen Flamme. Jeder spiesst ein Stück Brot auf eine lange Gabel und tunkt es ein. Wer sein Brot im Käse verliert, muss eine Runde singen! 🎶' },
+  // ----- Weinberg: erst ab Land-Stufe 10 (land), Fischerei ab 20 -----
+  rebe: { kind: 'grow', name: 'Rebstock-Reihe', icon: '🍇', area: 'weinberg', price: 400, land: 10,
+    item: 'trauben', n: 6, time: 45, tool: 'reben',
+    info: 'Reben sind Kletterpflanzen: Sie halten sich mit kleinen Ranken an Drähten fest. Am Genfersee wachsen sie an steilen Hängen in Terrassen (Lavaux) – die Sonne wärmt die Steinmauern, und der See spiegelt noch mehr Licht auf die Trauben. Erst sind sie klein, hart und grün, im Herbst süss und blau. Die Traubenernte heisst „Wümmet“.' },
+  kelterei: { kind: 'factory', name: 'Kelterei', icon: '🥤', area: 'dorf', price: 900, land: 10,
+    in: { trauben: 3 }, item: 'traubensaft', n: 1, time: 6,
+    info: 'In der Kelterei werden die Trauben von den Stielen getrennt (abbeeren) und zerquetscht. Eine Presse drückt den süssen Saft heraus – den Most. Wird er gleich kurz erhitzt, bleibt er Traubensaft. Für 1 Liter braucht man etwa 1,3 kg Trauben.' },
+  doerrhaus: { kind: 'factory', name: 'Dörrhaus', icon: '☀️', area: 'dorf', price: 1100, land: 10,
+    in: { trauben: 4 }, item: 'rosinen', n: 1, time: 10,
+    info: 'Rosinen sind getrocknete Trauben! Warme Luft zieht ganz langsam das Wasser heraus – aus 4 kg Trauben wird nur 1 kg Rosinen. Weil fast kein Wasser mehr drin ist, können keine Bakterien wachsen: Rosinen halten monatelang und sind sehr süss.' },
+  schneckenbeck: { kind: 'factory', name: 'Schnecken-Beck', icon: '🥐', area: 'dorf', price: 1800, land: 10,
+    in: { rosinen: 1, mehl: 2, milch: 1 }, item: 'schnecken', n: 1, time: 12,
+    info: 'Für Rosinenschnecken rollt der Bäcker („Beck“ sagt man in der Schweiz) einen Hefeteig flach aus, bestreicht ihn mit Vanillecreme und streut Rosinen darauf. Dann wird alles aufgerollt wie ein Schneckenhaus und in Scheiben geschnitten. Im Ofen gehen die Schnecken schön auf.' },
+  fischteich: { kind: 'grow', name: 'Fischteich', icon: '🐟', area: 'fischerei', price: 900, land: 20,
+    item: 'fisch', n: 4, time: 40, tool: 'fischen',
+    info: 'In Schweizer Seen leben Egli (Flussbarsche), Felchen und Forellen. Fische atmen mit Kiemen: Sie holen den Sauerstoff aus dem Wasser. Im Teich wachsen die kleinen Fische heran, bis sie gross genug sind. Ein Egli legt bis zu 300 000 Eier – als lange Schnüre an Wasserpflanzen!' },
+  filetiererei: { kind: 'factory', name: 'Filetiererei', icon: '🍣', area: 'dorf', price: 1500, land: 20,
+    in: { fisch: 2 }, item: 'filet', n: 1, time: 6,
+    info: 'Mit einem langen, biegsamen Messer schneidet man das Fleisch links und rechts von der Gräte ab – das sind die Filets. Haut und Gräten bleiben übrig. Gute Filetierer schaffen einen Fisch in weniger als einer Minute!' },
+  raeucherei: { kind: 'factory', name: 'Räucherei', icon: '🐠', area: 'dorf', price: 1800, land: 20,
+    in: { fisch: 3 }, item: 'raeucherfisch', n: 1, time: 10,
+    info: 'Die Fische hängen in einem Ofen über glimmendem Buchenholz. Der Rauch gibt ihnen Farbe und Geschmack, und er macht sie länger haltbar. Beim Heissräuchern ist es 60–90 °C heiss, beim Kalträuchern unter 25 °C – das dauert dann Tage!' },
+  seebeiz: { kind: 'factory', name: 'Seebeiz', icon: '🍤', area: 'dorf', price: 3000, land: 20,
+    in: { filet: 2, mehl: 1 }, item: 'knusperli', n: 1, time: 12,
+    info: 'Eine „Beiz“ ist in der Schweiz ein gemütliches Restaurant. In der Seebeiz gibt es Fischknusperli: Fischstücke werden in Mehl und Teig gewendet und in heissem Öl ausgebacken, bis sie goldbraun und knusprig sind. Dazu gibt es Zitrone und Pommes frites.' },
   // ----- freischaltbar: erst im Laden, wenn eine Endstation gebaut wurde (UNLOCKS) -----
   zentrifuge: { kind: 'factory', name: 'Milch-Zentrifuge', icon: '🌀', area: 'dorf', price: 350,
     in: { milch: 3 }, item: 'sahne', n: 1, time: 6,
@@ -141,6 +175,18 @@ const TOOLS = {
     { name: 'Leiterwagen', cap: 100, price: 200, info: 'Vier Räder tragen das ganze Gewicht – du musst nur noch ziehen.' },
     { name: 'Traktor mit Anhänger', cap: 240, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
   ]},
+  reben: { name: 'Trauben-Ernte', icon: '🍇', land: 10, levels: [
+    { name: 'Hände', speed: 1, price: 0, info: 'Trauben mit der Hand abreissen – dabei platzen viele Beeren.' },
+    { name: 'Rebschere', speed: 2, price: 300, info: 'Eine kleine, scharfe Schere schneidet den Stiel sauber ab – die Traube bleibt ganz.' },
+    { name: 'Traubenbutte', speed: 4, price: 900, info: 'Eine Butte ist ein grosser Korb, den man wie einen Rucksack trägt. Die Pflücker leeren ihre Eimer hinein – so muss niemand ständig hin und her laufen.' },
+    { name: 'Traubenvollernter', speed: 20, price: 4000, auto: true, info: 'Eine hohe Maschine fährt über die Rebreihe wie ein Tor. Biegsame Stäbe rütteln die Reben, die Beeren fallen auf Förderbänder. ERNTET AUTOMATISCH!' },
+  ]},
+  fischen: { name: 'Fischfang', icon: '🎣', land: 20, levels: [
+    { name: 'Hände', speed: 1, price: 0, info: 'Fische mit blossen Händen fangen? Die sind glitschig und schnell!' },
+    { name: 'Angel', speed: 2, price: 500, info: 'Am Ende der Schnur hängt ein Haken mit einem Köder. Beisst ein Fisch an, taucht der Schwimmer unter – jetzt schnell die Rute hochziehen!' },
+    { name: 'Netz', speed: 5, price: 1500, info: 'Ein Netz hat Maschen in einer bestimmten Grösse: Grosse Fische bleiben hängen, kleine schwimmen durch und können weiterwachsen.' },
+    { name: 'Fischpumpe', speed: 20, price: 8000, auto: true, info: 'Eine Pumpe saugt die Fische mit viel Wasser sanft durch ein dickes Rohr in einen Sortierer. FÄNGT AUTOMATISCH!' },
+  ]},
   // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Endprodukte (Ware, die kein Gebäude weiterverarbeitet) und verkauft sie
   spedition: { name: 'Spediteur', icon: '🚚', levels: [
     { name: 'Kein Spediteur', cap: 0, price: 0, info: 'Noch trägst du alle fertigen Waren selbst zum Händler.' },
@@ -207,7 +253,12 @@ const AREAS = {
   obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3, ex: 18, ec: 5 },
   weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3, ex: 33, ec: 3 },
   dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2, ex: 46, ec: 2 },
+  // from = erst ab dieser Land-Stufe; liegt im Osten, die Welt wird dafür breiter
+  weinberg:  { name: 'Weinberg',    x: 63, y: 5,  cols: 3, rows: 5, dx: 4,   dy: 3.5, base: 3, per: 2, from: 10, ex: 60, ec: 2 },
+  fischerei: { name: 'Fischteiche', x: 64, y: 26, cols: 3, rows: 4, dx: 4.5, dy: 4,   base: 2, per: 2, from: 20, ex: 69, ec: 2 },
 };
+const EAST_LAND = 10, WORLD_W_EAST = 77; // ab Land-Stufe 10 wächst die Welt nach Osten
+const PATHS_EAST = [[[50, 30], [61, 30], [61, 4]]];
 const PASTURE = { x: 38.5, y: 3.5, w: 17, h: 12 }; // Zaun (Kacheln)
 
 // Feste Orte (Kacheln, x/y = Mitte unten)
