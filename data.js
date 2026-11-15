@@ -259,6 +259,9 @@ const AREAS = {
 };
 const EAST_LAND = 10, WORLD_W_EAST = 77; // ab Land-Stufe 10 wächst die Welt nach Osten
 const PATHS_EAST = [[[50, 30], [61, 30], [61, 4]]];
+// Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
+const HOF_LV = [2, 5, 10, 15, 20];
+const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
 const PASTURE = { x: 38.5, y: 3.5, w: 17, h: 12 }; // Zaun (Kacheln)
 
 // Feste Orte (Kacheln, x/y = Mitte unten)

@@ -169,6 +169,7 @@ const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
 const avail = k => G.land >= (THINGS[k].land || 0) && !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
+const hofLv = () => HOF_LV.filter(l => G.land >= l).length;
 // Endstation (Ware wird nirgends weiterverarbeitet) zum ersten Mal gebaut → nächste Kette freischalten
 function checkUnlock(k) {
   const d = THINGS[k];
@@ -673,6 +674,7 @@ function shopList() {
     desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.',
     buy: () => {
       G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.');
+      const i = HOF_LV.indexOf(G.land); if (i >= 0) toast(`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
       for (const a of Object.values(AREAS)) if (a.from === G.land) { toast(`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
   });
@@ -937,14 +939,39 @@ function milkcan(x, y) {
 }
 
 const DRAW = {
-  hof(x, y, t) {
-    house(x - 50, y, 100, 64, '#9e3226', '#55504a', 34);
-    ctx.fillStyle = '#7d281e'; ctx.fillRect(x - 74, y - 48, 48, 48); ctx.strokeStyle = '#f2eadc'; ctx.lineWidth = 4;
-    ctx.strokeRect(x - 74, y - 48, 48, 48); ctx.beginPath(); ctx.moveTo(x - 74, y - 48); ctx.lineTo(x - 26, y); ctx.moveTo(x - 26, y - 48); ctx.lineTo(x - 74, y); ctx.stroke();
-    house(x + 50, y, 84, 56, '#f1e8d4', '#a8452e', 30);
-    win(x + 20, y - 44, 18, 16); win(x + 64, y - 44, 18, 16); door(x + 50, y, 16, 28);
-    ctx.fillStyle = '#8b8b8b'; ctx.fillRect(x + 70, y - 104, 10, 22);
-    flagPole(x + 108, y, 96, 26, 0);
+  hof(x, y) { // Alpen-Bauernhof, wächst mit der Land-Stufe (HOF_LV)
+    const lv = hofLv(), fl = lv >= 3 ? 2 : 1;
+    if (lv >= 5) kapelle(x + 190, y - 4);
+    if (lv >= 2) speicher(x - 205, y - 4);
+    if (lv >= 1) for (let i = 0; i < 4; i++) for (let j = 0; j < 5 - (i % 2); j++) { ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 4.5, 4.5, '#b07a42'); ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 2, 2, '#e3c08a'); } // Holzbeige
+    // Stall mit Heuboden
+    const st = alpHouse(x - 52, y, 100, 14, 46, 34);
+    ctx.fillStyle = '#7d4a26'; ctx.fillRect(x - 78, y - 50, 48, 50); ctx.strokeStyle = '#f2eadc'; ctx.lineWidth = 3;
+    ctx.strokeRect(x - 78, y - 50, 48, 50); ctx.beginPath(); ctx.moveTo(x - 78, y - 50); ctx.lineTo(x - 30, y); ctx.moveTo(x - 30, y - 50); ctx.lineTo(x - 78, y); ctx.stroke();
+    ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 60, st - 22, 16, 14); ctx.fillStyle = '#e8c35a'; ctx.fillRect(x - 58, st - 14, 12, 6); // Heuluke
+    win(x - 18, y - 42, 14, 12);
+    if (lv >= 4) { // Glockentürmchen (Dachreiter)
+      const bx = x - 52, by = st - 40;
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(bx - 8, by - 16, 16, 18);
+      ctx.fillStyle = '#2a2a2a'; ctx.fillRect(bx - 5, by - 13, 10, 10);
+      ctx.save(); ctx.translate(bx, by - 13); ctx.rotate(Math.sin(time * 2.4) * 0.35); ctx.fillStyle = '#d9a83a'; ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(4, 8); ctx.lineTo(2, 1); ctx.lineTo(-2, 1); ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#5a5248'; ctx.beginPath(); ctx.moveTo(bx - 12, by - 14); ctx.lineTo(bx, by - 34); ctx.lineTo(bx + 12, by - 14); ctx.fill();
+    }
+    // Wohnhaus: gemauertes Erdgeschoss, Holz darüber
+    const hx = x + 52, top = alpHouse(hx, y, 104, 32, 30 * fl, 32);
+    for (const wx of [-36, 18]) shutterWin(hx + wx, y - 26);
+    door(hx - 4, y, 16, 26, '#5b3a1e');
+    for (let f = 0; f < fl; f++) for (const wx of [-36, 18]) { shutterWin(hx + wx, top + 6 + f * 30); flowers(hx + wx - 4, hx + wx + 22, top + 26 + f * 30); }
+    shutterWin(hx - 8, top - 20, 16, 12);
+    if (lv >= 3) balcony(hx, 104, top + 30);
+    ctx.fillStyle = '#7d7468'; ctx.fillRect(hx + 26, top - 30, 9, 20); // Kamin
+    if (lv >= 1) { // Brunnen aus einem Holzstamm
+      const bx = x + 128, by = y + 16;
+      ellipse(bx, by, 26, 6, 'rgba(0,0,0,.22)'); ctx.fillStyle = '#8a5a30'; ctx.fillRect(bx - 24, by - 14, 48, 14); ctx.fillStyle = '#4f9ad0'; ctx.fillRect(bx - 21, by - 14, 42, 4);
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(bx - 28, by - 34, 7, 34); line('#9aa0a6', 3, bx - 22, by - 28, bx - 12, by - 28);
+      line('rgba(140,200,240,.85)', 2, bx - 12, by - 28, bx - 11, by - 14);
+    }
+    flagPole(x + 158, y, 96, 26, 0);
   },
   haendler(x, y) {
     ellipse(x + 6, y, 70, 10, 'rgba(0,0,0,.22)');
@@ -1052,6 +1079,42 @@ DRAW.fischteich = (x, y, t) => {
   ctx.fillStyle = '#a07a4a'; ctx.fillRect(x + 22, y - 6, 34, 8); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + 50, y + 2, 3, 6); // Steg
   if (t.store > 0) crate(x + 80, y + 4, '#5a8fb8', Math.min(t.store, 12));
 };
+// ---- Alpenstil: Holzhaus auf gemauertem Sockel, flaches weites Dach mit Steinen ----
+function alpHouse(x, y, w, base, up, rh) { // gibt die Oberkante der Wand zurück
+  ellipse(x + 8, y, w / 2 + 16, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#ece6da'; ctx.fillRect(x - w / 2, y - base, w, base);
+  const top = y - base - up, g = ctx.createLinearGradient(x - w / 2, 0, x + w / 2, 0); g.addColorStop(0, '#9a6236'); g.addColorStop(1, '#5f3a1e');
+  ctx.fillStyle = g; ctx.fillRect(x - w / 2, top, w, up);
+  ctx.beginPath(); ctx.moveTo(x - w / 2, top); ctx.lineTo(x, top - rh); ctx.lineTo(x + w / 2, top); ctx.fill(); // Giebel
+  ctx.strokeStyle = 'rgba(30,15,5,.35)'; ctx.lineWidth = 1;
+  for (let yy = y - base - 6; yy > top - rh + 4; yy -= 6) { const k = yy < top ? (yy - top + rh) / rh : 1; ctx.beginPath(); ctx.moveTo(x - w / 2 * k, yy); ctx.lineTo(x + w / 2 * k, yy); ctx.stroke(); } // Balken
+  ctx.fillStyle = '#5a5248'; ctx.beginPath(); ctx.moveTo(x - w / 2 - 18, top + 6); ctx.lineTo(x, top - rh - 8); ctx.lineTo(x + w / 2 + 18, top + 6);
+  ctx.lineTo(x + w / 2 + 12, top + 10); ctx.lineTo(x, top - rh); ctx.lineTo(x - w / 2 - 12, top + 10); ctx.closePath(); ctx.fill();
+  for (const k of [0.3, 0.65]) for (const sx of [-1, 1]) ellipse(x + sx * (w / 2 + 14) * k, top - rh - 6 + (rh + 12) * k, 3.5, 2.5, '#9a958c'); // Steine gegen den Föhnsturm
+  return top;
+}
+function shutterWin(x, y, w = 18, h = 16) { ctx.fillStyle = '#fff'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4); win(x, y, w, h); ctx.fillStyle = '#3d7a3a'; ctx.fillRect(x - 7, y - 2, 5, h + 4); ctx.fillRect(x + w + 2, y - 2, 5, h + 4); }
+function flowers(x0, x1, y) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x0, y, x1 - x0, 4); ctx.fillStyle = '#e8303a'; for (let xx = x0 + 2; xx < x1; xx += 5) { ctx.beginPath(); ctx.arc(xx, y - 1, 2.3, 0, 7); ctx.fill(); } }
+function balcony(x, w, y) {
+  ctx.fillStyle = '#7a4a26'; ctx.fillRect(x - w / 2 - 4, y - 2, w + 8, 4); for (let bx = x - w / 2; bx <= x + w / 2; bx += 8) ctx.fillRect(bx, y - 2, 2.5, 12); ctx.fillRect(x - w / 2 - 4, y + 8, w + 8, 2.5);
+  flowers(x - w / 2, x + w / 2, y - 4);
+}
+function speicher(x, y) { // Kornspeicher auf Stelzen mit Steinplatten gegen Mäuse
+  ellipse(x + 4, y, 30, 7, 'rgba(0,0,0,.22)');
+  for (const px of [-18, 14]) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x + px, y - 16, 5, 16); ellipse(x + px + 2.5, y - 16, 6, 2.5, '#9a958c'); }
+  alpHouse(x, y - 16, 48, 0, 34, 20); shutterWin(x - 6, y - 42, 12, 10);
+}
+function kapelle(x, y) {
+  ellipse(x + 4, y, 34, 8, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#f4efe4'; ctx.fillRect(x - 24, y - 50, 48, 50);
+  ctx.fillStyle = '#7a3b2a'; ctx.beginPath(); ctx.moveTo(x - 30, y - 48); ctx.lineTo(x, y - 78); ctx.lineTo(x + 30, y - 48); ctx.fill();
+  ctx.fillStyle = '#f4efe4'; ctx.fillRect(x - 8, y - 100, 16, 30); // Turm
+  ctx.fillStyle = '#2a2a2a'; ctx.fillRect(x - 4, y - 96, 8, 9);
+  ctx.fillStyle = '#7a3b2a'; ctx.beginPath(); ctx.moveTo(x - 11, y - 100); ctx.lineTo(x, y - 128); ctx.lineTo(x + 11, y - 100); ctx.fill();
+  line('#e8c35a', 2, x, y - 128, x, y - 140); line('#e8c35a', 2, x - 5, y - 135, x + 5, y - 135);
+  ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.moveTo(x - 8, y); ctx.lineTo(x - 8, y - 20); ctx.arc(x, y - 20, 8, Math.PI, 0); ctx.lineTo(x + 8, y); ctx.fill();
+  ellipse(x, y - 38, 5, 5, '#bfe0f5');
+}
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
 const HGT = { rebe: 62, fischteich: 50, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
