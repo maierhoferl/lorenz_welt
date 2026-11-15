@@ -12,6 +12,7 @@ var TR = {
     "wird beim Händler verkauft": "sold at the trader",
     "Spediteur": "haulier",
     "Zutat aus einem anderen Reiter": "ingredient from another tab",
+    "geht in einen anderen Reiter": "goes to another tab",
     "Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.": "Tip: tap a box – the whole chain lights up. ℹ️ explains how it works.",
     // Avatar-Baukasten (data.js → LOOK)
     "🎨 Aussehen": "🎨 Look",

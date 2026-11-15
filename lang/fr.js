@@ -12,6 +12,7 @@ var TR = {
     "wird beim Händler verkauft": "vendu chez le marchand",
     "Spediteur": "transporteur",
     "Zutat aus einem anderen Reiter": "ingrédient d’un autre onglet",
+    "geht in einen anderen Reiter": "va dans un autre onglet",
     "Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.": "Astuce : touche une case – toute la chaîne s’allume. ℹ️ explique comment ça marche.",
     // Avatar-Baukasten (data.js → LOOK)
     "🎨 Aussehen": "🎨 Apparence",
