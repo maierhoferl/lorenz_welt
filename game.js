@@ -168,6 +168,14 @@ const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
 const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
+const avail = k => !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
+// Endstation (Ware wird nirgends weiterverarbeitet) zum ersten Mal gebaut → nächste Kette freischalten
+function checkUnlock(k) {
+  const d = THINGS[k];
+  if (d.kind !== 'factory' || G.fin[k] || Object.keys(THINGS).some(f => avail(f) && THINGS[f].in?.[d.item])) return null;
+  G.fin[k] = 1;
+  return G.unlocks < UNLOCKS.length ? UNLOCKS[G.unlocks++] : null;
+}
 
 function slotsAvail(area) { const a = AREAS[area]; return a.base + a.per * G.land; }
 function slotPos(area, i) {
@@ -192,7 +200,7 @@ function addThing(type) {
   return t;
 }
 function newGame() {
-  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0 };
+  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0, unlocks: 0, fin: {} };
   for (const k in TOOLS) G.tools[k] = 0;
   addThing('feld').ripe = true;
   addThing('baum').ripe = true;
@@ -207,6 +215,9 @@ function loadGame(server) {
     Object.assign(G, s);
     G.tools = Object.assign(tools, s.tools);
     G.things = G.things.filter(t => THINGS[t.type]); // falls ein Typ entfernt wurde
+    const u0 = G.unlocks;
+    for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
+    if (G.unlocks > u0) setTimeout(() => toast(`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
 }
 function save(cloud) {
@@ -243,9 +254,20 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 let joy = null;
-cv.addEventListener('pointerdown', e => { AU.init(); if (!joy) { joy = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); } });
-cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
-const joyEnd = e => { if (joy && e.pointerId === joy.id) joy = null; };
+// Zwei Finger = Pinch-Zoom, ein Finger = Joystick
+const touches = new Map(); let pinch = 0;
+const spread = () => { const [a, b] = touches.values(); return dist(a.x, a.y, b.x, b.y) || 1; };
+cv.addEventListener('pointerdown', e => {
+  AU.init(); cv.setPointerCapture(e.pointerId); touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2) { joy = null; pinch = spread(); }
+  else if (!joy && touches.size === 1) joy = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY };
+});
+cv.addEventListener('pointermove', e => {
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && touches.size === 2) { const s = spread(); setZoom(s / pinch); pinch = s; }
+  else if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; }
+});
+const joyEnd = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = 0; if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
 
 // =================== Spiellogik ===================
@@ -510,14 +532,22 @@ let shopTab = 0;
 function shopList() {
   const tabs = [[], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
+    if (!avail(k)) continue;
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
       icon: d.icon, name: d.name, price: d.price, info: d.info,
       desc: d.kind === 'grow' ? `Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
       note: free ? `kommt auf: ${AREAS[d.area].name}` : '⚠️ Kein Platz – kauf mehr Land!', can: free,
-      buy: () => { const t = addThing(k); toast(`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); } },
+      buy: () => {
+        const t = addThing(k); toast(`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
+        const u = checkUnlock(k);
+        if (u) { toast(`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
+      },
     });
   }
+  if (G.unlocks < UNLOCKS.length) tabs[1].push({ icon: '🔒', name: 'Geheimes Rezept', price: 0, can: false,
+    desc: 'Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!',
+    info: 'Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.' });
   for (const [k, line] of Object.entries(TOOLS)) {
     const lv = G.tools[k], next = line.levels[lv + 1];
     if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: 'Beste Stufe erreicht! 🏆', info: line.levels[lv].info, can: false, price: 0 }); continue; }
@@ -556,7 +586,7 @@ function openShop() {
 
 // Produktions-Diagramm: alle möglichen Ketten, Besessenes farbig, Probleme rot/gelb
 function openPlan() {
-  const types = Object.keys(THINGS), depth = {};
+  const types = Object.keys(THINGS).filter(avail), depth = {};
   const makers = it => types.filter(k => THINGS[k].item === it);
   const dep = k => depth[k] ?? (depth[k] = THINGS[k].kind === 'grow' ? 0 : 1 + Math.max(0, ...Object.keys(THINGS[k].in).flatMap(it => makers(it).map(dep))));
   types.forEach(dep);

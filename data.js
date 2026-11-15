@@ -21,6 +21,17 @@ const ITEMS = {
   joghurt: { name: 'Joghurt',     icon: '🥣', price: 14 },
   kaese:   { name: 'Käse',        icon: '🧀', price: 30 },
   kuchen:  { name: 'Apfelkuchen', icon: '🥧', price: 38 },
+  // freischaltbar (siehe UNLOCKS)
+  sahne:   { name: 'Sahne',       icon: '🍶', price: 20 },
+  butter:  { name: 'Butter',      icon: '🧈', price: 55 },
+  kekse:   { name: 'Butterkekse', icon: '🍪', price: 45 },
+  saft:    { name: 'Apfelsaft',   icon: '🧃', price: 13 },
+  essig:   { name: 'Apfelessig',  icon: '🫙', price: 36 },
+  pizza:   { name: 'Pizza',       icon: '🍕', price: 62 },
+  griess:  { name: 'Grieß',       icon: '🥄', price: 10 },
+  nudeln:  { name: 'Nudeln',      icon: '🍝', price: 28 },
+  lasagne: { name: 'Lasagne',     icon: '🫕', price: 88 },
+  torte:   { name: 'Sahnetorte',  icon: '🎂', price: 160 },
 };
 
 const THINGS = {
@@ -49,7 +60,49 @@ const THINGS = {
   konditorei: { kind: 'factory', name: 'Konditorei', icon: '🎂', area: 'dorf', price: 450,
     in: { apfel: 3, mehl: 1, milch: 1 }, item: 'kuchen', n: 1, time: 12,
     info: 'Für Apfelkuchen mischt man Mehl, Milch, Butter, Eier und Zucker zu einem Teig. Die Äpfel werden geschält, in Spalten geschnitten und auf den Teig gelegt. Dann bäckt der Kuchen etwa 45 Minuten bei 180 °C. Butter wird übrigens auch aus Milch gemacht – durch kräftiges Schlagen von Sahne!' },
+
+  // ----- freischaltbar: erst im Laden, wenn eine Endstation gebaut wurde (UNLOCKS) -----
+  zentrifuge: { kind: 'factory', name: 'Milch-Zentrifuge', icon: '🌀', area: 'dorf', price: 350,
+    in: { milch: 3 }, item: 'sahne', n: 1, time: 6,
+    info: 'Eine Trommel dreht sich ganz schnell – bis zu 6000 Mal in der Minute! Dabei wird die schwere, wässrige Milch nach außen gedrückt, das leichte Fett bleibt innen. So trennt man die Sahne (Rahm) von der Magermilch. Früher ließ man die Milch einfach stehen, bis die Sahne oben schwamm.' },
+  butterei: { kind: 'factory', name: 'Butterei', icon: '🧈', area: 'dorf', price: 400,
+    in: { sahne: 2 }, item: 'butter', n: 1, time: 8,
+    info: 'Sahne wird im Butterfass lange und kräftig geschlagen. Irgendwann kleben die kleinen Fettkügelchen zusammen – plötzlich gibt es gelbe Butterklumpen und eine dünne Flüssigkeit, die Buttermilch. Die Butter wird gewaschen und geknetet. Für 1 kg Butter braucht man etwa 20 Liter Milch!' },
+  keksbaeckerei: { kind: 'factory', name: 'Keksbäckerei', icon: '🍪', area: 'dorf', price: 550,
+    in: { butter: 1, mehl: 2 }, item: 'kekse', n: 2, time: 10,
+    info: 'Butter, Mehl und Zucker werden zu einem Mürbeteig geknetet. Der Teig wird dünn ausgerollt und in Formen ausgestochen oder gestanzt. Im Ofen backen die Kekse nur etwa 10 Minuten. Das Wort „Keks“ kommt vom englischen „cakes“ – Kuchen.' },
+  saftpresse: { kind: 'factory', name: 'Saftpresse', icon: '🧃', area: 'dorf', price: 300,
+    in: { apfel: 3 }, item: 'saft', n: 1, time: 5,
+    info: 'Die Äpfel werden gewaschen und klein gemahlen – das heißt Maische. Dann presst eine Presse den Saft heraus, den Rest (Trester) bekommen oft die Tiere. Danach wird der Saft kurz erhitzt, damit er lange haltbar bleibt. Aus 1,5 kg Äpfeln wird etwa 1 Liter Saft.' },
+  essigbrauerei: { kind: 'factory', name: 'Essigbrauerei', icon: '🫙', area: 'dorf', price: 450,
+    in: { saft: 2 }, item: 'essig', n: 1, time: 12,
+    info: 'Zuerst verwandeln Hefen den Zucker im Apfelsaft in Alkohol. Dann kommen Essigbakterien dazu: Die brauchen Luft und machen aus dem Alkohol Essigsäure. Auf dem Essig wächst dabei eine glibberige Haut – die „Essigmutter“. Fertiger Essig enthält keinen Alkohol mehr.' },
+  pizzeria: { kind: 'factory', name: 'Pizzeria', icon: '🍕', area: 'dorf', price: 600,
+    in: { mehl: 2, kaese: 1 }, item: 'pizza', n: 1, time: 10,
+    info: 'Pizzateig ist Mehl, Wasser, Salz, Öl und Hefe. Er wird dünn ausgezogen, mit Tomatensoße bestrichen und mit Käse belegt. Ein Holzofen wird über 400 °C heiß – darin ist die Pizza in nur 90 Sekunden fertig! Erfunden wurde sie in Neapel in Italien.' },
+  griessmuehle: { kind: 'factory', name: 'Grießmühle', icon: '⚙️', area: 'dorf', price: 350,
+    in: { weizen: 3 }, item: 'griess', n: 1, time: 5,
+    info: 'Grieß ist grob gemahlenes Getreide – die Körnchen sind größer als beim Mehl. Für Nudeln nimmt man Hartweizen: Der ist besonders fest und gelb. Die Walzen stehen weiter auseinander als beim Mehl, und Siebe sortieren die passende Korngröße heraus.' },
+  nudelfabrik: { kind: 'factory', name: 'Nudelfabrik', icon: '🍝', area: 'dorf', price: 500,
+    in: { griess: 2 }, item: 'nudeln', n: 1, time: 8,
+    info: 'Grieß und Wasser werden zu einem festen Teig geknetet. Eine Maschine drückt den Teig durch eine Lochscheibe – die Form der Löcher bestimmt die Nudel: Spaghetti, Spiralen, Muscheln … Dann werden die Nudeln langsam getrocknet, damit sie nicht brechen. Trocken halten sie jahrelang!' },
+  trattoria: { kind: 'factory', name: 'Trattoria', icon: '🫕', area: 'dorf', price: 750,
+    in: { nudeln: 1, kaese: 1, milch: 1 }, item: 'lasagne', n: 1, time: 14,
+    info: 'Für Lasagne legt man breite Nudelplatten, Fleisch- oder Gemüsesoße und weiße Soße (Béchamel aus Milch, Butter und Mehl) in Schichten übereinander – wie ein Stapel. Oben drauf kommt Käse. Im Ofen wird alles weich und der Käse goldbraun.' },
+  tortenmeister: { kind: 'factory', name: 'Tortenmeister', icon: '🎂', area: 'dorf', price: 1000,
+    in: { kuchen: 2, sahne: 2 }, item: 'torte', n: 1, time: 16,
+    info: 'Ein Konditor-Meister schneidet Böden quer durch und füllt sie mit Sahne und Früchten. Kalte Sahne wird mit dem Schneebesen steif geschlagen: Dabei werden winzige Luftbläschen ins Fett eingeschlossen. Zum Schluss wird verziert – mit Spritzbeutel, Schokolade und Früchten. Konditor ist ein eigener Beruf mit 3 Jahren Lehre!' },
 };
+
+// Freischalten: Wird eine Endstation gebaut (ihre Ware verarbeitet niemand weiter, z. B. Konditorei),
+// kommt die nächste Kette in den Laden. Reihenfolge zählt (Tortenmeister braucht Sahne).
+const UNLOCKS = [
+  ['zentrifuge', 'butterei', 'keksbaeckerei'],
+  ['saftpresse', 'essigbrauerei'],
+  ['pizzeria'],
+  ['griessmuehle', 'nudelfabrik', 'trattoria'],
+  ['tortenmeister'],
+];
 
 const TOOLS = {
   getreide: { name: 'Getreide-Ernte', icon: '🌾', levels: [
