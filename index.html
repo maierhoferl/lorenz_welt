@@ -25,6 +25,20 @@
   h1 { font-size: clamp(40px, 9vw, 76px); margin:0; color:#fff; text-shadow: 0 4px 0 #8a1a12, 0 8px 20px rgba(0,0,0,.35); letter-spacing:1px; }
   .sub { margin:0; color:#fff; font-size:22px; text-shadow:0 2px 3px rgba(0,0,0,.4); }
   #plist { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; max-width:760px; }
+  .pwrap { position:relative; display:inline-block; }
+  .pav { width:90px; height:96px; }
+  .pedit { position:absolute; top:-8px; right:-8px; width:40px; height:40px; border:0; border-radius:50%; font-size:20px; background:#fff; box-shadow:0 3px 0 #b8925f, 0 4px 10px rgba(0,0,0,.2); }
+  #avatar h2 { margin:0; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.4); text-align:center; }
+  .avwrap { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; align-items:center; max-width:100%; }
+  #avcv { width:200px; height:230px; background:radial-gradient(#fff8 0 55%, #fff0 70%); border-radius:50%; }
+  #avopts { display:flex; flex-direction:column; gap:8px; max-height:58vh; overflow:auto; max-width:min(560px, 92vw); }
+  .avrow { display:flex; flex-direction:column; gap:4px; }
+  .avrow > div { display:flex; flex-wrap:wrap; gap:6px; }
+  .sw { width:32px; height:32px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); font-size:16px; padding:0; }
+  .sw.auto { background:#e9f5d8; }
+  .opt { border:0; border-radius:999px; padding:6px 12px; font:inherit; font-size:14px; background:#efe3c8; color:var(--ink); }
+  .sw.on { box-shadow:0 0 0 3px var(--ch); } .opt.on { background:var(--ch); color:#fff; }
+  .avbtns { display:flex; gap:10px; }
   #langs { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
   #langs button { border:0; border-radius:999px; padding:6px 12px; font:inherit; font-size:14px; font-weight:700; background:rgba(251,244,228,.8); color:var(--ink); }
   #langs button.on { background:var(--ch); color:#fff; }
@@ -118,6 +132,16 @@
     <button class="btn">Los geht's!</button>
     <button type="button" class="btn alt" id="addcancel">Abbrechen</button>
   </form>
+</section>
+
+<section id="avatar" class="screen" hidden>
+  <button class="back" data-back>←</button>
+  <h2 id="avtitle"></h2>
+  <div class="avwrap">
+    <canvas id="avcv"></canvas>
+    <div id="avopts" class="panel"></div>
+  </div>
+  <div class="avbtns"><button class="btn alt" id="avrand">🎲 Zufall</button><button class="btn" id="avok">Fertig ✓</button></div>
 </section>
 
 <section id="pin" class="screen" hidden>

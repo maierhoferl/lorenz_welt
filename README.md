@@ -27,6 +27,8 @@ Ein Aufbau- und Entdeckerspiel im Browser für Kinder (7–10 Jahre). Läuft auf
 **Steuerung:** Pfeiltasten / WASD. Auf iPad/iPhone: irgendwo hintippen und ziehen = Joystick, zwei Finger = Zoom.
 
 **Spieler:** Lorenz und Adrian sind angelegt, weitere können dazukommen. Beim ersten Start legt jeder einen 4-stelligen Code fest. Code vergessen → Rechenaufgaben lösen (Schwierigkeit nach Alter).
+
+**Aussehen:** Mit 🎨 auf der Spielerkarte stellt man das Aussehen ein (Haut, Gesicht, Haare, Frisur, Augen, Sommersprossen, Brille, Kopfbedeckung, T-Shirt, Hose, Schuhe – Optionen in `data.js` → `LOOK`); es wird pro Gerät gespeichert, mit dem Spielstand synchronisiert und gilt auch für die Figur im Spiel.
 Spielstände werden online gespeichert (Cloudflare Worker + D1, Ordner `worker/`) und sind auf jedem Gerät verfügbar: lokal alle 5 s, Server alle 30 s und beim Verlassen. Ohne Internet läuft das Spiel lokal weiter; der neuere Stand gewinnt.
 Der Code wird am Server geprüft (5 Fehlversuche → 2 Min. Sperre), die Rechenaufgaben zur Wiederherstellung stellt und prüft ebenfalls der Server.
 

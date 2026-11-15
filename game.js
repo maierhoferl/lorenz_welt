@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const cv = $('#cv'), ctx = cv.getContext('2d');
+const cv = $('#cv'); let ctx = cv.getContext('2d'); // let: Avatar-Vorschau zeichnet kurz auf eigene Canvas
 let W = 0, H = 0, DPR = 1, ZOOM = 1;
 function resize() {
   DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
@@ -61,9 +61,10 @@ const hasPin = p => online ? p.hasPin : !!p.pinHash;
 
 function drawSelect() {
   $('#plist').innerHTML = profiles.map((p, i) =>
-    `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? $t`🔒 ${p.age} Jahre` : $t`✨ neu`}</small></button>`).join('') +
+    `<div class="pwrap"><button class="pcard" data-i="${i}"><canvas class="pav" data-av="${i}"></canvas><b>${esc(p.name)}</b><small>${hasPin(p) ? $t`🔒 ${p.age} Jahre` : $t`✨ neu`}</small></button><button class="pedit" data-edit="${i}" title="${$t`🎨 Aussehen`}">🎨</button></div>`).join('') +
     (online ? `<i class="brk"></i><button class="pcard add" data-add>＋<b>${$t`Neuer Spieler`}</b></button>` : '');
   $('#whosub').textContent = online ? $t`Wer spielt?` : $t`Wer spielt? (offline – Spielstand nur auf diesem Gerät)`;
+  for (const c of document.querySelectorAll('[data-av]')) drawAvatar(c, getLook(profiles[+c.dataset.av].id));
 }
 async function renderSelect() {
   show('select');
@@ -80,6 +81,7 @@ async function renderSelect() {
 }
 $('#plist').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.edit != null) return openAvatar(profiles[+b.dataset.edit]);
   if (b.dataset.add != null) { $('#plist').hidden = true; $('#addform').hidden = false; $('#newname').value = ''; $('#newname').focus(); return; }
   openPin(profiles[+b.dataset.i]);
 };
@@ -155,6 +157,42 @@ $('#checkprobs').onclick = async () => {
     pin.mode = 'set'; show('pin'); drawPin($t`Super gerechnet! Wähle einen neuen Code.`);
   } catch (e) { loadProblems(e.code ? $t`Leider nicht alles richtig. Hier sind neue Aufgaben!` : $t`Kein Internet?`); }
 };
+
+// =================== Avatar-Baukasten ===================
+const getLook = id => store.get('lw_look_' + id) || {};
+const lookOf = l => Object.fromEntries(Object.entries(LOOK).map(([k, [, o]]) => [k, o[l?.[k]] ?? o[0]]));
+// Figur ausserhalb der Welt zeichnen: drawPlayer mit kurz ausgeliehenem Zustand (G, ctx, Blickrichtung, Schritt)
+function drawAvatar(c, look, t) {
+  const r = c.getBoundingClientRect(), dpr = devicePixelRatio || 1, w = r.width || 90, h = r.height || 110;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const keep = [G, ctx, trH, walk, amp, cart.on, harvest];
+  try {
+    ctx = c.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
+    const k = h * dpr / 75; ctx.setTransform(k, 0, 0, k, 0, 0);
+    G = { px: w * dpr / k / 2, py: 70, stage: 1, tools: { tragen: 0 }, inv: {}, look };
+    trH = t == null ? Math.PI / 2 - 0.45 : Math.PI / 2 + Math.sin(t * 0.7) * 1.4;
+    walk = (t || 0) * 7; amp = t == null ? 0 : 0.7; cart.on = false; harvest = null;
+    drawPlayer();
+  } finally { [G, ctx, trH, walk, amp, cart.on, harvest] = keep; }
+}
+let av = null;
+function openAvatar(p) {
+  av = { p, look: { ...getLook(p.id) } };
+  show('avatar'); $('#avtitle').textContent = $t`Wie siehst du aus, ${p.name}?`;
+  avOpts(); requestAnimationFrame(avLoop);
+}
+function avLoop(ts) { if (!av || $('#avatar').hidden) return; drawAvatar($('#avcv'), av.look, ts / 1000); requestAnimationFrame(avLoop); }
+function avOpts() {
+  $('#avopts').innerHTML = Object.entries(LOOK).map(([k, [name, opts]]) => `<div class="avrow"><b>${$t([name])}</b><div>${opts.map((o, i) => {
+    const on = (av.look[k] || 0) === i ? ' on' : '';
+    return o === 'auto' ? `<button class="sw auto${on}" data-k="${k}" data-v="${i}" title="${$t`wächst mit`}">🌱</button>`
+      : o[0] === '#' ? `<button class="sw${on}" data-k="${k}" data-v="${i}" style="background:${o}"></button>`
+      : `<button class="opt${on}" data-k="${k}" data-v="${i}">${$t([o])}</button>`;
+  }).join('')}</div></div>`).join('');
+}
+$('#avopts').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; av.look[b.dataset.k] = +b.dataset.v; avOpts(); };
+$('#avrand').onclick = () => { for (const k in LOOK) av.look[k] = Math.floor(Math.random() * LOOK[k][1].length); avOpts(); };
+$('#avok').onclick = () => { store.set('lw_look_' + av.p.id, { ...av.look, t: Date.now() }); av = null; renderSelect(); };
 
 // =================== Spielstand ===================
 let G = null, P = null;
@@ -234,7 +272,9 @@ function save(cloud) {
 }
 
 function startGame(p, key, server) {
-  P = p; KEY = key; pin = null; loadGame(server); AU.init(); show('game'); resize();
+  P = p; KEY = key; pin = null; loadGame(server);
+  const lk = getLook(p.id); // Aussehen: neuere Fassung gewinnt (Gerät oder Spielstand in der Cloud)
+  if ((G.look?.t || 0) > (lk.t || 0)) store.set('lw_look_' + p.id, G.look); else G.look = lk; AU.init(); show('game'); resize();
   shopDismiss = false; near = null; lastNear = null;
   pt = playTime(); if (pt.s >= (pt.lim || LIMIT)) timeUp();
   hud(); toast('ontouchstart' in window ? $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten oder wisch über den Bildschirm.` : $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten (oder WASD).`);
@@ -1275,12 +1315,12 @@ function tractorParts(x, y, s) {
 }
 // Bein mit Knie (2-Glied-IK) in der Ebene quer-Versatz b: Fuss schwingt nach vorn und hebt ab, Standbein bleibt am Boden.
 // Rechnet in (vorne, unten) wie in der Seitenansicht und projiziert dann in 3D.
-function leg3(P, s, p, L, drop, b, z0, col, am) {
+function leg3(P, s, p, L, drop, b, z0, col, am, shoe = '#4a2f1e') {
   const a = Math.sin(p) * 0.5 * am, fx = L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
   const vy = fy - hy, d = Math.hypot(fx, vy), k = Math.sqrt(Math.max(0, L * L / 4 - d * d / 4));
   const Q = (u, v) => P(u, b, z0 - v);
   line(col, 5 * s, ...Q(0, hy), ...Q(fx / 2 + vy / d * k, hy + vy / 2 - fx / d * k), ...Q(fx, fy));
-  line('#4a2f1e', 3.5 * s, ...Q(fx - 2, fy - 1), ...Q(fx + 5, fy - 1)); // Schuh zeigt nach vorn
+  line(shoe, 3.5 * s, ...Q(fx - 2, fy - 1), ...Q(fx + 5, fy - 1)); // Schuh zeigt nach vorn
 }
 function drawPlayer() {
   const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09, P = proj(x, y, s);
@@ -1292,7 +1332,7 @@ function drawPlayer() {
   const cartBack = cart.on && (cart.fy + cart.by) / 2 <= y;
   if (!tr) ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
   if (cartBack) drawCart(...anchor(), s);
-  const zu = lift - drop, shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st], skin = '#f2c9a2', hair = '#f2cf5b';
+  const lk = lookOf(G.look), zu = lift - drop, shirt = lk.shirt === 'auto' ? ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st] : lk.shirt, skin = lk.skin, hair = lk.hair;
   const hz = zu + legL + torso + headR - 1, shZ = zu + legL + torso - 4, handZ = zu + legL + 1;
   const front = tr || !!harvTool() || G.tools.tragen === 2, basket = !tr && G.tools.tragen === 1; // Hände nach vorn: Lenkrad, Werkzeug, Schubkarre
   const ball = (a, b, z, r, c) => () => { const [px, py] = P(a, b, z); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(px, py, r * s, 0, 7); ctx.fill(); };
@@ -1300,21 +1340,40 @@ function drawPlayer() {
   const plane = f => { ctx.save(); ctx.transform((Math.sign(P.ux) || 1) * Math.max(0.4, Math.abs(P.ux)) * s, P.uy * s, 0, s, x, y); f(); ctx.restore(); };
   const parts = [];
   const add = (a, b, f, k = 0) => parts.push({ d: P.d(a, b) + k, f });
-  for (const [b, ph, col] of [[-2.5, walk + Math.PI, '#28406a'], [2.5, walk, '#34507f']]) {
-    if (!tr) add(0, b, () => leg3(P, s, ph, legL, drop, b, lift, col, am));
-    else add(6, b, () => { line(col, 5 * s, ...P(0, b, 15), ...P(9, b, 15), ...P(10, b, 6)); line('#4a2f1e', 3.5 * s, ...P(9, b, 5), ...P(15, b, 5)); }); // sitzt
+  for (const [b, ph, col] of [[-2.5, walk + Math.PI, lk.pants], [2.5, walk, shade(lk.pants, 1.18)]]) {
+    if (!tr) add(0, b, () => leg3(P, s, ph, legL, drop, b, lift, col, am, lk.shoes));
+    else add(6, b, () => { line(col, 5 * s, ...P(0, b, 15), ...P(9, b, 15), ...P(10, b, 6)); line(lk.shoes, 3.5 * s, ...P(9, b, 5), ...P(15, b, 5)); }); // sitzt
   }
   add(0, 0, () => box3(P, -sh * 0.6, sh * 0.6, sh, zu + legL - 2, torso + 2, shade(shirt, 1.15), shirt));
   for (const sd of [-1, 1]) { // Arme
     const reach = sd > 0 ? front : basket, ha = reach ? (sd > 0 ? D.hx : D.bx) : -sd * leg * 0.8, hb = reach ? sd * sh * 0.6 : sd * (sh + 2.5);
     add(ha, hb, () => { line(shirt, 4.5 * s, ...P(0, sd * (sh + 1.5), shZ), ...P(ha, hb, handZ)); ball(ha, hb, handZ, 2.6, skin)(); }, 0.01);
   }
-  add(1.5, 0, ball(1.5, 0, hz, headR, skin), 0.02);                // Gesicht
-  add(-2.5, 0, ball(-2.5, 0, hz + 2, headR * 0.95, hair), 0.02);    // Haare hinten/oben
-  add(headR * 0.55, 0, () => { const [px, py] = P(headR * 0.55, 0, hz + headR * 0.55); ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(px, py, headR * 0.8 * s, headR * 0.4 * s, 0, 0, 7); ctx.fill(); }, 0.03); // Stirnfransen
-  for (const b of [-2.6, 2.6]) add(headR * 0.85, b, ball(headR * 0.85, b, hz + 1, 1.4, '#2a4a7a'), 0.04); // Augen
+  const blob = (a, b, z, rx, ry, c) => () => { const [px, py] = P(a, b, z); ellipse(px, py, rx * s, ry * s, c); };
+  const [fw, fh] = { Rund: [1, 1], Oval: [0.88, 1.15], Breit: [1.15, 0.92] }[lk.face];
+  add(1.5, 0, blob(1.5, 0, hz, headR * fw, headR * fh, skin), 0.02); // Gesicht
+  const hr = lk.style; // Frisur
+  if (hr === 'Lang') add(-headR * 0.7, 0, blob(-headR * 0.7, 0, hz - headR * 0.55, headR * 0.95, headR * 1.15, shade(hair, 0.92)), 0.015);
+  if (hr === 'Zopf') { add(-headR * 1.1, 0, ball(-headR * 1.1, 0, hz + 1, headR * 0.42, hair), 0.015); add(-headR * 1.25, 0, ball(-headR * 1.25, 0, hz - headR * 0.6, headR * 0.34, shade(hair, 0.9)), 0.012); }
+  if (hr !== 'Glatze') add(-2.5, 0, ball(-2.5, 0, hz + 2, headR * (hr === 'Igel' ? 0.85 : 0.95), hair), 0.02); // Haare hinten/oben
+  if (hr === 'Locken') for (let i = 0; i < 7; i++) { const w = i / 7 * 6.283, a = Math.cos(w) * headR * 0.75 - 1, b = Math.sin(w) * headR * 0.75; add(a, b, ball(a, b, hz + headR * 0.45, headR * 0.42, i % 2 ? hair : shade(hair, 1.1)), 0.03); }
+  if (hr === 'Igel') add(0, 0, () => { ctx.fillStyle = hair; for (let i = 0; i < 6; i++) { const w = i / 6 * 6.283, a = Math.cos(w) * headR * 0.5, b = Math.sin(w) * headR * 0.5, [x0, y0] = P(a, b, hz + headR * 0.6), [x1, y1] = P(a * 1.4, b * 1.4, hz + headR * 1.35); ctx.beginPath(); ctx.moveTo(x0 - 3 * s, y0); ctx.lineTo(x1, y1); ctx.lineTo(x0 + 3 * s, y0); ctx.fill(); } }, 0.035);
+  if (!['Glatze', 'Igel', 'Locken'].includes(hr)) add(headR * 0.55, 0, () => { const [px, py] = P(headR * 0.55, 0, hz + headR * 0.55); ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(px, py, headR * 0.8 * s, headR * 0.4 * s, 0, 0, 7); ctx.fill(); }, 0.03); // Stirnfransen
+  for (const b of [-2.6, 2.6]) add(headR * 0.85, b, ball(headR * 0.85, b, hz + 1, 1.4, lk.eyes), 0.04); // Augen
+  if (lk.freckles === 'Ja') for (const b of [-4, -3, -5, 3, 4, 5]) add(headR * 0.8, b, ball(headR * 0.8, b, hz - 1.5 + (Math.abs(b) % 2), 0.55, '#b0703a'), 0.045);
+  if (lk.glasses !== 'Keine') add(headR * 0.95, 0, () => {
+    const L = P(headR * 0.9, -2.6, hz + 1), R = P(headR * 0.9, 2.6, hz + 1);
+    ctx.lineWidth = 0.9 * s; ctx.strokeStyle = '#222'; ctx.fillStyle = lk.glasses === 'Sonnenbrille' ? 'rgba(20,20,30,.85)' : 'rgba(200,230,255,.25)';
+    for (const [px, py] of [L, R]) { ctx.beginPath(); ctx.arc(px, py, 2.3 * s, 0, 7); ctx.fill(); ctx.stroke(); }
+    line('#222', 0.9 * s, ...L, ...R);
+  }, 0.05);
+  const top = hz + headR * fh * 0.6; // Kopfbedeckung immer zuoberst
+  if (lk.hat === 'Sennenkäppi') add(0, 0, () => { const [px, py] = P(0, 0, top); ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.ellipse(px, py, headR * 0.95 * s, headR * 0.6 * s, 0, Math.PI, 0); ctx.fill(); ellipse(px, py, headR * 0.98 * s, 1.4 * s, '#1e1e1e'); ellipse(px, py - headR * 0.3 * s, 1.6 * s, 1.6 * s, '#fff'); }, 0.5);
+  if (lk.hat === 'Strohhut') add(0, 0, () => { const [px, py] = P(0, 0, top - 1); ellipse(px, py, headR * 1.9 * s, headR * 0.6 * s, '#e3c26a'); ctx.fillStyle = '#d9ae4a'; rrect(px - headR * 0.85 * s, py - headR * 0.85 * s, headR * 1.7 * s, headR * 0.85 * s, 3 * s); ctx.fill(); ctx.fillStyle = '#d23b2b'; ctx.fillRect(px - headR * 0.85 * s, py - headR * 0.3 * s, headR * 1.7 * s, 2 * s); }, 0.5);
+  if (lk.hat === 'Zipfelmütze') add(0, 0, () => { const [px, py] = P(0, 0, top - 1), [tx, ty] = P(-headR * 0.9, 0, top + headR * 1.4); ctx.fillStyle = '#d23b2b'; ctx.beginPath(); ctx.moveTo(px - headR * s, py); ctx.quadraticCurveTo(px, py - headR * 1.6 * s, tx, ty); ctx.lineTo(px + headR * s, py); ctx.fill(); ellipse(px, py, headR * s, 2 * s, '#f2f2f2'); ellipse(tx, ty, 2.4 * s, 2.4 * s, '#f2f2f2'); }, 0.5);
+  if (lk.hat === 'Velohelm') add(0, 0, () => { const [px, py] = P(0, 0, top - 2); ctx.fillStyle = '#3a6fd8'; ctx.beginPath(); ctx.ellipse(px, py, headR * 1.08 * s, headR * 0.85 * s, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.5)'; for (const o of [-0.4, 0, 0.4]) ctx.fillRect(px + o * headR * s - s, py - headR * 0.75 * s, 2 * s, headR * 0.5 * s); }, 0.5);
   add(headR * 0.9, 0, () => { const [px, py] = P(headR * 0.9, 0, hz - 3); ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.ellipse(px, py, 2.4 * s * Math.max(0.3, Math.abs(P.uy)), 2.4 * s, 0, 0.2, Math.PI - 0.2); ctx.stroke(); }, 0.04); // Mund
-  if (st >= 4) add(headR * 0.7, 0, () => { const [px, py] = P(headR * 0.7, 0, hz - 3); ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(px, py, (headR - 3) * s, 0.1, Math.PI - 0.1); ctx.fill(); }, 0.03); // Bart
+  if (st >= 4) add(headR * 0.7, 0, () => { const [px, py] = P(headR * 0.7, 0, hz - 3); ctx.fillStyle = hair; ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.arc(px, py, (headR - 3) * s, 0.1, Math.PI - 0.1); ctx.fill(); ctx.globalAlpha = 1; }, 0.03); // Bart
   const fig = () => {
     plane(() => gearBack(D));
     parts.sort((p, q) => p.d - q.d).forEach(p => p.f());

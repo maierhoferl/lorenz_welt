@@ -271,6 +271,22 @@ const FIXED = [
   { type: 'laden', name: 'Laden', x: 36, y: 23, info: 'Im Laden kaufst du Tiere, Bäume, Felder, Werkzeuge, Gebäude und neues Land. Bring dein Geld hierher!' },
 ];
 
+// Avatar-Baukasten (Startbildschirm → 🎨). Gespeichert werden nur die Nummern der Auswahl, Nummer 0 = Standard.
+// Farben werden als Farbfeld gezeigt, Wörter als Knopf (übersetzt über lang/*.js → ui); 'auto' = T-Shirt wechselt mit dem Alter.
+const LOOK = {
+  skin:     ['Hautfarbe',     ['#f2c9a2', '#f8dcc2', '#e3ae84', '#c98e5e', '#9a6440', '#6e4429', '#4a2c1a']],
+  face:     ['Gesichtsform',  ['Rund', 'Oval', 'Breit']],
+  hair:     ['Haarfarbe',     ['#f2cf5b', '#e0a84a', '#b5652a', '#7a4520', '#3a2618', '#151515', '#d8432a', '#ececec', '#e870b0', '#4a7ae0']],
+  style:    ['Frisur',        ['Kurz', 'Lang', 'Locken', 'Zopf', 'Igel', 'Glatze']],
+  eyes:     ['Augenfarbe',    ['#2a4a7a', '#3f8fcf', '#4a7a3a', '#6b4423', '#2a2a2a']],
+  freckles: ['Sommersprossen', ['Nein', 'Ja']],
+  glasses:  ['Brille',        ['Keine', 'Brille', 'Sonnenbrille']],
+  hat:      ['Kopfbedeckung', ['Keine', 'Sennenkäppi', 'Strohhut', 'Zipfelmütze', 'Velohelm']],
+  shirt:    ['T-Shirt',       ['auto', '#e8483b', '#f29a2e', '#f2cf3b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#e870b0', '#f2f2f2', '#2a2a2a']],
+  pants:    ['Hose',          ['#28406a', '#4a6aa8', '#3d3d3d', '#6b4a2b', '#2f6a3a', '#a83a3a']],
+  shoes:    ['Schuhe',        ['#4a2f1e', '#1a1a1a', '#d23b2b', '#3a6fd8', '#f2f2f2']],
+};
+
 // Wachstum des Spielers: ab welchem Welt-Punktestand wie viele Jahre älter
 const STAGES = [
   { score: 0, add: 0 }, { score: 8, add: 2 }, { score: 18, add: 5 }, { score: 32, add: 9 }, { score: 50, add: 16 },
