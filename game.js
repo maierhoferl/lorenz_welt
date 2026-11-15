@@ -800,12 +800,95 @@ DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e
 const HGT = { hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
+// Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
+const harvTool = () => harvest && THINGS[harvest.t.type].tool;
+const onTractor = () => G.tools.tragen === 4 && !harvest; // beim Ernten steigt man ab
+const liftH = () => harvTool() === 'obst' && G.tools.obst === 3 ? 26 : onTractor() ? 12 : 0;
+function wheel(x, y, r) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = '#a8a8a8'; ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, 7); ctx.fill(); }
+function line(c, w, ...pts) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[0], pts[1]); ctx.stroke(); }
+// Lokale Koordinaten: Ursprung an den Füßen, +x = Blickrichtung, y nach oben negativ
+function gearBack(D) {
+  const tr = G.tools.tragen, ht = harvTool(), top = D.lift + D.legL + D.torso + D.headR * 2;
+  if (tr === 3) { // Leiterwagen, hinten gezogen
+    line('#6b4a2b', 2, D.bx, D.hy, -26, -12);
+    ctx.fillStyle = '#b5523b'; ctx.fillRect(-64, -24, 38, 12);
+    for (let i = -60; i < -26; i += 6) line('#7a3524', 1.5, i, -24, i, -12);
+    wheel(-58, -5, 5); wheel(-32, -5, 5);
+  }
+  if (onTractor()) { // Anhänger + Kabine
+    line('#555', 2, -30, -16, -18, -16);
+    ctx.fillStyle = '#c9a24a'; ctx.fillRect(-76, -32, 46, 18); ctx.fillStyle = '#a8842f'; ctx.fillRect(-76, -32, 46, 3);
+    wheel(-53, -7, 7);
+    ctx.fillStyle = '#3c3c3c'; ctx.fillRect(-15, -top - 6, 2.5, top - 22); ctx.fillRect(10, -top - 6, 2.5, top - 22);
+    ctx.fillStyle = '#2f8f4e'; ctx.fillRect(-18, -top - 8, 34, 5);
+  }
+  if (ht === 'obst' && G.tools.obst === 2) { // Obstleiter mit drei Beinen
+    line('#9b7040', 2.5, 8, 0, 14, -78); line('#9b7040', 2.5, 20, 0, 18, -78); line('#7d5a33', 2, 34, 0, 16, -78);
+    for (let y = -10; y > -76; y -= 11) line('#9b7040', 2, 8 - y * 0.077, y, 20 + y * 0.026, y);
+  }
+  if (ht === 'obst' && G.tools.obst === 3) { // Hebebühne: Scheren-Hub
+    const L = D.lift;
+    ctx.fillStyle = '#555'; ctx.fillRect(-18, -5, 36, 5); wheel(-13, 0, 3); wheel(13, 0, 3);
+    line('#e0b020', 2.5, -14, -5, 14, -L, -14, -L, 14, -5, -14, -5);
+    ctx.fillStyle = '#e0b020'; ctx.fillRect(-18, -L - 3, 36, 4);
+    line('#e0b020', 2, -18, -L - 3, -18, -L - 20, 18, -L - 20, 18, -L - 3);
+  }
+}
+function gearFront(D) {
+  const tr = G.tools.tragen, ht = harvTool(), lv = ht && G.tools[ht], { hx, hy } = D, a = Math.sin(time * 12);
+  if (tr === 1) { // Korb in der hinteren Hand
+    line('#8a5a2b', 1.5, D.bx - 5, D.hy + 3, D.bx, D.hy - 3, D.bx + 5, D.hy + 3);
+    ctx.fillStyle = '#c48a45'; rrect(D.bx - 6, D.hy + 2, 12, 9, 2); ctx.fill(); line('#8a5a2b', 1, D.bx - 6, D.hy + 6, D.bx + 6, D.hy + 6);
+  }
+  if (tr === 2) { // Schubkarre vorne geschoben
+    line('#6b4a2b', 2, hx, hy, hx + 12, -12);
+    ctx.fillStyle = '#3d7fc4'; ctx.beginPath(); ctx.moveTo(hx + 6, -22); ctx.lineTo(hx + 36, -24); ctx.lineTo(hx + 29, -10); ctx.lineTo(hx + 11, -10); ctx.fill();
+    line('#555', 2, hx + 12, -10, hx + 12, 0); wheel(hx + 28, -5, 5);
+  }
+  if (ht === 'getreide' && lv === 1) { // Sichel schwingen
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(a * 0.6);
+    line('#6b4a2b', 2.5, 0, 0, 5, 0); ctx.strokeStyle = '#ccd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(10, 0, 6, Math.PI, Math.PI * 1.9); ctx.stroke(); ctx.restore();
+  }
+  if (ht === 'getreide' && lv === 2) { // Sense
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(a * 0.4);
+    line('#8a5a2b', 2.5, -2, -16, 5, 14); ctx.strokeStyle = '#ccd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(5, 14); ctx.quadraticCurveTo(16, 10, 26, 14); ctx.stroke(); ctx.restore();
+  }
+  if (ht === 'getreide' && lv === 3) { // Motormäher mit zitterndem Mähbalken
+    line('#333', 2, hx, hy, hx + 10, -10);
+    ctx.fillStyle = '#d33'; ctx.fillRect(hx + 8, -13, 14, 9); wheel(hx + 14, -3, 3);
+    const j = Math.sin(time * 60) * 1.5; ctx.fillStyle = '#999'; ctx.fillRect(hx + 20, -4, 24, 3);
+    ctx.fillStyle = '#ccd'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(hx + 21 + i * 4 + j, -4); ctx.lineTo(hx + 23 + i * 4 + j, -8); ctx.lineTo(hx + 25 + i * 4 + j, -4); ctx.fill(); }
+  }
+  if (ht === 'obst' && lv === 1) { // Pflückstange
+    const tx = hx + 14, ty = -D.legL - D.torso - 34 + a * 2;
+    line('#8a5a2b', 2, hx - 2, hy + 6, tx, ty); ctx.fillStyle = '#c48a45'; rrect(tx - 4, ty - 6, 8, 7, 2); ctx.fill();
+  }
+  if (ht === 'milch' && lv >= 1) { // Eimer (Schemel) bzw. Melkmaschine
+    if (lv === 1) {
+      ctx.fillStyle = '#9aa3ad'; ctx.beginPath(); ctx.moveTo(hx + 4, -12); ctx.lineTo(hx + 18, -12); ctx.lineTo(hx + 16, 0); ctx.lineTo(hx + 6, 0); ctx.fill();
+      ellipse(hx + 11, -12, 7, 2, '#fff');
+    } else {
+      ctx.fillStyle = '#b8c0c8'; rrect(hx + 8, -20, 14, 20, 3); ctx.fill();
+      ellipse(hx + 15, -15, 2.5, 2.5, a > 0 ? '#4c4' : '#262');
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx + 15, -20); ctx.quadraticCurveTo(hx + 22, hy - 6, hx + 2, hy); ctx.stroke();
+    }
+  }
+  if (onTractor()) { // Traktor-Rumpf vor den Beinen (Rahmen ohne Hub)
+    ctx.save(); ctx.translate(0, D.lift);
+    ctx.fillStyle = '#2f8f4e'; ctx.fillRect(-18, -30, 50, 16); ctx.fillRect(14, -40, 22, 12);
+    line('#333', 2.5, 28, -40, 28, -50 - Math.abs(a) * 2);
+    wheel(-6, -12, 12); wheel(28, -7, 7); ctx.restore();
+  }
+}
+
 function drawPlayer() {
   const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09;
   const bob = moving ? Math.abs(Math.sin(walk)) * 2 : 0, leg = moving ? Math.sin(walk) * 4 : 0;
   ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
   ctx.save(); ctx.translate(x, y - bob); ctx.scale(s * face, s);
-  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5;
+  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = liftH();
+  const D = { legL, torso, sh, headR, lift, hx: sh + 3 + leg * 0.5, hy: -legL - 1, bx: -sh - 3 - leg * 0.5 };
+  gearBack(D); ctx.translate(0, -lift);
   ctx.fillStyle = '#34507f'; ctx.fillRect(-sh + 2, -legL + leg * 0.3, 5, legL - leg * 0.3); ctx.fillRect(sh - 7, -legL - leg * 0.3, 5, legL + leg * 0.3);
   ctx.fillStyle = '#4a2f1e'; ctx.fillRect(-sh + 1, -3, 7, 3); ctx.fillRect(sh - 7, -3, 7, 3);
   const shirt = ['#e8483b', '#2f8f4e', '#3a6fd8', '#6b4fa3', '#4a6274'][st];
@@ -824,9 +907,10 @@ function drawPlayer() {
   ctx.fillStyle = '#2a4a7a'; ctx.beginPath(); ctx.arc(1.5, hy + 1, 1.4, 0, 7); ctx.arc(5.5, hy + 1, 1.4, 0, 7); ctx.fill();
   ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(3.5, hy + 3.5, 2.4, 0.2, Math.PI - 0.2); ctx.stroke();
   if (st >= 4) { ctx.fillStyle = 'rgba(220,180,80,.55)'; ctx.beginPath(); ctx.arc(2, hy + 3, headR - 2, 0.1, Math.PI - 0.1); ctx.fill(); }
+  gearFront(D);
   ctx.restore();
   const items = Object.keys(G.inv);
-  if (items.length) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * face, y - (legL + 6) * s); }
+  if (items.length) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * face, y - (legL + 6 + liftH()) * s); }
 }
 
 function render() {
@@ -901,7 +985,7 @@ function render() {
     }
   }
   if (harvest) {
-    const s = 0.85 + G.stage * 0.09, hy = G.py - 75 * s;
+    const s = 0.85 + G.stage * 0.09, hy = G.py - (75 + liftH()) * s;
     ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(G.px, hy, 12, 0, 7); ctx.stroke();
     ctx.strokeStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(G.px, hy, 12, -Math.PI / 2, -Math.PI / 2 + harvest.p * Math.PI * 2); ctx.stroke();
   }
