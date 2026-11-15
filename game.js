@@ -62,7 +62,7 @@ const hasPin = p => online ? p.hasPin : !!p.pinHash;
 function drawSelect() {
   $('#plist').innerHTML = profiles.map((p, i) =>
     `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? '🔒 ' + p.age + ' Jahre' : '✨ neu'}</small></button>`).join('') +
-    (online ? `<button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>` : '');
+    (online ? `<i class="brk"></i><button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>` : '');
   $('#whosub').textContent = online ? 'Wer spielt?' : 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)';
 }
 async function renderSelect() {
@@ -667,11 +667,19 @@ function openPlan() {
   for (const k of types) { const d = THINGS[k]; sup[d.item] = (sup[d.item] || 0) + cnt[k] * d.n / d.time * 60; if (d.in) for (const i in d.in) dem[i] = (dem[i] || 0) + cnt[k] * d.in[i] / d.time * 60; }
   const cols = Array.from({ length: maxD + 1 }, () => []);
   types.forEach(k => cols[depth[k]].push(k)); cols[maxD].push('haendler');
-  const NW = 170, NH = 62, GX = 70, GY = 18, posn = {};
-  const hMax = Math.max(...cols.map(c => c.length)) * (NH + GY);
-  cols.forEach((c, ci) => c.forEach((k, ri) => { posn[k] = { x: 10 + ci * (NW + GX), y: 10 + (hMax - c.length * (NH + GY)) / 2 + ri * (NH + GY) }; }));
-  const Wd = 20 + (maxD + 1) * (NW + GX) - GX, Hd = hMax + 10;
-  let edges = '', nodes = '';
+  const NW = 170, NH = 62, GX = 70, GY = 18, LH = 26, posn = {};
+  // Kategorien = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel). Jede Kategorie ein eigenes Band.
+  const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = Object.keys(THINGS).find(f => THINGS[f].item === it); return m ? catOf(m) : it; };
+  const cats = [...new Set(types.map(catOf))], Wd = 20 + (maxD + 1) * (NW + GX) - GX;
+  let edges = '', nodes = '', bands = '', y = 10;
+  cats.forEach((c, i) => {
+    const inC = cols.slice(0, maxD).map(col => col.filter(k => catOf(k) === c)), h = LH + Math.max(...inC.map(col => col.length)) * (NH + GY);
+    bands += `<rect x="2" y="${y - 4}" width="${Wd - 4 - NW - GX / 2}" height="${h}" rx="14" fill="rgba(168,116,63,${i % 2 ? .13 : .07})"/><text x="12" y="${y + 14}" font-size="14" font-weight="800" fill="#7a5530">${ITEMS[c].icon} ${ITEMS[c].name}</text>`;
+    inC.forEach((col, ci) => col.forEach((k, ri) => { posn[k] = { x: 10 + ci * (NW + GX), y: y + LH + ri * (NH + GY) }; }));
+    y += h + 8;
+  });
+  const Hd = y;
+  posn.haendler = { x: 10 + maxD * (NW + GX), y: (Hd - NH) / 2 };
   const r = v => Math.round(v * 10) / 10;
   const edge = (a, b, it, color, dash, label) => {
     const p = posn[a], q = posn[b], x1 = p.x + NW, y1 = p.y + NH / 2, x2 = q.x, y2 = q.y + NH / 2, mx = (x1 + x2) / 2;
@@ -736,7 +744,7 @@ function openPlan() {
       <text x="${p.x + 10}" y="${p.y + 47}" font-size="12" fill="#555">${rate}</text>
       ${warn ? `<circle cx="${p.x + NW - 4}" cy="${p.y + 4}" r="11" fill="#d23b2b"/><text x="${p.x + NW - 4}" y="${p.y + 9}" text-anchor="middle" fill="#fff" font-weight="900" font-size="15">!</text>` : ''}</g>`;
   }
-  const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${edges}${nodes}</svg>`;
+  const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${bands}${edges}${nodes}</svg>`;
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ passt</span><span style="color:#d23b2b">━ zu wenig</span><span style="color:#e39b1c">━ zu viel</span><span style="color:#3e7bc4">┅ du musst tragen</span><span style="opacity:.5">▢ noch nicht gebaut</span></div>`;
   modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><h3>Was jetzt am meisten bringt</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="geschätzter Nutzen in den nächsten ${M} Minuten"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} Fr.</span></li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ol><small>≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten. </small><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
   $('#plan').querySelectorAll('[data-k]').forEach(g => g.onclick = () => showInfo(THINGS[g.dataset.k] ? { type: g.dataset.k } : FIXED.find(f => f.type === g.dataset.k)));
