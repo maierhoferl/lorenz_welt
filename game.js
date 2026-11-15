@@ -472,14 +472,24 @@ function spedition(dt) {
   while (trucks.length < truckCount()) trucks.push({ x: hx, y: hy + trucks.length * 45, h: Math.PI, wait: trucks.length * 4, route: [], load: 0, sum: 0 });
   for (const [i, k] of trucks.entries()) {
     if (!k.route.length) { // im Depot
-      if ((k.wait += dt) < lv.every) continue;
-      const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t)));
-      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => b[fld(b)] - a[fld(a)]);
+      k.wait += dt;
+      if ((k.chk = (k.chk || 0) + dt) < 0.5) continue; // ponytail: Depot nur 2× pro Sekunde prüfen, surplus() ist O(Gebäude²)
+      k.chk = 0;
+      const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t))), val = t => t[fld(t)] * ITEMS[THINGS[t.type].item].price;
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => val(b) - val(a)); // wertvollste zuerst
+      // Gebäude ohne Abnehmer: nicht auf den Takt warten, schon ab 3 Stück losfahren
+      if (k.wait < lv.every && !todo.some(t => t[fld(t)] > 2 && !hasConsumer(THINGS[t.type].item))) continue;
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
-      // alle freien Fahrzeuge fahren gemeinsam los, Gebäude reihum verteilt – so sieht man mehrere unterwegs
-      const idle = trucks.filter(o => !o.route.length), left = idle.map(() => lv.cap);
-      todo.forEach((t, j) => { const n = j % idle.length; if (left[n] <= 0) return; const p = pos(t); idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; });
-      idle.forEach(o => { o.wait = 0; if (o.route.length) o.route.push({ x: hx, y: hy + trucks.indexOf(o) * 45 }); }); // zurück auf den eigenen Parkplatz
+      // alle freien Fahrzeuge fahren gemeinsam los: erster Halt reihum (so sieht man mehrere unterwegs),
+      // danach geht jedes Gebäude an das Fahrzeug mit Platz, dessen letzter Halt am nächsten liegt
+      const idle = trucks.filter(o => !o.route.length), left = idle.map(() => lv.cap), at = idle.map(o => ({ x: o.x, y: o.y }));
+      todo.forEach((t, j) => {
+        const p = pos(t), d = m => left[m] > 0 ? Math.hypot(p.x - at[m].x, p.y - at[m].y) : Infinity;
+        const n = j < idle.length ? j : idle.reduce((b, _, m) => d(m) < d(b) ? m : b, 0);
+        if (left[n] <= 0) return; // alle voll
+        idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; at[n] = p;
+      });
+      idle.forEach(o => { if (o.route.length) { o.wait = 0; o.route.push({ x: hx, y: hy + trucks.indexOf(o) * 45 }); } }); // zurück auf den eigenen Parkplatz
       continue;
     }
     k.wait += dt;
@@ -489,6 +499,7 @@ function spedition(dt) {
     if (r.t) { // beim Gebäude einladen
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? Math.min(r.t[f], lv.cap - k.load) : 0;
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
+      if (k.load >= lv.cap) k.route = k.route.filter(q => !q.t); // voll: restliche Halte auslassen, direkt zum Händler
     } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
   }
 }
