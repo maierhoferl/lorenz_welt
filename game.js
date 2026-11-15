@@ -475,10 +475,11 @@ function spedition(dt) {
       if ((k.wait += dt) < lv.every) continue;
       const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t)));
       const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => b[fld(b)] - a[fld(a)]);
-      let left = lv.cap;
-      for (const t of todo) { if (left <= 0) break; const p = pos(t); k.route.push({ t, x: p.x, y: p.y + 24 }); left -= t[fld(t)]; }
-      if (!k.route.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
-      k.wait = 0; k.route.push({ x: hx, y: hy + i * 45 }); // zurück auf den eigenen Parkplatz
+      if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
+      // alle freien Fahrzeuge fahren gemeinsam los, Gebäude reihum verteilt – so sieht man mehrere unterwegs
+      const idle = trucks.filter(o => !o.route.length), left = idle.map(() => lv.cap);
+      todo.forEach((t, j) => { const n = j % idle.length; if (left[n] <= 0) return; const p = pos(t); idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; });
+      idle.forEach(o => { o.wait = 0; if (o.route.length) o.route.push({ x: hx, y: hy + trucks.indexOf(o) * 45 }); }); // zurück auf den eigenen Parkplatz
       continue;
     }
     k.wait += dt;
@@ -785,7 +786,8 @@ function openShop() {
   el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = L[+b.dataset.buy];
     if (G.money < it.price) { AU.sfx('no'); return; }
-    G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud(); if (!$('#shop').hidden) openShop();
+    G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud();
+    if (!$('#shop').hidden) { const y = el.querySelector('.body').scrollTop; openShop(); el.querySelector('.body').scrollTop = y; } // Scrollposition behalten
   });
 }
 
