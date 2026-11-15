@@ -834,7 +834,8 @@ function openPlan() {
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
   const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
   const unitVal = f => eur(THINGS[f].item) * THINGS[f].n / Object.values(THINGS[f].in).reduce((a, b) => a + b); // Wert je Zutat nach Verarbeitung
-  const bestUser = (it, built) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f])).sort((a, b) => unitVal(b) - unitVal(a))[0];
+  const ready = f => Object.keys(THINGS[f].in).every(i => sup[i] > 0); // nur vorschlagen, wenn ALLE Zutaten schon hergestellt werden
+  const bestUser = (it, built) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f]) && ready(f)).sort((a, b) => unitVal(b) - unitVal(a))[0];
   let blocked = 0; // was gerade auf eine freie Tasche wartet
   for (const k of types) {
     const d = THINGS[k], it = d.item, fld = d.kind === 'grow' ? 'store' : 'out', cap = d.kind === 'grow' ? storeCap(d) : OUT_CAP;
@@ -848,7 +849,7 @@ function openPlan() {
     if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, $t`✨ <b>${ripe}× ${d.name} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`); }
   }
   for (const [it, n] of Object.entries(G.inv)) {
-    const f = G.things.find(t => THINGS[t.type].in?.[it] && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
+    const f = G.things.find(t => THINGS[t.type].in?.[it] && ready(t.type) && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
     if (f) tip(n * unitVal(f.type), $t`🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
     else tip(n * eur(it), $t`💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`);
   }
@@ -857,11 +858,11 @@ function openPlan() {
     const s = sup[it] || 0, dm = dem[it] || 0, makes = makers(it).map(k => THINGS[k].name).join(' / ');
     if (dm && s < dm * 0.9) {
       const f = bestUser(it, true);
-      tip((dm - s) * unitVal(f) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`));
+      tip((dm - s) * (f ? unitVal(f) : eur(it)) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`));
     }
     if (!s) continue;
     const bu = bestUser(it, true), best = bestUser(it, false);
-    if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
+    if (dm && bu && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
     if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
     if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`);
