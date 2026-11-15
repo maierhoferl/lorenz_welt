@@ -61,9 +61,9 @@ const hasPin = p => online ? p.hasPin : !!p.pinHash;
 
 function drawSelect() {
   $('#plist').innerHTML = profiles.map((p, i) =>
-    `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? '🔒 ' + p.age + ' Jahre' : '✨ neu'}</small></button>`).join('') +
-    (online ? `<i class="brk"></i><button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>` : '');
-  $('#whosub').textContent = online ? 'Wer spielt?' : 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)';
+    `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? $t`🔒 ${p.age} Jahre` : $t`✨ neu`}</small></button>`).join('') +
+    (online ? `<i class="brk"></i><button class="pcard add" data-add>＋<b>${$t`Neuer Spieler`}</b></button>` : '');
+  $('#whosub').textContent = online ? $t`Wer spielt?` : $t`Wer spielt? (offline – Spielstand nur auf diesem Gerät)`;
 }
 async function renderSelect() {
   show('select');
@@ -101,7 +101,7 @@ $('#pad').onclick = e => { const b = e.target.closest('button'); if (b) pinKey(b
 function openPin(p) { pin = { p, mode: hasPin(p) ? 'enter' : 'set', buf: '', first: '' }; show('pin'); drawPin(); }
 function drawPin(msg = '') {
   const n = esc(pin.p.name);
-  $('#pintitle').innerHTML = { enter: `Hallo ${n}! Gib deinen Geheimcode ein.`, set: `Hallo ${n}! Denk dir einen 4-stelligen Geheimcode aus.`, confirm: 'Gib den Code zur Sicherheit nochmal ein.' }[pin.mode];
+  $('#pintitle').innerHTML = { enter: $t`Hallo ${n}! Gib deinen Geheimcode ein.`, set: $t`Hallo ${n}! Denk dir einen 4-stelligen Geheimcode aus.`, confirm: $t`Gib den Code zur Sicherheit nochmal ein.` }[pin.mode];
   [...$('#dots').children].forEach((d, i) => d.classList.toggle('on', i < pin.buf.length));
   $('#pinmsg').textContent = msg;
   $('#forgot').hidden = pin.mode !== 'enter';
@@ -116,8 +116,8 @@ async function pinKey(k) {
   if (!pin) return;
   if (pin.mode === 'set') { pin.first = b; pin.mode = 'confirm'; drawPin(); }
   else if (pin.mode === 'confirm') {
-    if (b !== pin.first) { pin.mode = 'set'; shakeDots(); return drawPin('Die Codes waren verschieden – nochmal!'); }
-    if (online) try { await api('/setpin', { id: pin.p.id, pin: h, token: pin.token }); } catch (e) { pin.mode = 'set'; return drawPin('Hat nicht geklappt – nochmal versuchen.'); }
+    if (b !== pin.first) { pin.mode = 'set'; shakeDots(); return drawPin($t`Die Codes waren verschieden – nochmal!`); }
+    if (online) try { await api('/setpin', { id: pin.p.id, pin: h, token: pin.token }); } catch (e) { pin.mode = 'set'; return drawPin($t`Hat nicht geklappt – nochmal versuchen.`); }
     pin.p.hasPin = true; if (!online) pin.p.pinHash = h; login(h);
   } else login(h);
 }
@@ -127,12 +127,12 @@ async function login(h) {
     try { server = (await api('/login', { id: pin.p.id, pin: h })).save; if (!pin) return; }
     catch (e) {
       if (!pin) return;
-      if (e.code) { shakeDots(); return drawPin(e.code === 'locked' ? `Zu oft falsch – warte ${e.wait} Sekunden. ⏳` : 'Falscher Code 🙈'); }
+      if (e.code) { shakeDots(); return drawPin(e.code === 'locked' ? $t`Zu oft falsch – warte ${e.wait} Sekunden. ⏳` : $t`Falscher Code 🙈`); }
       online = false; // Netz weg → lokal weiter
     }
   }
   if (!online && pin.p.pinHash !== h) {
-    shakeDots(); return drawPin(pin.p.pinHash ? 'Falscher Code 🙈' : 'Ohne Internet kannst du dich auf diesem Gerät noch nicht anmelden.');
+    shakeDots(); return drawPin(pin.p.pinHash ? $t`Falscher Code 🙈` : $t`Ohne Internet kannst du dich auf diesem Gerät noch nicht anmelden.`);
   }
   pin.p.pinHash = h; saveProfiles(); // lokale Kopie für Offline-Anmeldung
   startGame(pin.p, h, server);
@@ -145,15 +145,15 @@ async function loadProblems(msg = '') {
     const { problems } = await api('/recover/start', { id: pin.p.id });
     show('recover'); $('#recmsg').textContent = msg;
     $('#probs').innerHTML = problems.map(q => `<label>${q} = <input inputmode="numeric"></label>`).join('');
-  } catch (e) { show('pin'); drawPin('Code-Hilfe geht nur mit Internet.'); }
+  } catch (e) { show('pin'); drawPin($t`Code-Hilfe geht nur mit Internet.`); }
 }
 $('#forgot').onclick = () => loadProblems();
 $('#checkprobs').onclick = async () => {
   const answers = [...$('#probs').querySelectorAll('input')].map(i => i.value.trim());
   try {
     pin.token = (await api('/recover/finish', { id: pin.p.id, answers })).token;
-    pin.mode = 'set'; show('pin'); drawPin('Super gerechnet! Wähle einen neuen Code.');
-  } catch (e) { loadProblems(e.code ? 'Leider nicht alles richtig. Hier sind neue Aufgaben!' : 'Kein Internet?'); }
+    pin.mode = 'set'; show('pin'); drawPin($t`Super gerechnet! Wähle einen neuen Code.`);
+  } catch (e) { loadProblems(e.code ? $t`Leider nicht alles richtig. Hier sind neue Aufgaben!` : $t`Kein Internet?`); }
 };
 
 // =================== Spielstand ===================
@@ -223,7 +223,7 @@ function loadGame(server) {
     if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
-    if (G.unlocks > u0) setTimeout(() => toast(`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
+    if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
 }
 function save(cloud) {
@@ -237,7 +237,7 @@ function startGame(p, key, server) {
   P = p; KEY = key; pin = null; loadGame(server); AU.init(); show('game'); resize();
   shopDismiss = false; near = null; lastNear = null;
   pt = playTime(); if (pt.s >= (pt.lim || LIMIT)) timeUp();
-  hud(); toast(`Willkommen, ${P.name}! Lauf mit den Pfeiltasten ${'ontouchstart' in window ? 'oder wisch über den Bildschirm' : '(oder WASD)'}.`);
+  hud(); toast('ontouchstart' in window ? $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten oder wisch über den Bildschirm.` : $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten (oder WASD).`);
 }
 // ---- Tageslimit: 30 Min. pro Spieler und Tag, Eltern-Code gibt je 5 Min. dazu ----
 const LIMIT = 30 * 60, PARENT = 'lorenzmaierhofer'; // ponytail: Klartext im Client – hält Kinder auf, nicht DevTools/localStorage
@@ -248,13 +248,13 @@ function tickTime(dt) {
   if (pt.d !== today()) pt = { d: today(), s: 0 };
   const before = pt.s; pt.s += dt;
   if (Math.floor(pt.s / 5) !== Math.floor(before / 5)) store.set('lw_time_' + P.id, pt);
-  if (before < LIMIT - 300 && pt.s >= LIMIT - 300) toast('⏰ Noch 5 Minuten Spielzeit für heute!');
+  if (before < LIMIT - 300 && pt.s >= LIMIT - 300) toast($t`⏰ Noch 5 Minuten Spielzeit für heute!`);
   if (pt.s >= (pt.lim || LIMIT)) timeUp();
 }
 function timeUp() { store.set('lw_time_' + P.id, pt); save(true); closeModals(); $('#tupass').value = ''; $('#tumsg').textContent = ''; show('timeup'); }
 $('#tuform').onsubmit = e => {
   e.preventDefault();
-  if ($('#tupass').value !== PARENT) { $('#tumsg').textContent = 'Falscher Code'; return; }
+  if ($('#tupass').value !== PARENT) { $('#tumsg').textContent = $t`Falscher Code`; return; }
   pt.lim = pt.s + 5 * 60; store.set('lw_time_' + P.id, pt); show('game'); resize();
 };
 $('#tuexit').onclick = () => $('#bexit').click();
@@ -416,7 +416,7 @@ function spedition(dt) {
     if (r.t) { // beim Gebäude einladen
       const it = THINGS[r.t.type].item, n = Math.min(r.t.out, lv.cap - k.load);
       r.t.out -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
-    } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, `🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
+    } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
   }
 }
 function warnings() {
@@ -431,34 +431,34 @@ function warnings() {
     const d = THINGS[t.type]; t.warn = ''; t.wl = 'red';
     if (d.kind === 'grow') {
       if (t.store >= storeCap(d)) {
-        if (hasConsumer(d.item)) { t.warn = `Zu viel ${ITEMS[d.item].name} – die Verarbeitung kommt nicht nach. Hol etwas ab oder baue mehr!`; t.wl = 'yellow'; }
-        else t.warn = `Lager voll! Hol ${ITEMS[d.item].name} ab und bring es zum Händler.`;
+        if (hasConsumer(d.item)) { t.warn = $t`Zu viel ${ITEMS[d.item].name} – die Verarbeitung kommt nicht nach. Hol etwas ab oder baue mehr!`; t.wl = 'yellow'; }
+        else t.warn = $t`Lager voll! Hol ${ITEMS[d.item].name} ab und bring es zum Händler.`;
       }
       continue;
     }
     if (t.out + d.n > OUT_CAP) {
-      t.warn = hasConsumer(d.item) ? `Lager voll – die nächste Station schafft nicht so viel ${ITEMS[d.item].name}. Hol etwas ab und verkauf es!` : `Lager voll! Hol ${ITEMS[d.item].name} ab und verkauf es.`;
+      t.warn = hasConsumer(d.item) ? $t`Lager voll – die nächste Station schafft nicht so viel ${ITEMS[d.item].name}. Hol etwas ab und verkauf es!` : $t`Lager voll! Hol ${ITEMS[d.item].name} ab und verkauf es.`;
       if (hasConsumer(d.item)) t.wl = 'yellow';
       continue;
     }
     const miss = Object.keys(d.in).filter(k => (t.inS[k] || 0) < d.in[k]);
     if (miss.length && t.wait > 5) {
       const k = miss[0], name = ITEMS[k].name;
-      if (!sup[k]) t.warn = `Es fehlt ${name} – niemand stellt das her! Kauf etwas, das ${name} macht.`;
+      if (!sup[k]) t.warn = $t`Es fehlt ${name} – niemand stellt das her! Kauf etwas, das ${name} macht.`;
       else {
         const auto = G.things.some(s => THINGS[s.type].item === k && (THINGS[s.type].kind === 'factory' || isAuto(s)));
-        t.warn = auto ? `Wartet auf ${name} …` : `Bring ${name} her! (oder kauf eine Maschine, die automatisch erntet)`;
+        t.warn = auto ? $t`Wartet auf ${name} …` : $t`Bring ${name} her! (oder kauf eine Maschine, die automatisch erntet)`;
       }
       continue;
     }
-    for (const k in d.in) if ((sup[k] || 0) < dem[k] * 0.9) { t.warn = `Zu wenig ${ITEMS[k].name}: gebraucht ${r(dem[k])}/min, hergestellt ${r(sup[k])}/min.`; t.wl = 'yellow'; break; }
+    for (const k in d.in) if ((sup[k] || 0) < dem[k] * 0.9) { t.warn = $t`Zu wenig ${ITEMS[k].name}: gebraucht ${r(dem[k])}/min, hergestellt ${r(sup[k])}/min.`; t.wl = 'yellow'; break; }
   }
 }
 
 function score() { return G.things.length + G.land * 3 + (G.lkw || 0) * 2 + Object.values(G.tools).reduce((a, b) => a + b, 0) * 2; }
 function checkStage() {
   let s = 0; STAGES.forEach((st, i) => { if (score() >= st.score) s = i; });
-  if (s > G.stage) { G.stage = s; toast(`🎉 ${P.name} ist gewachsen! Jetzt ${age()} Jahre alt.`); AU.sfx('grow'); }
+  if (s > G.stage) { G.stage = s; toast($t`🎉 ${P.name} ist gewachsen! Jetzt ${age()} Jahre alt.`); AU.sfx('grow'); }
 }
 
 function addInv(item, n) { G.inv[item] = (G.inv[item] || 0) + n; }
@@ -471,7 +471,7 @@ function toast(msg, key) {
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }
 function take(t, field) { // Ware vom Lager in die Tasche
   const item = THINGS[t.type].item, free = bagCap() - bagCount(), n = Math.min(t[field], free);
-  if (n <= 0) { toast('Deine Tasche ist voll! Bring alles zum Händler. 🧺', 'full'); return; }
+  if (n <= 0) { toast($t`Deine Tasche ist voll! Bring alles zum Händler. 🧺`, 'full'); return; }
   t[field] -= n; addInv(item, n); AU.sfx('pop');
   const p = pos(t); floater(p.x, p.y - 50, `+${n} ${ITEMS[item].icon}`);
 }
@@ -510,15 +510,15 @@ function decoSpotOk(x, y) {
 function placeDeco() {
   if (!G.carry) return;
   const { x, y } = ghostPos();
-  if (!decoSpotOk(x, y)) { AU.sfx('no'); toast('Hier ist kein Platz – such dir ein freies Stück Wiese! 🌼', 'noplace'); return; }
+  if (!decoSpotOk(x, y)) { AU.sfx('no'); toast($t`Hier ist kein Platz – such dir ein freies Stück Wiese! 🌼`, 'noplace'); return; }
   G.deco.push({ id: G.nid++, type: G.carry, x, y }); G.carry = null; AU.sfx('buy'); save(); hud();
 }
 function pickDeco(d) { if (G.carry) return; G.deco.splice(G.deco.indexOf(d), 1); G.carry = d.type; AU.sfx('pop'); hud(); }
 function buyDeco(k) {
   const d = DECOS[k];
-  if (d.where !== 'land') { G.deco.push({ id: G.nid++, type: k }); toast(`${d.name} ist da! ${d.where === 'see' ? `Schau auf den ${P.name}see 🌊` : d.where === 'luft' ? 'Schau in den Himmel ☁️' : 'Schau hinauf in die Berge 🏔️'}`); return; }
+  if (d.where !== 'land') { G.deco.push({ id: G.nid++, type: k }); toast($t`${d.name} ist da!` + ' ' + (d.where === 'see' ? $t`Schau auf den ${P.name}see 🌊` : d.where === 'luft' ? $t`Schau in den Himmel ☁️` : $t`Schau hinauf in die Berge 🏔️`)); return; }
   G.carry = k; shopDismiss = true; $('#shop').hidden = true;
-  toast(`Du trägst jetzt: ${d.name}. Lauf dorthin, wo es stehen soll, und tippe 📍 Hier abstellen!`);
+  toast($t`Du trägst jetzt: ${d.name}. Lauf dorthin, wo es stehen soll, und tippe 📍 Hier abstellen!`);
 }
 
 function interact(dt) {
@@ -533,7 +533,7 @@ function interact(dt) {
   if (d && d.kind === 'grow') {
     if (near.store > 0 && surplus(d.item)) take(near, 'store');
     if (near.ripe && !isAuto(near)) {
-      if (bagCount() >= bagCap()) { toast('Deine Tasche ist voll! Bring alles zum Händler. 🧺', 'full'); harvest = null; }
+      if (bagCount() >= bagCap()) { toast($t`Deine Tasche ist voll! Bring alles zum Händler. 🧺`, 'full'); harvest = null; }
       else {
         if (!harvest || harvest.t !== near) harvest = { t: near, p: 0 };
         harvest.p += dt * toolLv(d.tool).speed / HARVEST_TIME;
@@ -578,12 +578,12 @@ function soundLevels() {
 const NOTES = [[1000, '#9a7cc4'], [200, '#b98557'], [100, '#5f97d6'], [50, '#6fb46b'], [20, '#e0646e'], [10, '#efc93f']]; // Farben der Schweizer Banknoten
 function hud() {
   if (!G) return;
-  $('#who').textContent = `👦🏼 ${P.name} · ${age()} Jahre`;
+  $('#who').textContent = $t`👦🏼 ${P.name} · ${age()} Jahre`;
   let m = G.money, notes = '';
   for (const [v, c] of NOTES) { let k = Math.floor(m / v); m -= k * v; k = Math.min(k, 6); while (k--) notes += `<span class="note" style="background:${c}">${v}</span>`; }
-  $('#money').innerHTML = `💰 ${G.money} Fr.<span class="notes">${notes}${m ? `<span title="Münzen">🪙${m}</span>` : ''}</span>`;
+  $('#money').innerHTML = `💰 ${G.money} ${$t`Fr.`}<span class="notes">${notes}${m ? `<span title="${$t`Münzen`}">🪙${m}</span>` : ''}</span>`;
   const inv = Object.entries(G.inv).map(([k, n]) => `${ITEMS[k].icon}${n}`).join(' ');
-  $('#bag').innerHTML = `${TOOLS.tragen.icon} ${inv || '<small>leer</small>'} <small>(${bagCount()}/${bagCap()})</small>`;
+  $('#bag').innerHTML = `${TOOLS.tragen.icon} ${inv || `<small>${$t`leer`}</small>`} <small>(${bagCount()}/${bagCap()})</small>`;
   // Info-Leiste zum nächsten Ort
   const t = near, px = $('#prox');
   const set = (html, ...fns) => {
@@ -593,24 +593,24 @@ function hud() {
   };
   if (G.carry) {
     const dc = DECOS[G.carry], g = ghostPos(), ok = decoSpotOk(g.x, g.y);
-    return set(`<div><b>${dc.icon} ${dc.name}</b><div>${ok ? 'Lauf dorthin, wo es stehen soll.' : '<span class="warn">Hier ist kein Platz.</span> Geh auf eine freie Wiese.'}</div></div><button ${ok ? '' : 'disabled'}>📍 Hier abstellen</button>`, placeDeco);
+    return set(`<div><b>${dc.icon} ${dc.name}</b><div>${ok ? $t`Lauf dorthin, wo es stehen soll.` : `<span class="warn">${$t`Hier ist kein Platz.`}</span> ${$t`Geh auf eine freie Wiese.`}`}</div></div><button ${ok ? '' : 'disabled'}>${$t`📍 Hier abstellen`}</button>`, placeDeco);
   }
   if (!t && nearDeco) {
     const dc = DECOS[nearDeco.type], o = nearDeco;
-    return set(`<div><b>${dc.icon} ${dc.name}</b><div>Deko – macht nichts, ist aber schön! 😊</div></div><button>✋ Umstellen</button><button>ℹ️</button>`, () => pickDeco(o), () => showInfo(dc));
+    return set(`<div><b>${dc.icon} ${dc.name}</b><div>${$t`Deko – macht nichts, ist aber schön! 😊`}</div></div><button>${$t`✋ Umstellen`}</button><button>ℹ️</button>`, () => pickDeco(o), () => showInfo(dc));
   }
   if (!t) { px.hidden = true; return; }
   const d = THINGS[t.type] || t;
   let st = '';
   if (d.kind === 'grow') {
     const tl = toolLv(d.tool);
-    if (isAuto(t)) st = `🤖 ${tl.name} erntet automatisch · Lager ${t.store}/${storeCap(d)} ${ITEMS[d.item].icon}`;
-    else st = t.ripe ? `Reif! Bleib stehen – du erntest mit: <b>${tl.name}</b>` : `Wächst … ${Math.floor(t.timer / d.time * 100)} %`;
+    if (isAuto(t)) st = $t`🤖 ${tl.name} erntet automatisch · Lager ${t.store}/${storeCap(d)} ${ITEMS[d.item].icon}`;
+    else st = t.ripe ? $t`Reif! Bleib stehen – du erntest mit: <b>${tl.name}</b>` : $t`Wächst … ${Math.floor(t.timer / d.time * 100)} %`;
   } else if (d.kind === 'factory') {
-    st = Object.keys(d.in).map(k => `${ITEMS[k].icon} ${t.inS[k] || 0}/${d.in[k]}`).join(' + ') + ` → ${ITEMS[d.item].icon} ${t.out}` + (t.working ? ' ⚙️ arbeitet' : '');
-  } else st = { haendler: 'Komm mit vollen Taschen – du bekommst Geldscheine!', laden: 'Hier kannst du einkaufen.', hof: 'Dein Zuhause.' }[t.type] || '';
+    st = Object.keys(d.in).map(k => `${ITEMS[k].icon} ${t.inS[k] || 0}/${d.in[k]}`).join(' + ') + ` → ${ITEMS[d.item].icon} ${t.out}` + (t.working ? $t` ⚙️ arbeitet` : '');
+  } else st = { haendler: $t`Komm mit vollen Taschen – du bekommst Geldscheine!`, laden: $t`Hier kannst du einkaufen.`, hof: $t`Dein Zuhause.` }[t.type] || '';
   const w = t.warn ? `<div class="warn">❗ ${esc(t.warn)}</div>` : '';
-  set(`<div><b>${d.icon || ''} ${d.name}</b><div>${st}</div>${w}</div><button>ℹ️ Wie geht das?</button>`, () => showInfo(t));
+  set(`<div><b>${d.icon || ''} ${d.name}</b><div>${st}</div>${w}</div><button>${$t`ℹ️ Wie geht das?`}</button>`, () => showInfo(t));
 }
 
 // =================== Fenster: Info, Laden, Plan ===================
@@ -624,9 +624,9 @@ function modal(el, title, body, extraHead = '') {
 function showInfo(t) {
   const d = THINGS[t.type] || t;
   let extra = '';
-  if (d.kind === 'grow') { const tl = toolLv(d.tool); extra = `<p><b>Dein Werkzeug: ${tl.name}.</b> ${tl.info}</p><p>Ergibt ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name} alle ${d.time} Sekunden.</p>`; }
-  if (d.kind === 'factory') extra = `<p><b>Rezept:</b> ${recipe(d)} in ${d.time} Sekunden.</p>`;
-  modal($('#info'), `${d.icon || '💡'} ${d.name} – Wusstest du?`, `<p>${d.info}</p>${extra}<button class="btn" data-ok>Verstanden!</button>`);
+  if (d.kind === 'grow') { const tl = toolLv(d.tool); extra = $t`<p><b>Dein Werkzeug: ${tl.name}.</b> ${tl.info}</p><p>Ergibt ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name} alle ${d.time} Sekunden.</p>`; }
+  if (d.kind === 'factory') extra = $t`<p><b>Rezept:</b> ${recipe(d)} in ${d.time} Sekunden.</p>`;
+  modal($('#info'), $t`${d.icon || '💡'} ${d.name} – Wusstest du?`, `<p>${d.info}</p>${extra}<button class="btn" data-ok>${$t`Verstanden!`}</button>`);
   $('#info [data-ok]').onclick = () => $('#info').hidden = true;
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
@@ -636,65 +636,65 @@ function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
     if (!avail(k)) { // Vorschau: was mit mehr Land dazukommt
-      if (d.kind === 'grow') tabs[0].push({ icon: '🔒', name: d.name, price: 0, can: false, info: d.info, desc: `kommt ab Land-Stufe ${d.land} dazu – kauf mehr Land! 🗺️` });
+      if (d.kind === 'grow') tabs[0].push({ icon: '🔒', name: d.name, price: 0, can: false, info: d.info, desc: $t`kommt ab Land-Stufe ${d.land} dazu – kauf mehr Land! 🗺️` });
       continue;
     }
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
       icon: d.icon, name: d.name, price: d.price, info: d.info,
-      desc: d.kind === 'grow' ? `Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
-      note: free ? `kommt auf: ${AREAS[d.area].name}` : '⚠️ Kein Platz – kauf mehr Land!', can: free,
+      desc: d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
+      note: free ? $t`kommt auf: ${AREAS[d.area].name}` : $t`⚠️ Kein Platz – kauf mehr Land!`, can: free,
       buy: () => {
-        const t = addThing(k); toast(`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
+        const t = addThing(k); toast($t`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
         const u = checkUnlock(k);
-        if (u) { toast(`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
+        if (u) { toast($t`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
       },
     });
   }
-  if (G.unlocks < UNLOCKS.length) tabs[1].push({ icon: '🔒', name: 'Geheimes Rezept', price: 0, can: false,
-    desc: 'Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!',
-    info: 'Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.' });
+  if (G.unlocks < UNLOCKS.length) tabs[1].push({ icon: '🔒', name: $t`Geheimes Rezept`, price: 0, can: false,
+    desc: $t`Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!`,
+    info: $t`Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.` });
   for (const [k, line] of Object.entries(TOOLS)) {
     if (G.land < (line.land || 0)) continue;
     const lv = G.tools[k], next = line.levels[lv + 1];
-    if (!next && k === 'spedition') { tabs[2].push({ icon: '🚛', name: `Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
-      desc: `${line.name} · du hast ${truckCount()} Fahrzeuge`, note: 'fährt zusätzlich und holt noch mehr Waren ab',
-      buy: () => { G.lkw = (G.lkw || 0) + 1; toast(`🚛 Du hast jetzt ${truckCount()} Lastwagen!`); } }); continue; }
-    if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: 'Beste Stufe erreicht! 🏆', info: line.levels[lv].info, can: false, price: 0 }); continue; }
+    if (!next && k === 'spedition') { tabs[2].push({ icon: '🚛', name: $t`Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
+      desc: $t`${line.name} · du hast ${truckCount()} Fahrzeuge`, note: $t`fährt zusätzlich und holt noch mehr Waren ab`,
+      buy: () => { G.lkw = (G.lkw || 0) + 1; toast($t`🚛 Du hast jetzt ${truckCount()} Lastwagen!`); } }); continue; }
+    if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: $t`Beste Stufe erreicht! 🏆`, info: line.levels[lv].info, can: false, price: 0 }); continue; }
     tabs[2].push({
       icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
-      desc: `${line.name} · jetzt: ${line.levels[lv].name}`,
-      note: next.every ? `holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? `trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? '🤖 arbeitet automatisch!' : `${next.speed / line.levels[lv].speed}× schneller`,
-      buy: () => { G.tools[k]++; modal($('#info'), `${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>Super!</button>`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
+      desc: $t`${line.name} · jetzt: ${line.levels[lv].name}`,
+      note: next.every ? $t`holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? $t`trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? $t`🤖 arbeitet automatisch!` : $t`${next.speed / line.levels[lv].speed}× schneller`,
+      buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });
   }
   const lp = LAND_PRICES[G.land] ?? LAND_PRICES.at(-1) + (G.land - LAND_PRICES.length + 1) * 2000;
   tabs[3].push({
-    icon: '🗺️', name: `Land Stufe ${G.land + 1}`, price: lp, can: true,
-    desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.',
+    icon: '🗺️', name: $t`Land Stufe ${G.land + 1}`, price: lp, can: true,
+    desc: $t`Mehr Platz für Felder, Bäume, Kühe und Gebäude`, info: $t`Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.`,
     buy: () => {
-      G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.');
-      const i = HOF_LV.indexOf(G.land); if (i >= 0) toast(`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
-      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast(`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
+      G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? $t`🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.` : $t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
+      const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
+      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
   });
   for (const [k, d] of Object.entries(DECOS)) {
     const full = d.max && decoCount(k) >= d.max, busy = d.where === 'land' && G.carry;
     tabs[4].push({ icon: d.icon, name: d.name, price: d.price, info: d.info, can: !full && !busy,
-      desc: { land: 'Du stellst es hin, wo du willst', see: 'Schwimmt auf dem See', luft: 'Fliegt über deine Welt', berg: 'Fährt in die Berge' }[d.where],
-      note: full ? '✅ Schon gekauft' : busy ? `Stell zuerst ${DECOS[G.carry].name} ab` : decoCount(k) ? `Hast du schon ${decoCount(k)}×` : '',
+      desc: { land: $t`Du stellst es hin, wo du willst`, see: $t`Schwimmt auf dem See`, luft: $t`Fliegt über deine Welt`, berg: $t`Fährt in die Berge` }[d.where],
+      note: full ? $t`✅ Schon gekauft` : busy ? $t`Stell zuerst ${DECOS[G.carry].name} ab` : decoCount(k) ? $t`Hast du schon ${decoCount(k)}×` : '',
       buy: () => buyDeco(k) });
   }
   return tabs;
 }
 function openShop() {
-  const tabs = shopList(), names = ['🌱 Tiere & Pflanzen', '🏭 Gebäude', '🔧 Werkzeuge', '🗺️ Land', '🏔️ Deko'];
+  const tabs = shopList(), names = [$t`🌱 Tiere & Pflanzen`, $t`🏭 Gebäude`, $t`🔧 Werkzeuge`, $t`🗺️ Land`, $t`🏔️ Deko`];
   const L = tabs[shopTab];
   const head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
-    <div class="row">${it.price ? `<span class="price">${it.price} Fr.</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>Kaufen</button>` : ''}</div></div>`).join('')}</div>`;
-  modal($('#shop'), `🛒 Laden <small style="font-weight:600;font-size:16px">– du hast ${G.money} Fr.</small>`, body, head);
+    <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
+  modal($('#shop'), `${$t`🛒 Laden`} <small style="font-weight:600;font-size:16px">${$t`– du hast ${G.money} Fr.`}</small>`, body, head);
   const el = $('#shop');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = +b.dataset.tab; openShop(); });
   el.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const m = b.closest('.card').querySelector('.more'); m.hidden = !m.hidden; });
@@ -759,29 +759,29 @@ function openPlan() {
     if (ts.length && surplus(it)) { // nur Überschuss lässt sich abholen
       const n = ts.reduce((a, t) => a + t[fld], 0), full = ts.filter(t => t[fld] + d.n > cap).length, v = n * eur(it) + full * perMin(d) * eur(it) * M;
       blocked += v;
-      tip(v, `📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name}${full ? ` (bei ${full} ist das Lager voll, dort steht die Arbeit!)` : ''} – und verkauf es beim Händler.`);
+      tip(v, (full ? $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} (bei ${full} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.` : $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} – und verkauf es beim Händler.`));
     }
     const ripe = G.things.filter(t => t.type === k && t.ripe && !isAuto(t)).length;
-    if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, `✨ <b>${ripe}× ${d.name} ${ripe > 1 ? 'sind' : 'ist'} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`); }
+    if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, $t`✨ <b>${ripe}× ${d.name} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`); }
   }
   for (const [it, n] of Object.entries(G.inv)) {
     const f = G.things.find(t => THINGS[t.type].in?.[it] && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
-    if (f) tip(n * unitVal(f.type), `🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
-    else tip(n * eur(it), `💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`);
+    if (f) tip(n * unitVal(f.type), $t`🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
+    else tip(n * eur(it), $t`💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`);
   }
-  if (bagCount() >= bagCap()) tip(blocked + 1, `🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
+  if (bagCount() >= bagCap()) tip(blocked + 1, $t`🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
   for (const it in ITEMS) {
     const s = sup[it] || 0, dm = dem[it] || 0, makes = makers(it).map(k => THINGS[k].name).join(' / ');
     if (dm && s < dm * 0.9) {
       const f = bestUser(it, true);
-      tip((dm - s) * unitVal(f) * M, `🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min. ${s ? `Kauf mehr ${makes}.` : `Niemand macht ${ITEMS[it].name} – kauf ${makes}!`}`);
+      tip((dm - s) * unitVal(f) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`));
     }
     if (!s) continue;
     const bu = bestUser(it, true), best = bestUser(it, false);
-    if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, `🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
-    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, `🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
+    if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
+    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
-    if (dm && manual.length) tip(s * eur(it) * M * 0.5, `✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
+    if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
   }
   tips.sort((a, b) => b.v - a.v);
   for (const k of types.concat('haendler')) {
@@ -982,7 +982,7 @@ const DRAW = {
     ctx.fillStyle = '#9b6a3a'; ctx.fillRect(x - 62, y - 30, 124, 30); ctx.fillStyle = '#7b5228'; ctx.fillRect(x - 62, y - 30, 124, 5);
     crate(x - 38, y - 30, '#d8332a', 10); crate(x - 10, y - 30, '#e0b54a', 10); crate(x + 32, y - 30, '#f5f5f0', 8);
     awning(x, y - 84, 132, '#d23b2b', '#fff', 10);
-    sign(x, y - 94, 'HÄNDLER 💰');
+    sign(x, y - 94, $t`HÄNDLER 💰`);
     flagPole(x + 57, y - 72, 26, 16, 2);
   },
   laden(x, y) {
@@ -992,7 +992,7 @@ const DRAW = {
     ctx.font = '16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🔧🐄', x - 39, y - 30); ctx.fillText('🌳🚜', x + 39, y - 30);
     door(x, y, 22, 40, '#3d6b8f');
     awning(x, y - 72, 150, '#d52b1e', '#fff', 12);
-    sign(x, y - 112, 'LADEN 🛒');
+    sign(x, y - 112, $t`LADEN 🛒`);
     flagPole(x - 80, y, 110, 24, 3); flagPole(x + 80, y, 110, 24, 4);
   },
   muehle(x, y, t) {
@@ -1018,7 +1018,7 @@ const DRAW = {
     for (let yy = y - 58; yy < y; yy += 7) { ctx.beginPath(); ctx.moveTo(x - 58, yy); ctx.lineTo(x + 58, yy); ctx.stroke(); }
     ctx.fillStyle = '#7d4632'; ctx.fillRect(x + 28, y - 110, 14, 30);
     win(x - 48, y - 46, 30, 22, t.working); win(x + 18, y - 46, 30, 22, t.working); door(x - 4, y, 18, 32);
-    sign(x, y - 66, 'BÄCKEREI 🥨');
+    sign(x, y - 66, $t`BÄCKEREI 🥨`);
   },
   molkerei(x, y, t) {
     for (const [sx, h] of [[34, 96], [58, 84]]) {
@@ -1029,7 +1029,7 @@ const DRAW = {
     house(x - 22, y, 92, 58, '#f4f4ef', '#7d8a96', 26);
     win(x - 58, y - 44, 20, 16); win(x - 22, y - 44, 20, 16); door(x + 10, y, 16, 28, '#4d6a85');
     ctx.strokeStyle = '#8e9aa5'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 24, y - 40); ctx.lineTo(x + 34, y - 40); ctx.stroke();
-    sign(x - 22, y - 62, 'MOLKEREI 🥛');
+    sign(x - 22, y - 62, $t`MOLKEREI 🥛`);
   },
   kaeserei(x, y) {
     house(x, y, 104, 62, '#a8743f', '#5b3a1e', 34);
@@ -1037,20 +1037,20 @@ const DRAW = {
     for (let xx = x - 50; xx < x + 52; xx += 8) { ctx.beginPath(); ctx.moveTo(xx, y - 62); ctx.lineTo(xx, y); ctx.stroke(); }
     win(x - 40, y - 46, 20, 18); win(x + 20, y - 46, 20, 18); door(x - 4, y, 18, 32);
     for (let i = 0; i < 3; i++) { ellipse(x + 64, y - 4 - i * 9, 14, 6, '#e8b830'); ellipse(x + 64, y - 6 - i * 9, 14, 5, '#f5cf4a'); }
-    sign(x, y - 70, 'KÄSEREI 🧀');
+    sign(x, y - 70, $t`KÄSEREI 🧀`);
   },
-  fonduestube(x, y, t) { DECO_DRAW.chalet(x, y, t, t.working); sign(x, y - 66, 'FONDUE-STÜBLI 🍲'); },
+  fonduestube(x, y, t) { DECO_DRAW.chalet(x, y, t, t.working); sign(x, y - 66, $t`FONDUE-STÜBLI 🍲`); },
   muesli_kueche(x, y, t) {
     house(x, y, 104, 60, '#f3ead2', '#d52b1e', 30); win(x - 40, y - 44, 22, 18, t.working); win(x + 18, y - 44, 22, 18, t.working); door(x - 4, y, 18, 30);
     for (const [ax, c] of [[-56, '#d8332a'], [-46, '#a6c84a'], [52, '#d8332a']]) ellipse(x + ax, y - 4, 5, 5, c);
-    sign(x, y - 66, 'MÜESLI 🥗');
+    sign(x, y - 66, $t`MÜESLI 🥗`);
   },
   konditorei(x, y, t) {
     house(x, y, 108, 62, '#f6d4dc', '#b05a7a', 30);
     win(x - 46, y - 44, 34, 24, t.working); door(x + 20, y, 18, 32, '#b05a7a');
     ctx.font = '18px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🥧', x - 29, y - 26);
     awning(x - 29, y - 52, 46, '#b05a7a', '#fff', 5);
-    sign(x, y - 68, 'KONDITOREI 🎂');
+    sign(x, y - 68, $t`KONDITOREI 🎂`);
   },
 };
 // ---- Weinberg & Fischteich ----
@@ -1442,7 +1442,7 @@ function drawLake() {
   const sx = (LAKE.x - 3.2) * T, sy = (LAKE.y + 2.9) * T;
   ctx.fillStyle = '#8a5a2b'; for (let i = 0; i < 6; i++) ctx.fillRect(sx - 14 + i * 2, sy - 58 + i * 10, 26, 7);
   ctx.fillStyle = '#5b3a1e'; for (const [px, py] of [[-14, -54], [12, -54], [-4, 2], [22, 2]]) ctx.fillRect(sx + px, sy + py, 3, 10);
-  label(cx, cy + LAKE.ry * T + 30, `${P.name}see`, 14);
+  label(cx, cy + LAKE.ry * T + 30, $t`${P.name}see`, 14);
 }
 function lakeDecos() {
   const L = G.deco.filter(d => DECOS[d.type].where === 'see').map(d => {
@@ -1492,7 +1492,7 @@ const DECO_DRAW = {
       ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.lineTo(x1 + dir * 6, yy + 5); ctx.lineTo(x1, yy + 10); ctx.lineTo(x0, yy + 10); ctx.fill();
       ctx.fillStyle = '#222'; ctx.font = '700 6.5px system-ui'; ctx.textAlign = 'center'; ctx.fillText(txt, (x0 + x1) / 2, yy + 7.5);
     };
-    arrow(y - 54, 1, `${P.name}see 5 min`); arrow(y - 42, -1, 'Alp 2 h 30 min');
+    arrow(y - 54, 1, $t`${P.name}see` + ' 5 min'); arrow(y - 42, -1, $t`Alp` + ' 2 h 30 min');
   },
   edelweiss(x, y, o) {
     ellipse(x + 2, y, 18, 5, 'rgba(0,0,0,.15)'); ellipse(x, y - 2, 17, 5, '#7c8f6a');

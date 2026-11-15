@@ -19,6 +19,7 @@ Ein Aufbau- und Entdeckerspiel im Browser für Kinder (7–10 Jahre). Läuft auf
 - **🏔️ Deko** (Laden → Reiter „Deko“): Dinge ohne Funktion, einfach schön und lustig – Steinmann, Gartenzwerg, Tanne, Wanderweg-Schild, Edelweiss, Schneemann, Schweizer Fahne, Murmeltier, Alphornbläser, Bernhardiner, Fondue-Tisch, Dorfbrunnen, Chalet, Uhrturm (zeigt die echte Uhrzeit). Nach dem Kauf trägst du sie und stellst sie mit **📍 Hier abstellen** (oder Enter/Leertaste) selbst hin; mit **✋ Umstellen** kannst du sie später verschieben. Schwan, Segelboot und Raddampfer schwimmen auf dem See, Heissluftballone fliegen über die Welt, die Gondelbahn fährt in die Berge. Neue Deko: `data.js` → `DECOS` und Zeichnung in `game.js` → `DECO_DRAW`.
 - **🗺️ Land-Stufen schalten Neues frei:** Ab Land-Stufe 10 wächst die Welt nach Osten: 🍇 **Weinberg** (Rebstock-Reihen → Kelterei/Traubensaft, Dörrhaus/Rosinen → Schnecken-Beck/Rosinenschnecken, Werkzeuge Rebschere → Traubenbutte → Traubenvollernter). Ab Stufe 20 kommen 🐟 **Fischteiche** dazu (Filetiererei, Räucherei, Seebeiz/Fischknusperli, Werkzeuge Angel → Netz → Fischpumpe). Im Laden sieht man vorher schon 🔒, was kommt. Gesteuert über `land:` in `THINGS`/`TOOLS` und `from:` in `AREAS`.
 - **🏡 Bauernhof im Alpenstil** wird mit dem Land ausgebaut (`HOF_LV` in `data.js`): Stufe 2 Brunnen + Holzbeige, 5 Kornspeicher, 10 zweiter Stock mit Geranien-Balkon, 15 Glockentürmchen auf dem Stall, 20 Kapelle.
+- **🌐 Sprachen:** Deutsch, Français (Genf), Italiano (Tessin), English – Auswahl unten auf dem Startbildschirm (pro Gerät gespeichert). UI-Texte stehen im Code als ``$t`deutscher Text ${wert}` `` und werden in `lang/<code>.js` → `ui` nachgeschlagen (Schlüssel = deutscher Text, Werte als `{}`); Spielinhalte aus `data.js` werden dort nach ID übersetzt (`items`, `things`, `tools`, `decos`, `areas`, `fixed`, `hof`). Fehlt etwas, bleibt Deutsch stehen. **Wer einen deutschen Text ändert, muss ihn in allen drei Sprachdateien mitändern.**
 - Je grösser die Welt, desto älter wird der Bub (bis zum Erwachsenen).
 - Kein Ziel – die Welt wachsen zu lassen ist das Spiel.
 
@@ -39,6 +40,8 @@ Laden, Diagramm, Transport und Warnungen funktionieren dann automatisch.
 ## Dateien
 - `index.html` – Bildschirme & Stil
 - `data.js` – Spielinhalte (Waren, Gebäude, Werkzeuge, Karte)
+- `i18n.js` – Sprachwahl, `$t`-Übersetzung, übersetzt `data.js` und `index.html`
+- `lang/fr.js`, `lang/it.js`, `lang/en.js` – Übersetzungen
 - `game.js` – Spiellogik, Zeichnen, Laden, Diagramm, Spieler/Code
 - `audio.js` – alle Klänge, live erzeugt mit WebAudio
 

@@ -25,6 +25,9 @@
   h1 { font-size: clamp(40px, 9vw, 76px); margin:0; color:#fff; text-shadow: 0 4px 0 #8a1a12, 0 8px 20px rgba(0,0,0,.35); letter-spacing:1px; }
   .sub { margin:0; color:#fff; font-size:22px; text-shadow:0 2px 3px rgba(0,0,0,.4); }
   #plist { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; max-width:760px; }
+  #langs { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
+  #langs button { border:0; border-radius:999px; padding:6px 12px; font:inherit; font-size:14px; font-weight:700; background:rgba(251,244,228,.8); color:var(--ink); }
+  #langs button.on { background:var(--ch); color:#fff; }
   .pcard { width:150px; height:170px; border:0; border-radius:22px; background:var(--paper); box-shadow:0 6px 0 #b8925f, 0 10px 20px rgba(0,0,0,.25);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:58px; transition:transform .1s; }
   .pcard:active { transform: translateY(4px); box-shadow:0 2px 0 #b8925f; }
@@ -107,6 +110,7 @@
   <p class="sub">Dein Dorf und deine Wirtschaft in den Schweizer Alpen 🏔️</p>
   <p class="sub" id="whosub">Wer spielt?</p>
   <div id="plist"></div>
+  <div id="langs"></div>
   <form id="addform" class="panel" hidden>
     <b>Neuer Spieler</b>
     <input id="newname" maxlength="14" placeholder="Name" required autocomplete="off">
@@ -170,7 +174,8 @@
 
 <script>
 // Immer frisch laden – sonst mischt der Browser-Cache alte Scripts mit neuem HTML/CSS (kaputte Tipps, tote Knöpfe)
-for (const f of ['data.js', 'audio.js', 'game.js']) { const s = document.createElement('script'); s.src = f + '?t=' + Date.now(); s.async = false; document.body.append(s); }
+const LANG = (() => { try { return localStorage.getItem('lw_lang') || 'de'; } catch (e) { return 'de'; } })();
+for (const f of ['data.js', ...(LANG === 'de' ? [] : [`lang/${LANG}.js`]), 'i18n.js', 'audio.js', 'game.js']) { const s = document.createElement('script'); s.src = f + '?t=' + Date.now(); s.async = false; document.body.append(s); }
 </script>
 </body>
 </html>
