@@ -7,10 +7,10 @@
 // Alles andere (Laden, Diagramm, Warnungen, Transport) funktioniert dann automatisch.
 
 const T = 48;                      // Pixel pro Kachel
-const WORLD = { w: 60, h: 44 };    // Weltgröße in Kacheln (h wächst mit gekauftem Land)
+const WORLD = { w: 60, h: 44 };    // Weltgrösse in Kacheln (h wächst mit gekauftem Land)
 const WORLD_H0 = WORLD.h;
 const HARVEST_TIME = 3;            // Sekunden Ernte von Hand (geteilt durch Werkzeug-Tempo)
-const OUT_CAP = 10;                // Lager-Größe für fertige Waren in Gebäuden
+const OUT_CAP = 10;                // Lager-Grösse für fertige Waren in Gebäuden
 
 const ITEMS = {
   weizen:  { name: 'Weizen',      icon: '🌾', price: 2 },
@@ -28,10 +28,13 @@ const ITEMS = {
   saft:    { name: 'Apfelsaft',   icon: '🧃', price: 13 },
   essig:   { name: 'Apfelessig',  icon: '🫙', price: 36 },
   pizza:   { name: 'Pizza',       icon: '🍕', price: 62 },
-  griess:  { name: 'Grieß',       icon: '🥄', price: 10 },
+  griess:  { name: 'Griess',       icon: '🥄', price: 10 },
   nudeln:  { name: 'Nudeln',      icon: '🍝', price: 28 },
   lasagne: { name: 'Lasagne',     icon: '🫕', price: 88 },
   torte:   { name: 'Sahnetorte',  icon: '🎂', price: 160 },
+  // Schweizer Spezialitäten
+  muesli:  { name: 'Birchermüesli', icon: '🥗', price: 34 },
+  fondue:  { name: 'Käsefondue',  icon: '🍲', price: 110 },
 };
 
 const THINGS = {
@@ -40,14 +43,14 @@ const THINGS = {
     info: 'Weizen ist eigentlich ein Gras! Aus einem Korn wächst ein Halm mit einer Ähre – darin stecken 30 bis 50 neue Körner. Zuerst ist er grün, im Sommer wird er goldgelb und trocken: dann ist er reif. In Echt dauert das fast ein Jahr (man sät schon im Herbst), hier geht es schneller.' },
   baum: { kind: 'grow', name: 'Apfelbaum', icon: '🌳', area: 'obst', price: 25,
     item: 'apfel', n: 4, time: 35, tool: 'obst',
-    info: 'Im Frühling blüht der Apfelbaum weiß-rosa. Bienen fliegen von Blüte zu Blüte und tragen Blütenstaub mit (Bestäubung). Nur aus bestäubten Blüten wächst ein Apfel – erst klein und grün, dann groß und rot. Ein großer Baum trägt bis zu 500 Äpfel im Jahr!' },
+    info: 'Im Frühling blüht der Apfelbaum weiss-rosa. Bienen fliegen von Blüte zu Blüte und tragen Blütenstaub mit (Bestäubung). Nur aus bestäubten Blüten wächst ein Apfel – erst klein und grün, dann gross und rot. Ein grosser Baum trägt bis zu 500 Äpfel im Jahr!' },
   kuh: { kind: 'grow', name: 'Kuh', icon: '🐄', area: 'weide', price: 80,
     item: 'milch', n: 2, time: 25, tool: 'milch',
-    info: 'Eine Kuh gibt nur Milch, nachdem sie ein Kalb bekommen hat. Sie frisst etwa 50 kg Gras am Tag, trinkt bis zu 100 Liter Wasser und gibt 20–30 Liter Milch. Ihr Magen hat 4 Kammern: Sie schluckt das Gras, würgt es später wieder hoch und kaut es nochmal – darum heißt sie Wiederkäuer.' },
+    info: 'Eine Kuh gibt nur Milch, nachdem sie ein Kalb bekommen hat. Sie frisst etwa 50 kg Gras am Tag, trinkt bis zu 100 Liter Wasser und gibt 20–30 Liter Milch. Ihr Magen hat 4 Kammern: Sie schluckt das Gras, würgt es später wieder hoch und kaut es nochmal – darum heisst sie Wiederkäuer.' },
 
   muehle: { kind: 'factory', name: 'Mühle', icon: '🌬️', area: 'dorf', price: 150,
     in: { weizen: 2 }, item: 'mehl', n: 1, time: 5,
-    info: 'Der Wind dreht die Flügel, die drehen über Zahnräder einen schweren Mühlstein. Die Körner werden zwischen zwei Steinen zerrieben (heute nimmt man Stahlwalzen). Danach wird gesiebt: Die Schale (Kleie) bleibt hängen, das feine weiße Mehl fällt durch. Aus 100 kg Weizen werden etwa 75 kg Mehl.' },
+    info: 'Der Wind dreht die Flügel, die drehen über Zahnräder einen schweren Mühlstein. Die Körner werden zwischen zwei Steinen zerrieben (heute nimmt man Stahlwalzen). Danach wird gesiebt: Die Schale (Kleie) bleibt hängen, das feine weisse Mehl fällt durch. Aus 100 kg Weizen werden etwa 75 kg Mehl.' },
   baeckerei: { kind: 'factory', name: 'Bäckerei', icon: '🥖', area: 'dorf', price: 300,
     in: { mehl: 2 }, item: 'brot', n: 1, time: 9,
     info: 'Teig = Mehl + Wasser + Salz + Hefe. Hefe sind winzige Pilze. Sie fressen Zucker und machen dabei Gas (CO₂) – wie kleine Pupse 😄. Die Gasbläschen lassen den Teig aufgehen. Im Ofen bei etwa 230 °C wird die Kruste braun und knusprig, innen bleibt das Brot weich.' },
@@ -61,10 +64,16 @@ const THINGS = {
     in: { apfel: 3, mehl: 1, milch: 1 }, item: 'kuchen', n: 1, time: 12,
     info: 'Für Apfelkuchen mischt man Mehl, Milch, Butter, Eier und Zucker zu einem Teig. Die Äpfel werden geschält, in Spalten geschnitten und auf den Teig gelegt. Dann bäckt der Kuchen etwa 45 Minuten bei 180 °C. Butter wird übrigens auch aus Milch gemacht – durch kräftiges Schlagen von Sahne!' },
 
+  muesli_kueche: { kind: 'factory', name: 'Müesli-Küche', icon: '🥗', area: 'dorf', price: 350,
+    in: { apfel: 2, joghurt: 1 }, item: 'muesli', n: 1, time: 8,
+    info: 'Das Birchermüesli hat der Schweizer Arzt Maximilian Bircher-Benner vor über 100 Jahren erfunden. Er fand: Rohe Früchte machen gesund und stark! Die Äpfel werden mit der Schale gerieben, mit Haferflocken, Joghurt (oder Milch), Zitrone und Nüssen gemischt. „Müesli“ ist Schweizerdeutsch und heisst „kleines Mus“.' },
+  fonduestube: { kind: 'factory', name: 'Fondue-Stübli', icon: '🍲', area: 'dorf', price: 500,
+    in: { kaese: 2, brot: 1 }, item: 'fondue', n: 1, time: 12,
+    info: 'Käsefondue ist das Schweizer Nationalgericht! Geriebener Käse (oft Gruyère und Vacherin) schmilzt mit etwas Weisswein im Caquelon – einem Topf aus Ton – über einer kleinen Flamme. Jeder spiesst ein Stück Brot auf eine lange Gabel und tunkt es ein. Wer sein Brot im Käse verliert, muss eine Runde singen! 🎶' },
   // ----- freischaltbar: erst im Laden, wenn eine Endstation gebaut wurde (UNLOCKS) -----
   zentrifuge: { kind: 'factory', name: 'Milch-Zentrifuge', icon: '🌀', area: 'dorf', price: 350,
     in: { milch: 3 }, item: 'sahne', n: 1, time: 6,
-    info: 'Eine Trommel dreht sich ganz schnell – bis zu 6000 Mal in der Minute! Dabei wird die schwere, wässrige Milch nach außen gedrückt, das leichte Fett bleibt innen. So trennt man die Sahne (Rahm) von der Magermilch. Früher ließ man die Milch einfach stehen, bis die Sahne oben schwamm.' },
+    info: 'Eine Trommel dreht sich ganz schnell – bis zu 6000 Mal in der Minute! Dabei wird die schwere, wässrige Milch nach aussen gedrückt, das leichte Fett bleibt innen. So trennt man die Sahne (Rahm) von der Magermilch. Früher liess man die Milch einfach stehen, bis die Sahne oben schwamm.' },
   butterei: { kind: 'factory', name: 'Butterei', icon: '🧈', area: 'dorf', price: 400,
     in: { sahne: 2 }, item: 'butter', n: 1, time: 8,
     info: 'Sahne wird im Butterfass lange und kräftig geschlagen. Irgendwann kleben die kleinen Fettkügelchen zusammen – plötzlich gibt es gelbe Butterklumpen und eine dünne Flüssigkeit, die Buttermilch. Die Butter wird gewaschen und geknetet. Für 1 kg Butter braucht man etwa 20 Liter Milch!' },
@@ -73,22 +82,22 @@ const THINGS = {
     info: 'Butter, Mehl und Zucker werden zu einem Mürbeteig geknetet. Der Teig wird dünn ausgerollt und in Formen ausgestochen oder gestanzt. Im Ofen backen die Kekse nur etwa 10 Minuten. Das Wort „Keks“ kommt vom englischen „cakes“ – Kuchen.' },
   saftpresse: { kind: 'factory', name: 'Saftpresse', icon: '🧃', area: 'dorf', price: 300,
     in: { apfel: 3 }, item: 'saft', n: 1, time: 5,
-    info: 'Die Äpfel werden gewaschen und klein gemahlen – das heißt Maische. Dann presst eine Presse den Saft heraus, den Rest (Trester) bekommen oft die Tiere. Danach wird der Saft kurz erhitzt, damit er lange haltbar bleibt. Aus 1,5 kg Äpfeln wird etwa 1 Liter Saft.' },
+    info: 'Die Äpfel werden gewaschen und klein gemahlen – das heisst Maische. Dann presst eine Presse den Saft heraus, den Rest (Trester) bekommen oft die Tiere. Danach wird der Saft kurz erhitzt, damit er lange haltbar bleibt. Aus 1,5 kg Äpfeln wird etwa 1 Liter Saft.' },
   essigbrauerei: { kind: 'factory', name: 'Essigbrauerei', icon: '🫙', area: 'dorf', price: 450,
     in: { saft: 2 }, item: 'essig', n: 1, time: 12,
     info: 'Zuerst verwandeln Hefen den Zucker im Apfelsaft in Alkohol. Dann kommen Essigbakterien dazu: Die brauchen Luft und machen aus dem Alkohol Essigsäure. Auf dem Essig wächst dabei eine glibberige Haut – die „Essigmutter“. Fertiger Essig enthält keinen Alkohol mehr.' },
   pizzeria: { kind: 'factory', name: 'Pizzeria', icon: '🍕', area: 'dorf', price: 600,
     in: { mehl: 2, kaese: 1 }, item: 'pizza', n: 1, time: 10,
-    info: 'Pizzateig ist Mehl, Wasser, Salz, Öl und Hefe. Er wird dünn ausgezogen, mit Tomatensoße bestrichen und mit Käse belegt. Ein Holzofen wird über 400 °C heiß – darin ist die Pizza in nur 90 Sekunden fertig! Erfunden wurde sie in Neapel in Italien.' },
-  griessmuehle: { kind: 'factory', name: 'Grießmühle', icon: '⚙️', area: 'dorf', price: 350,
+    info: 'Pizzateig ist Mehl, Wasser, Salz, Öl und Hefe. Er wird dünn ausgezogen, mit Tomatensosse bestrichen und mit Käse belegt. Ein Holzofen wird über 400 °C heiss – darin ist die Pizza in nur 90 Sekunden fertig! Erfunden wurde sie in Neapel in Italien.' },
+  griessmuehle: { kind: 'factory', name: 'Griessmühle', icon: '⚙️', area: 'dorf', price: 350,
     in: { weizen: 3 }, item: 'griess', n: 1, time: 5,
-    info: 'Grieß ist grob gemahlenes Getreide – die Körnchen sind größer als beim Mehl. Für Nudeln nimmt man Hartweizen: Der ist besonders fest und gelb. Die Walzen stehen weiter auseinander als beim Mehl, und Siebe sortieren die passende Korngröße heraus.' },
+    info: 'Griess ist grob gemahlenes Getreide – die Körnchen sind grösser als beim Mehl. Für Nudeln nimmt man Hartweizen: Der ist besonders fest und gelb. Die Walzen stehen weiter auseinander als beim Mehl, und Siebe sortieren die passende Korngrösse heraus.' },
   nudelfabrik: { kind: 'factory', name: 'Nudelfabrik', icon: '🍝', area: 'dorf', price: 500,
     in: { griess: 2 }, item: 'nudeln', n: 1, time: 8,
-    info: 'Grieß und Wasser werden zu einem festen Teig geknetet. Eine Maschine drückt den Teig durch eine Lochscheibe – die Form der Löcher bestimmt die Nudel: Spaghetti, Spiralen, Muscheln … Dann werden die Nudeln langsam getrocknet, damit sie nicht brechen. Trocken halten sie jahrelang!' },
+    info: 'Griess und Wasser werden zu einem festen Teig geknetet. Eine Maschine drückt den Teig durch eine Lochscheibe – die Form der Löcher bestimmt die Nudel: Spaghetti, Spiralen, Muscheln … Dann werden die Nudeln langsam getrocknet, damit sie nicht brechen. Trocken halten sie jahrelang!' },
   trattoria: { kind: 'factory', name: 'Trattoria', icon: '🫕', area: 'dorf', price: 750,
     in: { nudeln: 1, kaese: 1, milch: 1 }, item: 'lasagne', n: 1, time: 14,
-    info: 'Für Lasagne legt man breite Nudelplatten, Fleisch- oder Gemüsesoße und weiße Soße (Béchamel aus Milch, Butter und Mehl) in Schichten übereinander – wie ein Stapel. Oben drauf kommt Käse. Im Ofen wird alles weich und der Käse goldbraun.' },
+    info: 'Für Lasagne legt man breite Nudelplatten, Fleisch- oder Gemüsesosse und weisse Sosse (Béchamel aus Milch, Butter und Mehl) in Schichten übereinander – wie ein Stapel. Oben drauf kommt Käse. Im Ofen wird alles weich und der Käse goldbraun.' },
   tortenmeister: { kind: 'factory', name: 'Tortenmeister', icon: '🎂', area: 'dorf', price: 1000,
     in: { kuchen: 2, sahne: 2 }, item: 'torte', n: 1, time: 16,
     info: 'Ein Konditor-Meister schneidet Böden quer durch und füllt sie mit Sahne und Früchten. Kalte Sahne wird mit dem Schneebesen steif geschlagen: Dabei werden winzige Luftbläschen ins Fett eingeschlossen. Zum Schluss wird verziert – mit Spritzbeutel, Schokolade und Früchten. Konditor ist ein eigener Beruf mit 3 Jahren Lehre!' },
@@ -106,7 +115,7 @@ const UNLOCKS = [
 
 const TOOLS = {
   getreide: { name: 'Getreide-Ernte', icon: '🌾', levels: [
-    { name: 'Hände', speed: 1, price: 0, info: 'Halme mit der Hand abreißen – ganz schön mühsam!' },
+    { name: 'Hände', speed: 1, price: 0, info: 'Halme mit der Hand abreissen – ganz schön mühsam!' },
     { name: 'Sichel', speed: 2, price: 30, info: 'Eine gebogene Klinge. Man fasst die Halme mit einer Hand und schneidet sie mit der anderen ab. Die Sichel gibt es seit über 10.000 Jahren!' },
     { name: 'Sense', speed: 4, price: 90, info: 'Langer Stiel, lange Klinge: Man mäht im Stehen mit schwingenden Bewegungen. Viel schneller als mit der Sichel.' },
     { name: 'Motormäher', speed: 8, price: 350, info: 'Ein Benzinmotor bewegt einen Mähbalken: Viele dreieckige Messer gleiten schnell hin und her – wie eine riesige Schere.' },
@@ -122,7 +131,7 @@ const TOOLS = {
   milch: { name: 'Melken', icon: '🥛', levels: [
     { name: 'Hände', speed: 1, price: 0, info: 'Melken mit der Hand: Die Zitze oben mit Daumen und Zeigefinger zudrücken, dann mit den anderen Fingern die Milch nach unten drücken.' },
     { name: 'Melkschemel & Eimer', speed: 2, price: 40, info: 'Ein Hocker zum Sitzen und ein Eimer dazwischen – so geht es bequemer und schneller.' },
-    { name: 'Melkmaschine', speed: 5, price: 250, info: 'Melkbecher kommen auf die Zitzen. Eine Pumpe saugt im Takt (Pulsieren) – fast wie ein trinkendes Kalb. Die Milch fließt durch Schläuche in einen Kühltank mit 4 °C.' },
+    { name: 'Melkmaschine', speed: 5, price: 250, info: 'Melkbecher kommen auf die Zitzen. Eine Pumpe saugt im Takt (Pulsieren) – fast wie ein trinkendes Kalb. Die Milch fliesst durch Schläuche in einen Kühltank mit 4 °C.' },
     { name: 'Melkroboter', speed: 20, price: 1100, auto: true, info: 'Die Kuh geht selbst hinein, wann sie will! Ein Roboterarm mit Laser-Kamera findet die Zitzen, putzt sie und setzt die Becher an. MELKT AUTOMATISCH!' },
   ]},
   tragen: { name: 'Transport', icon: '🎒', levels: [
@@ -135,10 +144,58 @@ const TOOLS = {
   // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Endprodukte (Ware, die kein Gebäude weiterverarbeitet) und verkauft sie
   spedition: { name: 'Spediteur', icon: '🚚', levels: [
     { name: 'Kein Spediteur', cap: 0, price: 0, info: 'Noch trägst du alle fertigen Waren selbst zum Händler.' },
-    { name: 'Bote mit Lastenrad', cap: 8, every: 30, price: 2500, info: 'Du stellst einen Boten an: Er holt fertige Waren aus deinen Gebäuden und verkauft sie für dich beim Händler. Ein Lastenrad hat vorne eine große Kiste – ohne Benzin, nur mit Muskelkraft. Angestellte bekommen Lohn, darum ist das teuer!' },
-    { name: 'Lieferwagen', cap: 25, every: 25, price: 6000, info: 'Ein Lieferwagen hat hinten einen großen Laderaum ohne Fenster. Mit Kühl-Lieferwagen bleiben Joghurt, Käse und Torten auch im Sommer frisch – innen sind es nur 4 °C.' },
+    { name: 'Bote mit Lastenrad', cap: 8, every: 30, price: 2500, info: 'Du stellst einen Boten an: Er holt fertige Waren aus deinen Gebäuden und verkauft sie für dich beim Händler. Ein Lastenrad hat vorne eine grosse Kiste – ohne Benzin, nur mit Muskelkraft. Angestellte bekommen Lohn, darum ist das teuer!' },
+    { name: 'Lieferwagen', cap: 25, every: 25, price: 6000, info: 'Ein Lieferwagen hat hinten einen grossen Laderaum ohne Fenster. Mit Kühl-Lieferwagen bleiben Joghurt, Käse und Torten auch im Sommer frisch – innen sind es nur 4 °C.' },
     { name: 'Lastwagen', cap: 60, every: 20, price: 15000, info: 'Ein Lastwagen (LKW) darf bis zu 40 Tonnen wiegen – so viel wie 30 Autos! Der Fahrer braucht einen eigenen Führerschein und muss nach 4½ Stunden Fahrt eine Pause machen.' },
   ]},
+};
+
+// ===== Schweiz: Alpen-Panorama im Norden, See, Deko =====
+const ALPS = 7;                                         // Kacheln Berge oberhalb der Welt (nur Kulisse)
+const LAKE = { x: 49, y: 23, rx: 6.5, ry: 3.6 };        // See (Kacheln), man kann nicht hineinlaufen
+const CHF = '<span class="chflag"></span>';             // Schweizer Fahne als HTML (Emoji 🇨🇭 fehlt unter Windows)
+
+// Landschafts-Deko: hat keine Funktion – ist einfach schön und lustig.
+// where: 'land' = du stellst sie selbst hin, 'see' = schwimmt auf dem See, 'luft' = fliegt, 'berg' = in den Alpen
+const DECOS = {
+  steinmann:  { name: 'Steinmann', icon: '🪨', price: 10, where: 'land',
+    info: 'Ein Steinmann ist ein kleiner Turm aus aufeinandergelegten Steinen. In den Bergen zeigen Steinmänner den Wanderern den Weg – vor allem, wenn Nebel kommt. Wer vorbeigeht, legt oft noch einen Stein dazu.' },
+  gartenzwerg: { name: 'Gartenzwerg', icon: '🧙', price: 15, where: 'land',
+    info: 'Gartenzwerge passen auf den Garten auf – sagt man. Die ersten wurden vor fast 200 Jahren aus Ton gebrannt. Dieser hier hat heute frei und macht nichts. Gar nichts. 😄' },
+  tanne:      { name: 'Tanne', icon: '🌲', price: 20, where: 'land',
+    info: 'Ein Drittel der Schweiz ist Wald! In den Bergen wachsen vor allem Fichten und Tannen. Ihre Nadeln bleiben auch im Winter grün. Der Bergwald ist wichtig: Er schützt die Dörfer vor Lawinen und Steinschlag.' },
+  wegweiser:  { name: 'Wanderweg-Schild', icon: '🪧', price: 20, where: 'land',
+    info: 'Die gelben Wanderweg-Schilder kennt in der Schweiz jedes Kind! Sie zeigen, wie viele Stunden und Minuten man bis zum nächsten Ziel läuft. Die Schweiz hat über 65 000 km Wanderwege – damit käme man anderthalb Mal um die ganze Erde.' },
+  edelweiss:  { name: 'Edelweiss-Beet', icon: '🤍', price: 25, where: 'land',
+    info: 'Das Edelweiss wächst hoch oben in den Alpen zwischen Felsen. Seine Blüten sind mit feinen weissen Härchen bedeckt – wie ein Wollpulli. Die schützen vor Kälte und der starken Sonne in den Bergen. In der Natur darf man es nicht pflücken!' },
+  schneemann: { name: 'Schneemann', icon: '⛄', price: 30, where: 'land',
+    info: 'Dieser Schneemann kommt direkt vom Gletscher und schmilzt nie – nicht mal im Sommer! In echt wäre das schwierig: Schnee schmilzt schon bei 0 °C.' },
+  fahne:      { name: 'Schweizer Fahne', icon: CHF, price: 40, where: 'land',
+    info: 'Die Schweizer Fahne ist eine von nur zwei quadratischen Landesfahnen der Welt (die andere ist die vom Vatikan). Weisses Kreuz auf rotem Grund. Am 1. August, dem Nationalfeiertag, hängen überall Fahnen und es gibt Feuerwerk und Lampions.' },
+  murmeltier: { name: 'Murmeltier', icon: '🐿️', price: 60, where: 'land',
+    info: 'Murmeltiere leben in Erdhöhlen auf den Alpwiesen. Sieht eines einen Adler, pfeift es ganz laut – dann verschwinden alle blitzschnell im Bau. Im Winter schlafen sie fast 6 Monate lang und atmen dabei nur 2- bis 3-mal pro Minute.' },
+  alphorn:    { name: 'Alphornbläser', icon: '🎺', price: 120, where: 'land',
+    info: 'Das Alphorn ist bis zu 4 Meter lang und aus einem einzigen Fichtenstamm gemacht – ohne Löcher und ohne Tasten! Die Töne macht der Bläser nur mit den Lippen. Früher riefen die Hirten damit über die Berge zu den Kühen und zu anderen Alpen.' },
+  bernhardiner: { name: 'Bernhardiner', icon: '🐕', price: 150, where: 'land',
+    info: 'Bernhardiner kommen vom Grossen St. Bernhard, einem Pass in den Alpen. Die Mönche dort züchteten die starken Hunde, um Menschen im Schnee zu finden. Der berühmteste hiess Barry und rettete über 40 Menschen. Das Fässchen am Hals ist eher eine schöne Geschichte.' },
+  fondue_tisch: { name: 'Fondue-Tisch', icon: '🍲', price: 180, where: 'land',
+    info: 'Ein Tisch mit Bänken und einem dampfenden Fondue-Caquelon. Niemand isst – es duftet nur herrlich. Wer sein Brot im Käse verliert, muss singen!' },
+  brunnen:    { name: 'Dorfbrunnen', icon: '⛲', price: 200, where: 'land',
+    info: 'In Schweizer Dörfern plätschert fast überall ein Brunnen – oft mit Blumen geschmückt. Allein in der Stadt Basel gibt es über 170 Brunnen, und aus fast allen kann man Trinkwasser trinken!' },
+  chalet:     { name: 'Chalet', icon: '🏡', price: 400, where: 'land',
+    info: 'Ein Chalet ist ein Holzhaus aus den Bergen. Das breite Dach hält viel Schnee aus und schützt die Wände vor Regen. Auf den Balkonen blühen rote Geranien. Das Holz wird mit den Jahren von der Sonne fast schwarz.' },
+  uhrturm:    { name: 'Uhrturm', icon: '🕰️', price: 500, where: 'land',
+    info: 'Die Schweiz ist berühmt für ihre Uhren! Schon vor 400 Jahren bauten Uhrmacher in Genf und im Jura winzige Zahnräder von Hand. Dieser Turm zeigt die echte Uhrzeit – schau mal genau hin!' },
+  schwan:     { name: 'Schwan', icon: '🦢', price: 80, where: 'see',
+    info: 'Schwäne paddeln mit ihren grossen Schwimmfüssen. Sie bleiben ihr ganzes Leben mit demselben Partner zusammen. Ein Schwan wiegt bis zu 12 kg – er braucht einen langen Anlauf übers Wasser, um loszufliegen.' },
+  segelboot:  { name: 'Segelboot', icon: '⛵', price: 250, where: 'see',
+    info: 'Ein Segelboot fährt nur mit Wind! Das Segel ist gebogen wie ein Flugzeugflügel. Darum kann ein Boot sogar schräg gegen den Wind fahren – im Zickzack, das heisst „kreuzen“.' },
+  dampfschiff: { name: 'Raddampfer', icon: '🛳️', price: 800, where: 'see',
+    info: 'Auf Schweizer Seen fahren noch echte Raddampfer, manche über 100 Jahre alt! Eine Dampfmaschine dreht die zwei grossen Schaufelräder an der Seite. Durch die Fenster im Bauch des Schiffs sieht man die Maschine arbeiten.' },
+  ballon:     { name: 'Heissluftballon', icon: '🎈', price: 600, where: 'luft', max: 6,
+    info: 'Ein Brenner macht die Luft im Ballon heiss. Heisse Luft ist leichter als kalte – darum steigt der Ballon! Lenken kann man ihn nicht, er fliegt mit dem Wind. In Château-d’Oex treffen sich jeden Winter Ballone aus der ganzen Welt.' },
+  gondelbahn: { name: 'Gondelbahn', icon: '🚡', price: 1500, where: 'berg', max: 1,
+    info: 'Eine Gondelbahn hängt an einem dicken Stahlseil. Ein starker Motor in der Station zieht das Seil – die Gondeln fahren über Täler und Felsen bis auf den Berg. Die Schweiz hat über 2000 Seilbahnen!' },
 };
 
 const LAND_PRICES = [120, 300, 700, 1500, 3000];

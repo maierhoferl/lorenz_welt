@@ -39,7 +39,22 @@ const AU = (() => {
     o.connect(filt('lowpass', 650, 3)).connect(g).connect(master); o.start(t); o.stop(t + 1.6);
   }
 
+  // Kuhglocke: unharmonische Teiltöne, kurz und blechern
+  function bell(v, delay = 0) { tone('triangle', 520, 505, 0.7, 0.16 * v, delay); tone('sine', 1290, 1270, 0.45, 0.08 * v, delay); tone('sine', 2010, 1990, 0.25, 0.04 * v, delay); }
+  // Alphorn: nur Naturtöne (Obertöne von F), weich angeblasen
+  function alphorn(v) {
+    const f = 87.3, mel = [[6, 0.7], [8, 0.5], [9, 0.5], [8, 0.9], [6, 0.6], [5, 0.6], [6, 1.6]];
+    let t = ac.currentTime;
+    for (const [h, d] of mel) {
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sawtooth'; o.frequency.value = f * h;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.16 * v, t + 0.09); g.gain.setValueAtTime(0.16 * v, t + d - 0.08); g.gain.linearRampToValueAtTime(0, t + d + 0.05);
+      o.connect(filt('lowpass', 1100, 1.5)).connect(g).connect(master); o.start(t); o.stop(t + d + 0.1); t += d;
+    }
+  }
+  function woof(v) { for (let i = 0; i < 2; i++) { tone('sawtooth', 260, 140, 0.13, 0.2 * v, i * 0.25); burst(0.1, 0.15 * v, 'lowpass', 900, 1, i * 0.25); } }
+
   const BED = {
+    brunnen: () => noise().connect(filt('bandpass', 2200, 0.6)),                  // Wasser plätschert
     feld: () => noise().connect(filt('bandpass', 900, 0.5)),                       // Wind im Getreide
     muehle: () => noise().connect(filt('lowpass', 160, 2)),                        // Mahlstein rumpelt
     baeckerei: () => noise().connect(filt('lowpass', 380)),                        // Ofen faucht
@@ -47,9 +62,13 @@ const AU = (() => {
     kaeserei: () => osc('sawtooth', 46).connect(filt('lowpass', 160)),
     konditorei: () => osc('square', 170).connect(filt('lowpass', 500)),            // Rührmaschine
   };
-  const BED_VOL = { feld: 0.07, muehle: 0.45, baeckerei: 0.25, molkerei: 0.18, kaeserei: 0.15, konditorei: 0.05 };
+  const BED_VOL = { brunnen: 0.09, feld: 0.07, muehle: 0.45, baeckerei: 0.25, molkerei: 0.18, kaeserei: 0.15, konditorei: 0.05 };
   const EV = {
-    kuh: [7, moo],
+    kuh: [2.2, v => { if (Math.random() < 0.25) moo(v); else for (let i = 0, n = 1 + Math.random() * 3 | 0; i < n; i++) bell(v, i * 0.28 + Math.random() * 0.1); }], // Muh & Kuhglocken
+    alphorn: [9, alphorn],
+    murmeltier: [5, v => tone('sine', 2900, 2400, 0.35, 0.12 * v)],                                                             // Pfiff
+    bernhardiner: [7, woof],
+    uhrturm: [12, v => [0, 1, 2].forEach(i => bell(v * 0.8, i * 0.6))],
     baum: [2.5, v => { for (let i = 0; i < 3; i++) tone('sine', 2600 + Math.random() * 900, 4300, 0.08, 0.07 * v, i * 0.11); }], // Vögel
     feld: [3.5, v => { for (let i = 0; i < 4; i++) burst(0.03, 0.08 * v, 'bandpass', 5200, 8, i * 0.07); }],                    // Grille
     muehle: [1.8, v => tone('sawtooth', 75, 62, 0.6, 0.12 * v)],                                                               // Holz knarrt

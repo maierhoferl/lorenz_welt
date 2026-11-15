@@ -11,7 +11,7 @@ let zoomU = 1;
 try { zoomU = +localStorage.getItem('lw_zoom') || 1; } catch (e) {}
 function setZoom(f) { zoomU = clamp(zoomU * f, 0.05, 2); try { localStorage.setItem('lw_zoom', zoomU); } catch (e) {} }
 function calcZoom() {
-  const fit = Math.min(W / (WORLD.w * T), H / (WORLD.h * T)), z = Math.max(0.6, Math.min(1.15, Math.min(W, H) / 620)) * zoomU;
+  const fit = Math.min(W / (WORLD.w * T), H / ((WORLD.h + ALPS) * T)), z = Math.max(0.6, Math.min(1.15, Math.min(W, H) / 620)) * zoomU;
   if (z < fit) zoomU *= fit / z; // nicht weiter raus als die ganze Welt
   ZOOM = Math.max(z, fit);
 }
@@ -63,7 +63,7 @@ function drawSelect() {
   $('#plist').innerHTML = profiles.map((p, i) =>
     `<button class="pcard" data-i="${i}">👦🏼<b>${esc(p.name)}</b><small>${hasPin(p) ? '🔒 ' + p.age + ' Jahre' : '✨ neu'}</small></button>`).join('') +
     (online ? `<button class="pcard add" data-add>＋<b>Neuer Spieler</b></button>` : '');
-  $('.sub').textContent = online ? 'Wer spielt?' : 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)';
+  $('#whosub').textContent = online ? 'Wer spielt?' : 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)';
 }
 async function renderSelect() {
   show('select');
@@ -200,7 +200,7 @@ function addThing(type) {
   return t;
 }
 function newGame() {
-  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0, unlocks: 0, fin: {} };
+  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 29 * T, py: 16 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null };
   for (const k in TOOLS) G.tools[k] = 0;
   addThing('feld').ripe = true;
   addThing('baum').ripe = true;
@@ -215,6 +215,8 @@ function loadGame(server) {
     Object.assign(G, s);
     G.tools = Object.assign(tools, s.tools);
     G.things = G.things.filter(t => THINGS[t.type]); // falls ein Typ entfernt wurde
+    G.deco = (G.deco || []).filter(d => DECOS[d.type]);
+    if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
     if (G.unlocks > u0) setTimeout(() => toast(`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
@@ -249,6 +251,7 @@ addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault();
   if (e.key === 'Escape') closeModals();
+  if (G.carry && (e.key === 'Enter' || e.key === ' ') && $('#shop').hidden) placeDeco();
   if (e.key === '+' || e.key === '-') setZoom(e.key === '+' ? 1.25 : 0.8);
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -273,7 +276,7 @@ cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', j
 // =================== Spiellogik ===================
 let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = false, walk = 0, face = 1, faceS = 1, amp = 0, time = 0;
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
-let trH = 0; // Fahrtrichtung des Traktors (Bogenmaß)
+let trH = 0; // Fahrtrichtung des Traktors (Bogenmass)
 const packages = [], floaters = [], particles = [];
 let acc = { tr: 0, w: 0, save: 0, hud: 0, sp: 0 };
 
@@ -285,9 +288,12 @@ function update(dt) {
   if (joy) { const dx = joy.x - joy.x0, dy = joy.y - joy.y0, l = Math.hypot(dx, dy); if (l > 8) { mx = dx / Math.max(l, 50); my = dy / Math.max(l, 50); } }
   const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   const sp = 4.6 * T * (1 + G.stage * 0.06);
+  const ox = G.px, oy = G.py;
   G.px = clamp(G.px + mx * sp * dt, T, (WORLD.w - 1) * T);
+  if (inLake(G.px, G.py)) G.px = ox; // nicht in den See laufen – am Ufer entlang rutschen
   fitWorld();
   G.py = clamp(G.py + my * sp * dt, T * 1.5, (WORLD.h - 0.5) * T);
+  if (inLake(G.px, G.py)) G.py = oy;
   moving = ml > 0.1;
   if (moving) { walk += dt * 11; if (Math.abs(mx) > 0.2) face = Math.sign(mx); }
   amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 10); // Schritt weich ein-/ausblenden
@@ -315,6 +321,7 @@ function update(dt) {
       if (t.type === 'muehle') t.ang = (t.ang || 0) + dt * (t.working ? 2.2 : 0.25);
     }
   }
+  for (const d of G.deco) if (d.type === 'alphorn' && Math.random() < dt * 0.7 && dist(G.px, G.py, d.x, d.y) < 9 * T) floaters.push({ x: d.x + 60 + rndf(-6, 6), y: d.y - 30, text: Math.random() < 0.5 ? '♪' : '♫', t: 0 });
   if ((acc.tr += dt) > 0.35) { acc.tr = 0; transfers(); }
   if ((acc.sp += dt) > (toolLv('spedition').every || 1e9)) { acc.sp = 0; spedition(); }
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
@@ -341,7 +348,7 @@ function cowMove(t, dt) {
   if (Math.abs(t.tx - t.cx) > 2) t.face = Math.sign(t.tx - t.cx);
 }
 
-// Waren fließen automatisch zu Gebäuden, die sie brauchen (aus Lagern von Feldern/Bäumen/Kühen und anderen Gebäuden)
+// Waren fliessen automatisch zu Gebäuden, die sie brauchen (aus Lagern von Feldern/Bäumen/Kühen und anderen Gebäuden)
 function transfers() {
   for (const f of G.things) {
     const d = THINGS[f.type]; if (d.kind !== 'factory') continue;
@@ -373,7 +380,7 @@ function spedition() { // Spediteur holt Endprodukte ab und verkauft sie beim H�
     const n = Math.min(t.out, left); t.out -= n; left -= n; sum += n * ITEMS[d.item].price;
     packages.push({ x0: t.x, y0: t.y - 20, x1: h.x, y1: h.y - 30, t: 0, dur: 2.5, icon: '🚚' + ITEMS[d.item].icon });
   }
-  if (sum) { G.money += sum; floater(h.x, h.y - 90, `🚚 +${sum} €`); AU.sfx('cash'); }
+  if (sum) { G.money += sum; floater(h.x, h.y - 90, `🚚 +${sum} Fr.`); AU.sfx('cash'); }
 }
 function warnings() {
   const sup = {}, dem = {};
@@ -444,6 +451,39 @@ function reach(t) {
 }
 const FIXED_E = FIXED.map(f => ({ ...f, x: f.x * T, y: f.y * T }));
 
+// =================== See & Deko ===================
+const lakeR = a => 1 + 0.07 * Math.sin(3 * a + 1) + 0.05 * Math.sin(5 * a + 2); // Ufer etwas wellig
+function inLake(x, y, m = 0) {
+  const dx = x / T - LAKE.x, dy = (y / T - LAKE.y) * LAKE.rx / LAKE.ry, a = Math.atan2(dy, dx);
+  return Math.hypot(dx, dy) < LAKE.rx * lakeR(a) + m;
+}
+const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k ? 1 : 0);
+const ghostPos = () => ({ x: G.px + face * 46, y: G.py + 2 });
+let nearDeco = null;
+function decoSpotOk(x, y) {
+  if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6)) return false;
+  for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
+  for (const t of G.things) {
+    if (t.type === 'feld') { if (Math.abs(x - t.x) < 2.8 * T && Math.abs(y - t.y) < 1.9 * T) return false; }
+    else if (THINGS[t.type].kind === 'factory') { if (Math.abs(x - t.x) < 2.4 * T && y < t.y + 0.7 * T && y > t.y - 1.2 * T) return false; }
+    else if (t.type === 'baum' && dist(x, y, t.x, t.y) < 0.9 * T) return false;
+  }
+  return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
+}
+function placeDeco() {
+  if (!G.carry) return;
+  const { x, y } = ghostPos();
+  if (!decoSpotOk(x, y)) { AU.sfx('no'); toast('Hier ist kein Platz – such dir ein freies Stück Wiese! 🌼', 'noplace'); return; }
+  G.deco.push({ id: G.nid++, type: G.carry, x, y }); G.carry = null; AU.sfx('buy'); save(); hud();
+}
+function pickDeco(d) { if (G.carry) return; G.deco.splice(G.deco.indexOf(d), 1); G.carry = d.type; AU.sfx('pop'); hud(); }
+function buyDeco(k) {
+  const d = DECOS[k];
+  if (d.where !== 'land') { G.deco.push({ id: G.nid++, type: k }); toast(`${d.name} ist da! ${d.where === 'see' ? `Schau auf den ${P.name}see 🌊` : d.where === 'luft' ? 'Schau in den Himmel ☁️' : 'Schau hinauf in die Berge 🏔️'}`); return; }
+  G.carry = k; shopDismiss = true; $('#shop').hidden = true;
+  toast(`Du trägst jetzt: ${d.name}. Lauf dorthin, wo es stehen soll, und tippe 📍 Hier abstellen!`);
+}
+
 function interact(dt) {
   near = null; let nd = 1e9;
   for (const t of G.things.concat(FIXED_E)) { const d = reach(t); if (d < nd) { nd = d; near = t; } }
@@ -478,8 +518,10 @@ function interact(dt) {
   }
   if (near?.type === 'haendler' && bagCount() > 0) {
     let sum = 0; for (const k in G.inv) sum += G.inv[k] * ITEMS[k].price;
-    G.inv = {}; G.money += sum; AU.sfx('cash'); floater(near.x, near.y - 90, `+${sum} € 💶`);
+    G.inv = {}; G.money += sum; AU.sfx('cash'); floater(near.x, near.y - 90, `+${sum} Fr. 💰`);
   }
+  nearDeco = null; let dd = 1.1 * T;
+  if (!near) for (const o of G.deco) if (DECOS[o.type].where === 'land') { const k = dist(G.px, G.py, o.x, o.y); if (k < dd) { dd = k; nearDeco = o; } }
   if (near?.type === 'laden') { if (!shopDismiss && $('#shop').hidden) openShop(); }
   else { shopDismiss = false; if (!$('#shop').hidden) $('#shop').hidden = true; }
 }
@@ -491,21 +533,35 @@ function soundLevels() {
     const p = pos(t), v = clamp(1 - dist(G.px, G.py, p.x, p.y) / (6 * T), 0, 1) * (THINGS[t.type].kind === 'factory' && !t.working ? 0.25 : 1);
     if (v > L[t.type]) L[t.type] = v;
   }
+  for (const d of G.deco) if (d.x != null) { const v = clamp(1 - dist(G.px, G.py, d.x, d.y) / (7 * T), 0, 1); if (v > (L[d.type] || 0)) L[d.type] = v; }
   return L;
 }
 
 // =================== HUD ===================
-const NOTES = [[500, '#b88fc9'], [200, '#e6c84b'], [100, '#7cb87a'], [50, '#f0a35a'], [20, '#7aa3d6'], [10, '#e07a6e'], [5, '#bdbdbd']];
+const NOTES = [[1000, '#9a7cc4'], [200, '#b98557'], [100, '#5f97d6'], [50, '#6fb46b'], [20, '#e0646e'], [10, '#efc93f']]; // Farben der Schweizer Banknoten
 function hud() {
   if (!G) return;
   $('#who').textContent = `👦🏼 ${P.name} · ${age()} Jahre`;
   let m = G.money, notes = '';
   for (const [v, c] of NOTES) { let k = Math.floor(m / v); m -= k * v; k = Math.min(k, 6); while (k--) notes += `<span class="note" style="background:${c}">${v}</span>`; }
-  $('#money').innerHTML = `💶 ${G.money} €<span class="notes">${notes}${m ? `<span title="Münzen">🪙${m}</span>` : ''}</span>`;
+  $('#money').innerHTML = `💰 ${G.money} Fr.<span class="notes">${notes}${m ? `<span title="Münzen">🪙${m}</span>` : ''}</span>`;
   const inv = Object.entries(G.inv).map(([k, n]) => `${ITEMS[k].icon}${n}`).join(' ');
   $('#bag').innerHTML = `${TOOLS.tragen.icon} ${inv || '<small>leer</small>'} <small>(${bagCount()}/${bagCap()})</small>`;
   // Info-Leiste zum nächsten Ort
   const t = near, px = $('#prox');
+  const set = (html, ...fns) => {
+    if (px.dataset.html !== html) { px.dataset.html = html; px.innerHTML = html; } // nicht ständig neu bauen, sonst gehen Tipper verloren
+    px.querySelectorAll('button').forEach((b, i) => b.onclick = fns[i]);
+    px.hidden = false;
+  };
+  if (G.carry) {
+    const dc = DECOS[G.carry], g = ghostPos(), ok = decoSpotOk(g.x, g.y);
+    return set(`<div><b>${dc.icon} ${dc.name}</b><div>${ok ? 'Lauf dorthin, wo es stehen soll.' : '<span class="warn">Hier ist kein Platz.</span> Geh auf eine freie Wiese.'}</div></div><button ${ok ? '' : 'disabled'}>📍 Hier abstellen</button>`, placeDeco);
+  }
+  if (!t && nearDeco) {
+    const dc = DECOS[nearDeco.type], o = nearDeco;
+    return set(`<div><b>${dc.icon} ${dc.name}</b><div>Deko – macht nichts, ist aber schön! 😊</div></div><button>✋ Umstellen</button><button>ℹ️</button>`, () => pickDeco(o), () => showInfo(dc));
+  }
   if (!t) { px.hidden = true; return; }
   const d = THINGS[t.type] || t;
   let st = '';
@@ -517,10 +573,7 @@ function hud() {
     st = Object.keys(d.in).map(k => `${ITEMS[k].icon} ${t.inS[k] || 0}/${d.in[k]}`).join(' + ') + ` → ${ITEMS[d.item].icon} ${t.out}` + (t.working ? ' ⚙️ arbeitet' : '');
   } else st = { haendler: 'Komm mit vollen Taschen – du bekommst Geldscheine!', laden: 'Hier kannst du einkaufen.', hof: 'Dein Zuhause.' }[t.type] || '';
   const w = t.warn ? `<div class="warn">❗ ${esc(t.warn)}</div>` : '';
-  const html = `<div><b>${d.icon || ''} ${d.name}</b><div>${st}</div>${w}</div><button>ℹ️ Wie geht das?</button>`;
-  if (px.dataset.html !== html) { px.dataset.html = html; px.innerHTML = html; } // nicht ständig neu bauen, sonst gehen Tipper verloren
-  px.querySelector('button').onclick = () => showInfo(t);
-  px.hidden = false;
+  set(`<div><b>${d.icon || ''} ${d.name}</b><div>${st}</div>${w}</div><button>ℹ️ Wie geht das?</button>`, () => showInfo(t));
 }
 
 // =================== Fenster: Info, Laden, Plan ===================
@@ -543,7 +596,7 @@ const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} 
 
 let shopTab = 0;
 function shopList() {
-  const tabs = [[], [], [], []];
+  const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
     if (!avail(k)) continue;
     const free = freeSlot(d.area) >= 0;
@@ -574,26 +627,33 @@ function shopList() {
   const lp = LAND_PRICES[G.land] ?? LAND_PRICES.at(-1) + (G.land - LAND_PRICES.length + 1) * 2000;
   tabs[3].push({
     icon: '🗺️', name: `Land Stufe ${G.land + 1}`, price: lp, can: true,
-    desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrößern. Bauern kaufen oder pachten Land von Nachbarn.',
-    buy: () => { G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist größer geworden! Neue Plätze sind gestrichelt markiert.'); },
+    desc: 'Mehr Platz für Felder, Bäume, Kühe und Gebäude', info: 'Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.',
+    buy: () => { G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? '🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.' : '🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.'); },
   });
+  for (const [k, d] of Object.entries(DECOS)) {
+    const full = d.max && decoCount(k) >= d.max, busy = d.where === 'land' && G.carry;
+    tabs[4].push({ icon: d.icon, name: d.name, price: d.price, info: d.info, can: !full && !busy,
+      desc: { land: 'Du stellst es hin, wo du willst', see: 'Schwimmt auf dem See', luft: 'Fliegt über deine Welt', berg: 'Fährt in die Berge' }[d.where],
+      note: full ? '✅ Schon gekauft' : busy ? `Stell zuerst ${DECOS[G.carry].name} ab` : decoCount(k) ? `Hast du schon ${decoCount(k)}×` : '',
+      buy: () => buyDeco(k) });
+  }
   return tabs;
 }
 function openShop() {
-  const tabs = shopList(), names = ['🌱 Tiere & Pflanzen', '🏭 Gebäude', '🔧 Werkzeuge', '🗺️ Land'];
+  const tabs = shopList(), names = ['🌱 Tiere & Pflanzen', '🏭 Gebäude', '🔧 Werkzeuge', '🗺️ Land', '🏔️ Deko'];
   const L = tabs[shopTab];
   const head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
-    <div class="row">${it.price ? `<span class="price">${it.price} €</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>Kaufen</button>` : ''}</div></div>`).join('')}</div>`;
-  modal($('#shop'), `🛒 Laden <small style="font-weight:600;font-size:16px">– du hast ${G.money} €</small>`, body, head);
+    <div class="row">${it.price ? `<span class="price">${it.price} Fr.</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>Kaufen</button>` : ''}</div></div>`).join('')}</div>`;
+  modal($('#shop'), `🛒 Laden <small style="font-weight:600;font-size:16px">– du hast ${G.money} Fr.</small>`, body, head);
   const el = $('#shop');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = +b.dataset.tab; openShop(); });
   el.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const m = b.closest('.card').querySelector('.more'); m.hidden = !m.hidden; });
   el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = L[+b.dataset.buy];
     if (G.money < it.price) { AU.sfx('no'); return; }
-    G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud(); openShop();
+    G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud(); if (!$('#shop').hidden) openShop();
   });
 }
 
@@ -631,7 +691,7 @@ function openPlan() {
     }
     if (cnt[k] && !consumers.some(f => cnt[f])) edge(k, 'haendler', it, '#3e7bc4', true, `${ITEMS[it].icon} ${d.kind === 'factory' && G.tools.spedition ? '🚚 Spediteur' : 'du trägst'}`);
   }
-  // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ € in den nächsten M Minuten
+  // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
   const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
   const unitVal = f => eur(THINGS[f].item) * THINGS[f].n / Object.values(THINGS[f].in).reduce((a, b) => a + b); // Wert je Zutat nach Verarbeitung
@@ -651,7 +711,7 @@ function openPlan() {
   for (const [it, n] of Object.entries(G.inv)) {
     const f = G.things.find(t => THINGS[t.type].in?.[it] && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
     if (f) tip(n * unitVal(f.type), `🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
-    else tip(n * eur(it), `💶 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} €).`);
+    else tip(n * eur(it), `💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`);
   }
   if (bagCount() >= bagCap()) tip(blocked + 1, `🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
   for (const it in ITEMS) {
@@ -663,7 +723,7 @@ function openPlan() {
     if (!s) continue;
     const bu = bestUser(it, true), best = bestUser(it, false);
     if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, `🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
-    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, `🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} €): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
+    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, `🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
     if (dm && manual.length) tip(s * eur(it) * M * 0.5, `✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
   }
@@ -671,8 +731,8 @@ function openPlan() {
   for (const k of types.concat('haendler')) {
     const p = posn[k], d = THINGS[k] || FIXED.find(f => f.type === k), on = k === 'haendler' || cnt[k] > 0;
     const warn = G.things.some(t => t.type === k && t.warn);
-    const rate = THINGS[k] ? (cnt[k] ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : `${d.price} € im Laden`) : 'macht Geld 💶';
-    const ic = d.icon || '💶';
+    const rate = THINGS[k] ? (cnt[k] ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : `${d.price} Fr. im Laden`) : 'macht Geld 💰';
+    const ic = d.icon || '💰';
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
       <text x="${p.x + 10}" y="${p.y + 26}" font-size="16" font-weight="800">${ic} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
       <text x="${p.x + 10}" y="${p.y + 47}" font-size="12" fill="#555">${rate}</text>
@@ -680,7 +740,7 @@ function openPlan() {
   }
   const svg = `<svg width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker></defs>${edges}${nodes}</svg>`;
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ passt</span><span style="color:#d23b2b">━ zu wenig</span><span style="color:#e39b1c">━ zu viel</span><span style="color:#3e7bc4">┅ du musst tragen</span><span style="opacity:.5">▢ noch nicht gebaut</span></div>`;
-  modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><h3>Was jetzt am meisten bringt</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="geschätzter Nutzen in den nächsten ${M} Minuten"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} €</span></li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ol><small>≈ € = geschätzter Nutzen in den nächsten ${M} Minuten. </small><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
+  modal($('#plan'), '📊 Dein Produktions-Plan', `${legend}<div style="overflow:auto">${svg}</div><h3>Was jetzt am meisten bringt</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="geschätzter Nutzen in den nächsten ${M} Minuten"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} Fr.</span></li>`).join('') || '<li>✅ Alles läuft rund!</li>'}</ol><small>≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten. </small><small>Tipp: Tippe auf ein Kästchen, um zu lernen, wie es funktioniert.</small>`);
   $('#plan').querySelectorAll('[data-k]').forEach(g => g.onclick = () => showInfo(THINGS[g.dataset.k] ? { type: g.dataset.k } : FIXED.find(f => f.type === g.dataset.k)));
 }
 
@@ -807,6 +867,12 @@ function drawCow(t) {
   ellipse(31, hy + 6, 6, 4.5, '#e8a0a8');
   ctx.fillStyle = '#e8dcc0'; ctx.fillRect(22, hy - 11, 2, 4); ctx.fillRect(29, hy - 11, 2, 4);
   ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(29, hy - 2, 1.4, 0, 7); ctx.fill();
+  // Kuhglocke am roten Riemen
+  const bs = walking ? Math.sin(time * 9 + t.id) * 0.35 : 0;
+  ctx.strokeStyle = '#d52b1e'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(20, hy + 2); ctx.quadraticCurveTo(22, hy + 9, 28, hy + 6); ctx.stroke();
+  ctx.save(); ctx.translate(22, hy + 8); ctx.rotate(bs);
+  ctx.fillStyle = '#d9a92e'; ctx.beginPath(); ctx.moveTo(-2.5, 0); ctx.lineTo(2.5, 0); ctx.lineTo(4, 7); ctx.lineTo(-4, 7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8a6a1a'; ctx.fillRect(-4, 6, 8, 1.5); ctx.restore();
   ctx.restore();
   if (t.store > 0) milkcan(t.x + 26, t.y + 4);
 }
@@ -824,6 +890,7 @@ const DRAW = {
     house(x + 50, y, 84, 56, '#f1e8d4', '#a8452e', 30);
     win(x + 20, y - 44, 18, 16); win(x + 64, y - 44, 18, 16); door(x + 50, y, 16, 28);
     ctx.fillStyle = '#8b8b8b'; ctx.fillRect(x + 70, y - 104, 10, 22);
+    flagPole(x + 108, y, 96, 26, 0);
   },
   haendler(x, y) {
     ellipse(x + 6, y, 70, 10, 'rgba(0,0,0,.22)');
@@ -834,7 +901,8 @@ const DRAW = {
     ctx.fillStyle = '#9b6a3a'; ctx.fillRect(x - 62, y - 30, 124, 30); ctx.fillStyle = '#7b5228'; ctx.fillRect(x - 62, y - 30, 124, 5);
     crate(x - 38, y - 30, '#d8332a', 10); crate(x - 10, y - 30, '#e0b54a', 10); crate(x + 32, y - 30, '#f5f5f0', 8);
     awning(x, y - 84, 132, '#d23b2b', '#fff', 10);
-    sign(x, y - 94, 'HÄNDLER 💶');
+    sign(x, y - 94, 'HÄNDLER 💰');
+    flagPole(x + 57, y - 72, 26, 16, 2);
   },
   laden(x, y) {
     house(x, y, 140, 72, '#f0dfb2', '#3d6b8f', 32);
@@ -842,8 +910,9 @@ const DRAW = {
     ctx.fillStyle = '#cfe8f5'; ctx.fillRect(x - 60, y - 54, 42, 36); ctx.fillRect(x + 18, y - 54, 42, 36);
     ctx.font = '16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🔧🐄', x - 39, y - 30); ctx.fillText('🌳🚜', x + 39, y - 30);
     door(x, y, 22, 40, '#3d6b8f');
-    awning(x, y - 72, 150, '#3d6b8f', '#fff', 12);
+    awning(x, y - 72, 150, '#d52b1e', '#fff', 12);
     sign(x, y - 112, 'LADEN 🛒');
+    flagPole(x - 80, y, 110, 24, 3); flagPole(x + 80, y, 110, 24, 4);
   },
   muehle(x, y, t) {
     ellipse(x + 6, y, 40, 10, 'rgba(0,0,0,.25)');
@@ -889,6 +958,12 @@ const DRAW = {
     for (let i = 0; i < 3; i++) { ellipse(x + 64, y - 4 - i * 9, 14, 6, '#e8b830'); ellipse(x + 64, y - 6 - i * 9, 14, 5, '#f5cf4a'); }
     sign(x, y - 70, 'KÄSEREI 🧀');
   },
+  fonduestube(x, y, t) { DECO_DRAW.chalet(x, y, t, t.working); sign(x, y - 66, 'FONDUE-STÜBLI 🍲'); },
+  muesli_kueche(x, y, t) {
+    house(x, y, 104, 60, '#f3ead2', '#d52b1e', 30); win(x - 40, y - 44, 22, 18, t.working); win(x + 18, y - 44, 22, 18, t.working); door(x - 4, y, 18, 30);
+    for (const [ax, c] of [[-56, '#d8332a'], [-46, '#a6c84a'], [52, '#d8332a']]) ellipse(x + ax, y - 4, 5, 5, c);
+    sign(x, y - 66, 'MÜESLI 🥗');
+  },
   konditorei(x, y, t) {
     house(x, y, 108, 62, '#f6d4dc', '#b05a7a', 30);
     win(x - 46, y - 44, 34, 24, t.working); door(x + 20, y, 18, 32, '#b05a7a');
@@ -898,7 +973,7 @@ const DRAW = {
   },
 };
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
@@ -907,7 +982,7 @@ const onTractor = () => G.tools.tragen === 4 && !harvest; // beim Ernten steigt 
 const liftH = () => harvTool() === 'obst' && G.tools.obst === 3 ? 26 : onTractor() ? 12 : 0;
 function wheel(x, y, r) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = '#a8a8a8'; ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, 7); ctx.fill(); }
 function line(c, w, ...pts) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[0], pts[1]); ctx.stroke(); }
-// Lokale Koordinaten: Ursprung an den Füßen, +x = Blickrichtung, y nach oben negativ
+// Lokale Koordinaten: Ursprung an den Füssen, +x = Blickrichtung, y nach oben negativ
 function gearBack(D) {
   const ht = harvTool();
   if (ht === 'obst' && G.tools.obst === 2) { // Obstleiter mit drei Beinen
@@ -1026,7 +1101,7 @@ function tractorParts(x, y, s) {
     post(-8, 9), post(-8, -9), post(6, 9), post(6, -9),
     { y: Infinity, d: () => box(-10, 8, 11, 58, 3, '#38a35b', '#26794a') }]; // Dach
 }
-// Bein mit Knie (2-Glied-IK): Fuß schwingt nach vorn und hebt dabei ab, Standbein bleibt am Boden
+// Bein mit Knie (2-Glied-IK): Fuss schwingt nach vorn und hebt dabei ab, Standbein bleibt am Boden
 function legDraw(p, L, drop, hipX, col, am) {
   const a = Math.sin(p) * 0.5 * am, fx = hipX + L * Math.sin(a), fy = -Math.max(0, Math.cos(p)) * L * 0.3 * am, hy = -L + drop;
   const vx = fx - hipX, vy = fy - hy, d = Math.hypot(vx, vy), k = Math.sqrt(Math.max(0, L * L / 4 - d * d / 4));
@@ -1075,20 +1150,376 @@ function drawPlayer() {
   if (items.length && !cart.on) { ctx.font = `${14 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), x + 16 * s * sx, y - (legL + 6 + liftH()) * s); }
 }
 
+// =================== Schweiz: Fahne, Alpen, See, Deko ===================
+const FLAG_IMG = (() => { // Schweizer Fahne: quadratisch, weisses Kreuz auf Rot
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#d52b1e'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#fff'; g.fillRect(26, 12, 12, 40); g.fillRect(12, 26, 40, 12);
+  return c;
+})();
+// x/y = oben am Mast, Tuch weht nach rechts (in Streifen gezeichnet, die sich wellen)
+function swissFlag(x, y, s, ph = 0) {
+  const n = 12, w = s / n;
+  for (let i = 0; i < n; i++) {
+    const off = Math.sin(time * 4 + ph - i * 0.55) * s * 0.07 * (i / n), lt = 0.92 + Math.cos(time * 4 + ph - i * 0.55) * 0.1;
+    ctx.drawImage(FLAG_IMG, i * 64 / n, 0, 64 / n, 64, x + i * w, y + off, w + 0.7, s);
+    ctx.fillStyle = lt > 1 ? `rgba(255,255,255,${(lt - 1) * 1.2})` : `rgba(0,0,0,${(1 - lt) * 1.2})`; ctx.fillRect(x + i * w, y + off, w + 0.7, s);
+  }
+}
+function flagPole(x, y, h, s, ph = 0) {
+  line('#cfd3d8', 2.5, x, y, x, y - h); ellipse(x, y - h - 1, 2.6, 2.6, '#e8c35a');
+  swissFlag(x + 1, y - h + 2, s, ph);
+}
+
+// ---- Alpen-Panorama (Kulisse nördlich der Welt, y < 0) ----
+const alps = (() => {
+  const Wp = WORLD.w * T, r = seeded(42), step = 12;
+  const peaks = (n, hMin, hMax, wMin, wMax) => Array.from({ length: n }, (_, i) => ({ x: (i + 0.15 + r() * 0.7) / n * Wp, h: hMin + r() * (hMax - hMin), wl: wMin + r() * (wMax - wMin), wr: wMin + r() * (wMax - wMin) }));
+  const ridge = (pk, base, rough) => {
+    const pts = [];
+    for (let x = -step; x <= Wp + step; x += step) {
+      let h = 0; for (const p of pk) h = Math.max(h, p.h - Math.abs(x - p.x) * p.h / (x < p.x ? p.wl : p.wr));
+      pts.push([x, base - h + (r() - 0.5) * rough * Math.min(1, h / 60)]);
+    }
+    return pts;
+  };
+  const far = peaks(15, 150, 250, 150, 240), near = peaks(7, 110, 200, 200, 300);
+  near.push({ x: Wp * 0.64, h: 300, wl: 120, wr: 210, horn: true }); // das grosse Horn
+  const firs = Array.from({ length: 70 }, () => [r() * Wp, r(), 0.5 + r() * 0.45]);
+  return { Wp, far, near, farR: ridge(far, -40, 10), nearR: ridge(near, -6, 14), firs, horn: near.at(-1) };
+})();
+const hillY = x => -34 + 14 * Math.sin(x * 0.0035 + 1) + 8 * Math.sin(x * 0.011 + 2);
+function ridgeAt(R, x) { const i = clamp(Math.round((x + 12) / 12), 0, R.length - 1); return R[i][1]; }
+function mountainRange(R, pk, base, c1, c2, snowY) {
+  const path = () => { ctx.beginPath(); ctx.moveTo(R[0][0], 10); for (const [x, y] of R) ctx.lineTo(x, y); ctx.lineTo(R.at(-1)[0], 10); ctx.closePath(); };
+  const g = ctx.createLinearGradient(0, -ALPS * T, 0, 0); g.addColorStop(0, c1); g.addColorStop(1, c2);
+  path(); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); path(); ctx.clip();
+  ctx.fillStyle = 'rgba(20,30,50,.16)'; // Schattenseite (Licht von links)
+  for (const p of pk) { ctx.beginPath(); ctx.moveTo(p.x, base - p.h); ctx.lineTo(p.x + p.wr, base); ctx.lineTo(p.x + p.wr * 0.15, base); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(-20, -ALPS * T - 10); // Schnee oberhalb der Schneegrenze
+  for (let x = -20; x <= alps.Wp + 20; x += 16) ctx.lineTo(x, snowY + Math.sin(x * 0.05) * 9 + Math.sin(x * 0.13) * 6);
+  ctx.lineTo(alps.Wp + 20, -ALPS * T - 10); ctx.fill();
+  ctx.fillStyle = 'rgba(120,150,190,.28)';
+  for (const p of pk) { ctx.beginPath(); ctx.moveTo(p.x, base - p.h); ctx.lineTo(p.x + p.wr, base); ctx.lineTo(p.x + p.wr * 0.15, base); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+function drawAlps() {
+  const top = -ALPS * T, Wp = alps.Wp;
+  let g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
+  ctx.fillStyle = g; ctx.fillRect(0, top, Wp, -top + 2);
+  for (let i = 0; i < 7; i++) { // Wolken
+    const cx = ((time * (6 + i) + i * 523) % (Wp + 300)) - 150, cy = top + 40 + (i * 37) % 90;
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (const [dx, dy, rr] of [[0, 0, 22], [22, 4, 17], [-22, 5, 16], [10, -10, 16]]) { ctx.beginPath(); ctx.arc(cx + dx, cy + dy, rr, 0, 7); ctx.fill(); }
+  }
+  mountainRange(alps.farR, alps.far, -40, '#9db3cf', '#7f97b5', -180);
+  mountainRange(alps.nearR, alps.near, -6, '#8a8f99', '#6c7a6c', -175);
+  const h = alps.horn; flagPole(h.x, -6 - h.h + 4, 26, 14, 1); // Gipfelfahne
+  // Alpwiesen-Hügel, nahtlos ins Gras
+  ctx.beginPath(); ctx.moveTo(0, 14); for (let x = 0; x <= Wp; x += 16) ctx.lineTo(x, hillY(x)); ctx.lineTo(Wp, 14); ctx.closePath();
+  ctx.fillStyle = grassPat; ctx.fill();
+  g = ctx.createLinearGradient(0, -50, 0, 0); g.addColorStop(0, 'rgba(40,80,30,.25)'); g.addColorStop(1, 'rgba(40,80,30,0)'); ctx.fillStyle = g; ctx.fill();
+  // Bergsee in der Alp
+  const bx = Wp * 0.3, by = hillY(Wp * 0.3) + 16;
+  ellipse(bx, by, 74, 11, '#d9c89a'); ellipse(bx, by, 68, 8.5, '#3fb6c7'); ellipse(bx - 14, by - 2, 30, 2.5, 'rgba(255,255,255,.35)');
+  for (const [fx, fy, fs] of alps.firs) { const y = hillY(fx) + 6 + fy * 18; if (Math.abs(fx - bx) > 90 || y < by - 14) tanne(fx, y, fs); }
+  if (G.deco.some(d => d.type === 'gondelbahn')) gondola();
+}
+function gondola() {
+  const bx = 34 * T, by = 1.6 * T, tx = 40.5 * T, ty = ridgeAt(alps.nearR, 40.5 * T) + 34;
+  const station = (x, y, w) => { ellipse(x + 4, y, w / 2 + 6, 5, 'rgba(0,0,0,.2)'); ctx.fillStyle = '#c8c2b6'; ctx.fillRect(x - w / 2, y - 24, w, 24); ctx.fillStyle = '#d52b1e'; ctx.fillRect(x - w / 2 - 4, y - 30, w + 8, 7); ctx.fillStyle = '#3d4b5c'; ctx.fillRect(x - 8, y - 18, 16, 18); };
+  station(tx, ty, 40); line('#666', 4, bx + 6, by, bx + 6, by - 50);
+  for (const o of [-3, 3]) line('#3a3a3a', 1.2, bx + 6, by - 44 + o, tx, ty - 22 + o);
+  station(bx, by, 46);
+  for (const [u0, o] of [[0, -3], [0.5, 3]]) { // zwei Gondeln, eine rauf, eine runter
+    const u = (Math.sin(time * 0.18 + u0 * Math.PI * 2) + 1) / 2, x = bx + 6 + (tx - bx - 6) * u, y = by - 44 + o + (ty - 22 - by + 44) * u;
+    line('#333', 1.5, x, y, x, y + 10);
+    ctx.fillStyle = '#d52b1e'; rrect(x - 9, y + 10, 18, 14, 4); ctx.fill();
+    ctx.fillStyle = '#cfe8f5'; ctx.fillRect(x - 6, y + 13, 12, 5);
+  }
+}
+function tanne(x, y, s = 1) {
+  ellipse(x + 3 * s, y, 13 * s, 4 * s, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 2.5 * s, y - 9 * s, 5 * s, 9 * s);
+  for (let i = 0; i < 4; i++) {
+    const w = (17 - i * 3.5) * s, yb = y - (6 + i * 11) * s, ht = 17 * s;
+    const g = ctx.createLinearGradient(x - w, 0, x + w, 0); g.addColorStop(0, '#3f7a3a'); g.addColorStop(1, '#1f4a26');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - w, yb); ctx.lineTo(x, yb - ht); ctx.lineTo(x + w, yb); ctx.closePath(); ctx.fill();
+  }
+}
+
+// ---- See ----
+function lakePath(m) {
+  ctx.beginPath();
+  for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, rr = LAKE.rx * lakeR(a) + m; ctx.lineTo((LAKE.x + Math.cos(a) * rr) * T, (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T); }
+  ctx.closePath();
+}
+function drawLake() {
+  const cx = LAKE.x * T, cy = LAKE.y * T;
+  lakePath(0.45); ctx.fillStyle = '#dccb98'; ctx.fill();
+  lakePath(0.12); ctx.fillStyle = '#8fc7d8'; ctx.fill();
+  const g = ctx.createRadialGradient(cx - 40, cy - 20, 10, cx, cy, LAKE.rx * T); g.addColorStop(0, '#4fb0e0'); g.addColorStop(1, '#2a70ad');
+  lakePath(0); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); lakePath(0); ctx.clip();
+  // Spiegelung der Berge und kleine Wellen
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(cx - 60, cy - 50, 120, 22, -0.1, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5; const r = seeded(11);
+  for (let i = 0; i < 26; i++) {
+    const wx = cx + (r() - 0.5) * LAKE.rx * 2 * T, wy = cy + (r() - 0.5) * LAKE.ry * 2 * T, k = (time * 0.4 + r()) % 1;
+    ctx.globalAlpha = Math.sin(k * Math.PI); ctx.beginPath(); ctx.arc(wx, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.arc(wx + 12, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+  // Schilf am Ufer
+  for (const a of [2.4, 2.6, 0.5, 0.65, 4.1]) {
+    const rr = LAKE.rx * lakeR(a) - 0.1, x = (LAKE.x + Math.cos(a) * rr) * T, y = (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T;
+    for (let i = 0; i < 6; i++) { const sx = x + i * 4 - 10, sw = Math.sin(time * 1.6 + i) * 2; line('#5f8a3a', 1.6, sx, y + 4, sx + sw, y - 16 - (i % 3) * 4); ellipse(sx + sw, y - 16 - (i % 3) * 4, 1.6, 4, '#7a4e2a'); }
+  }
+  // Steg
+  const sx = (LAKE.x - 3.2) * T, sy = (LAKE.y + 2.9) * T;
+  ctx.fillStyle = '#8a5a2b'; for (let i = 0; i < 6; i++) ctx.fillRect(sx - 14 + i * 2, sy - 58 + i * 10, 26, 7);
+  ctx.fillStyle = '#5b3a1e'; for (const [px, py] of [[-14, -54], [12, -54], [-4, 2], [22, 2]]) ctx.fillRect(sx + px, sy + py, 3, 10);
+  label(cx, cy + LAKE.ry * T + 30, `${P.name}see`, 14);
+}
+function lakeDecos() {
+  const L = G.deco.filter(d => DECOS[d.type].where === 'see').map(d => {
+    const sp = { schwan: 0.06, segelboot: 0.09, dampfschiff: 0.035 }[d.type], dir = d.id % 2 ? 1 : -1, k = 0.3 + (d.id * 0.37) % 0.42;
+    const a = time * sp * dir + d.id * 1.7;
+    return { d, x: (LAKE.x + Math.cos(a) * LAKE.rx * k) * T, y: (LAKE.y + Math.sin(a) * LAKE.ry * k) * T + 6, f: -Math.sin(a) * dir >= 0 ? 1 : -1 };
+  }).sort((a, b) => a.y - b.y);
+  for (const o of L) { ctx.save(); ctx.translate(o.x, o.y + Math.sin(time * 2 + o.d.id) * 1.2); ctx.scale(o.f, 1); DECO_DRAW[o.d.type](0, 0, o.d); ctx.restore(); }
+}
+function balloons() {
+  const Wp = alps.Wp;
+  for (const d of G.deco) {
+    if (d.type !== 'ballon') continue;
+    const x = ((time * 13 + d.id * 977) % (Wp + 600)) - 300, gy = (5 + (d.id * 13) % 32) * T, y = gy - 210 - Math.sin(time * 0.5 + d.id) * 18;
+    ellipse(x, gy, 26, 8, 'rgba(0,0,0,.13)');
+    DECO_DRAW.ballon(x, y, d);
+  }
+}
+
+// ---- Deko-Zeichnungen (x/y = Fusspunkt) ----
+const DECO_DRAW = {
+  steinmann(x, y) {
+    ellipse(x + 3, y, 14, 4, 'rgba(0,0,0,.22)');
+    for (const [dx, dy, rx, ry, c] of [[0, -4, 12, 5, '#8d8d86'], [1, -12, 9.5, 4.5, '#a3a39b'], [-1, -19.5, 7.5, 4, '#7f8079'], [1, -25.5, 5.5, 3.2, '#9c9c94'], [0, -30.5, 3.5, 2.4, '#b0b0a8']]) {
+      ellipse(x + dx, y + dy, rx, ry, c); ellipse(x + dx - rx * 0.3, y + dy - ry * 0.4, rx * 0.4, ry * 0.3, 'rgba(255,255,255,.3)');
+    }
+  },
+  gartenzwerg(x, y, o) {
+    ellipse(x + 2, y, 10, 3, 'rgba(0,0,0,.25)');
+    ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 6, y - 4, 5, 4); ctx.fillRect(x + 1, y - 4, 5, 4);
+    ctx.fillStyle = '#3a6fd8'; rrect(x - 7, y - 17, 14, 14, 4); ctx.fill();
+    ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 7, y - 10, 14, 2.5);
+    ellipse(x, y - 22, 6, 6, '#f2c9a2');
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x - 6, y - 21); ctx.lineTo(x + 6, y - 21); ctx.lineTo(x, y - 9); ctx.fill(); // Bart
+    ellipse(x, y - 21, 2, 1.6, '#e8a0a0');
+    const blink = (time + o.id) % 4 < 0.15;
+    ctx.fillStyle = '#222'; if (blink) ctx.fillRect(x - 3.5, y - 24, 2.4, 0.8); else ellipse(x - 2.3, y - 24, 0.9, 0.9, '#222'); ellipse(x + 2.3, y - 24, 0.9, 0.9, '#222');
+    ctx.fillStyle = '#d52b1e'; ctx.beginPath(); ctx.moveTo(x - 7, y - 26); ctx.lineTo(x + 7, y - 26); ctx.lineTo(x + 3, y - 44); ctx.closePath(); ctx.fill();
+  },
+  tanne(x, y) { tanne(x, y, 1.6); },
+  wegweiser(x, y) {
+    ellipse(x + 2, y, 8, 3, 'rgba(0,0,0,.22)');
+    line('#b9bfc6', 3, x, y, x, y - 54);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.5, y - 20, 3, 3); ctx.fillStyle = '#d52b1e'; ctx.fillRect(x - 1.5, y - 17, 3, 3); ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.5, y - 14, 3, 3);
+    const arrow = (yy, dir, txt) => {
+      const x0 = x, x1 = x + dir * 52; ctx.fillStyle = '#f5c400'; ctx.beginPath();
+      ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.lineTo(x1 + dir * 6, yy + 5); ctx.lineTo(x1, yy + 10); ctx.lineTo(x0, yy + 10); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.font = '700 6.5px system-ui'; ctx.textAlign = 'center'; ctx.fillText(txt, (x0 + x1) / 2, yy + 7.5);
+    };
+    arrow(y - 54, 1, `${P.name}see 5 min`); arrow(y - 42, -1, 'Alp 2 h 30 min');
+  },
+  edelweiss(x, y, o) {
+    ellipse(x + 2, y, 18, 5, 'rgba(0,0,0,.15)'); ellipse(x, y - 2, 17, 5, '#7c8f6a');
+    const r = seeded(o.id * 3 + 1);
+    for (let i = 0; i < 6; i++) {
+      const fx = x + (r() - 0.5) * 26, fy = y - 5 - r() * 9;
+      line('#8fa07c', 1.3, fx, y - 2, fx, fy);
+      ctx.fillStyle = '#f4f4ee'; for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283 + time * 0.2 * 0; ctx.beginPath(); ctx.ellipse(fx + Math.cos(a) * 3.2, fy + Math.sin(a) * 2.6, 2.4, 1.2, a, 0, 7); ctx.fill(); }
+      ellipse(fx, fy, 1.6, 1.4, '#e8d36a');
+    }
+  },
+  schneemann(x, y) {
+    ellipse(x + 3, y, 16, 5, 'rgba(0,0,0,.2)');
+    for (const [dy, rr] of [[-13, 14], [-34, 10.5], [-50, 7.5]]) { const g = ctx.createRadialGradient(x - rr * 0.4, y + dy - rr * 0.4, 1, x, y + dy, rr); g.addColorStop(0, '#fff'); g.addColorStop(1, '#cfdbe6'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y + dy, rr, 0, 7); ctx.fill(); }
+    line('#6b4a2b', 1.6, x - 9, y - 36, x - 22, y - 46); line('#6b4a2b', 1.6, x + 9, y - 36, x + 22, y - 44 + Math.sin(time * 3) * 3); // winkt
+    ctx.fillStyle = '#d52b1e'; ctx.fillRect(x - 8, y - 44, 16, 4); ctx.fillRect(x + 3, y - 44, 4, 10); // Schal
+    ctx.fillStyle = '#222'; for (const dy of [-38, -32, -26]) { ctx.beginPath(); ctx.arc(x, y + dy, 1.4, 0, 7); ctx.fill(); }
+    ellipse(x - 2.5, y - 52, 1.1, 1.1, '#222'); ellipse(x + 2.5, y - 52, 1.1, 1.1, '#222');
+    ctx.fillStyle = '#f08a24'; ctx.beginPath(); ctx.moveTo(x, y - 50); ctx.lineTo(x + 10, y - 48.5); ctx.lineTo(x, y - 47.5); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 8, y - 58, 16, 2.5); ctx.fillRect(x - 5, y - 68, 10, 10);
+  },
+  fahne(x, y, o) { ellipse(x + 3, y, 8, 3, 'rgba(0,0,0,.25)'); ctx.fillStyle = '#9a9a92'; ctx.fillRect(x - 4, y - 4, 8, 4); flagPole(x, y - 2, 74, 28, o.id); },
+  murmeltier(x, y, o) {
+    ellipse(x, y - 1, 18, 6, '#8a6a43'); ellipse(x, y - 2, 10, 3.5, '#2b1d10');
+    const ph = (time * 0.32 + o.id * 0.37) % 1, up = ph < 0.6 ? Math.pow(Math.sin(ph / 0.6 * Math.PI), 0.4) : 0;
+    if (up > 0.02) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 60, 40, 58); ctx.clip();
+      const by = y - 2 + 26 * (1 - up);
+      ellipse(x, by - 12, 7.5, 12, '#a07848'); ellipse(x, by - 9, 4.5, 8, '#d9b98a');
+      ellipse(x, by - 25, 6, 5.5, '#a07848'); ellipse(x - 4.5, by - 29, 1.8, 1.8, '#6b4a2b'); ellipse(x + 4.5, by - 29, 1.8, 1.8, '#6b4a2b');
+      ellipse(x - 2.2, by - 26, 1, 1, '#111'); ellipse(x + 2.2, by - 26, 1, 1, '#111'); ellipse(x, by - 23, 1.5, 1, '#3a2a1a');
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.2, by - 22, 2.4, 2);
+      ellipse(x - 4, by - 15, 2, 1.5, '#6b4a2b'); ellipse(x + 4, by - 15, 2, 1.5, '#6b4a2b'); // Pfötchen
+      ctx.restore();
+      if (up > 0.95 && ph > 0.25 && ph < 0.35) label(x + 14, y - 34, '!', 14);
+    }
+    ctx.fillStyle = '#8a6a43'; ctx.beginPath(); ctx.ellipse(x, y - 1, 11, 3.5, 0, 0, Math.PI); ctx.fill();
+  },
+  alphorn(x, y, o) {
+    ellipse(x + 30, y, 44, 6, 'rgba(0,0,0,.2)');
+    const sw = Math.sin(time * 1.4 + o.id) * 1.5;
+    // Horn: langer Holz-Trichter bis auf den Boden
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineCap = 'round';
+    for (const [w, c] of [[4.5, '#7a4a20'], [3, '#b07a42']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + 5, y - 35 + sw); ctx.lineTo(x + 58, y - 8); ctx.stroke(); }
+    ctx.fillStyle = '#9b6a3a'; ctx.beginPath(); ctx.moveTo(x + 54, y - 10); ctx.quadraticCurveTo(x + 64, y - 4, x + 66, y - 16); ctx.lineTo(x + 74, y - 14); ctx.quadraticCurveTo(x + 72, y + 1, x + 56, y - 3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#d52b1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 52, y - 10); ctx.lineTo(x + 55, y - 4); ctx.stroke();
+    // Bläser in Tracht
+    ctx.fillStyle = '#2b2b2b'; ctx.fillRect(x - 6, y - 16, 5, 9); ctx.fillRect(x + 1, y - 16, 5, 9);
+    ctx.fillStyle = '#eee'; ctx.fillRect(x - 6, y - 7, 5, 6); ctx.fillRect(x + 1, y - 7, 5, 6);
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 7, y - 2, 6, 2.5); ctx.fillRect(x + 1, y - 2, 6, 2.5);
+    ctx.fillStyle = '#2f5ea8'; rrect(x - 8, y - 33, 16, 18, 4); ctx.fill(); // Edelweiss-Hemd
+    ctx.fillStyle = '#fff'; for (const [a, b] of [[-4, -29], [3, -25], [-3, -20], [4, -19]]) ctx.fillRect(x + a, y + b, 1.6, 1.6);
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 8, y - 33, 4, 18); ctx.fillRect(x + 4, y - 33, 4, 18); // Weste
+    line('#2f5ea8', 3.5, x + 6, y - 30, x + 12, y - 27 + sw * 0.5);
+    ellipse(x + 1, y - 40 + sw, 6.5, 6.5, '#f2c9a2');
+    ellipse(x + 4, y - 37 + sw, 3, 2.5, '#f2a0a0'); // Backen voller Luft
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 7, y - 47 + sw, 15, 2.5); ctx.fillRect(x - 4, y - 52 + sw, 9, 5);
+  },
+  bernhardiner(x, y, o) {
+    ellipse(x + 2, y, 26, 6, 'rgba(0,0,0,.22)');
+    const wag = Math.sin(time * 9 + o.id) * 0.5;
+    ctx.save(); ctx.translate(x - 20, y - 22); ctx.rotate(-0.9 + wag); line('#a0582a', 4, 0, 0, 0, -12); ctx.restore();
+    ctx.fillStyle = '#f4ede0'; for (const lx of [-15, -9, 10, 16]) ctx.fillRect(x + lx - 2.5, y - 12, 5, 12);
+    ellipse(x, y - 20, 22, 11, '#f4ede0'); ellipse(x - 6, y - 23, 12, 7, '#a0582a'); ellipse(x + 10, y - 24, 6, 5, '#a0582a');
+    ellipse(x + 22, y - 32, 10, 9, '#a0582a'); ellipse(x + 27, y - 28, 6.5, 5, '#f4ede0'); ctx.fillStyle = '#f4ede0'; ctx.fillRect(x + 21, y - 41, 3, 10);
+    ellipse(x + 15, y - 30, 4, 8, '#6b3a1a'); ellipse(x + 32, y - 29, 2, 1.6, '#222'); ellipse(x + 24, y - 34, 1.4, 1.4, '#222');
+    const tg = (time * 0.8 + o.id) % 3 < 0.8; if (tg) ellipse(x + 30, y - 24, 2, 3, '#e8708a'); // Zunge
+    ctx.fillStyle = '#7a4a20'; rrect(x + 14, y - 22, 12, 8, 2); ctx.fill(); ctx.fillStyle = '#c9a227'; ctx.fillRect(x + 16, y - 22, 1.5, 8); ctx.fillRect(x + 22, y - 22, 1.5, 8); // Fässchen
+  },
+  fondue_tisch(x, y) {
+    ellipse(x + 4, y, 40, 7, 'rgba(0,0,0,.2)');
+    ctx.fillStyle = '#7a4e2a'; ctx.fillRect(x - 34, y - 10, 68, 4); ctx.fillRect(x - 32, y - 6, 3, 6); ctx.fillRect(x + 29, y - 6, 3, 6); // Bank
+    ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x - 24, y - 22, 3, 22); ctx.fillRect(x + 21, y - 22, 3, 22);
+    ctx.fillStyle = '#a8743f'; ctx.fillRect(x - 30, y - 26, 60, 5);
+    ctx.fillStyle = '#d23b2b'; for (let i = 0; i < 6; i++) ctx.fillRect(x - 30 + i * 10, y - 26, 5, 5); // Tischtuch kariert
+    ctx.fillStyle = '#333'; ctx.fillRect(x - 6, y - 30, 12, 4);
+    ellipse(x, y - 36, 10, 6.5, '#c0392b'); ellipse(x, y - 41, 9, 2.6, '#f2d36b'); // Caquelon mit Käse
+    ctx.fillStyle = '#d9a95a'; for (const [a, b] of [[-22, -30], [-16, -29], [16, -30], [22, -29]]) ctx.fillRect(x + a, y + b, 4, 3.5);
+    line('#999', 1, x - 4, y - 42, x - 16, y - 54); line('#999', 1, x + 3, y - 42, x + 14, y - 56);
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) { const k = (time * 0.5 + i / 3) % 1; ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.moveTo(x - 4 + i * 4, y - 44 - k * 22); ctx.quadraticCurveTo(x + 2 + i * 4 + Math.sin(time * 3 + i) * 4, y - 50 - k * 22, x - 2 + i * 4, y - 56 - k * 22); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  },
+  brunnen(x, y, o) {
+    ellipse(x + 4, y, 40, 7, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#a7a59c'; ctx.fillRect(x - 17, y - 54, 10, 40); ctx.fillStyle = '#c4c2b8'; ctx.fillRect(x - 17, y - 54, 4, 40);
+    ellipse(x - 12, y - 56, 7, 3, '#8f8d85'); flagPole(x - 12, y - 56, 18, 11, o.id);
+    line('#8a8f96', 2.5, x - 7, y - 42, x + 2, y - 42);
+    let g = ctx.createLinearGradient(0, y - 20, 0, y); g.addColorStop(0, '#c9c7bd'); g.addColorStop(1, '#8f8d85');
+    ctx.fillStyle = g; rrect(x - 34, y - 20, 68, 20, 4); ctx.fill();
+    ctx.fillStyle = '#5aa8d8'; rrect(x - 30, y - 20, 60, 5, 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,210,240,.9)'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); ctx.lineDashOffset = -time * 30;
+    ctx.beginPath(); ctx.moveTo(x + 2, y - 42); ctx.quadraticCurveTo(x + 12, y - 40, x + 12, y - 18); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; const k = (time * 1.5) % 1; ctx.beginPath(); ctx.ellipse(x + 12, y - 17.5, 4 + k * 10, 1.2 + k * 1.5, 0, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#4f8a2f'; ctx.fillRect(x - 32, y - 14, 18, 5); ctx.fillStyle = '#e8483b'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(x - 30 + i * 3.5, y - 15, 2, 0, 7); ctx.fill(); }
+  },
+  chalet(x, y, o, lit) {
+    ellipse(x + 8, y, 72, 10, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#ece6da'; ctx.fillRect(x - 56, y - 18, 112, 18); // Steinsockel
+    ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.lineWidth = 1; ctx.strokeRect(x - 56, y - 18, 112, 18);
+    const g = ctx.createLinearGradient(x - 56, 0, x + 56, 0); g.addColorStop(0, '#8a5530'); g.addColorStop(1, '#5f3a1e');
+    ctx.fillStyle = g; ctx.fillRect(x - 56, y - 62, 112, 44);
+    ctx.beginPath(); ctx.moveTo(x - 56, y - 62); ctx.lineTo(x, y - 92); ctx.lineTo(x + 56, y - 62); ctx.fill(); // Giebel
+    ctx.strokeStyle = 'rgba(30,15,5,.35)'; for (let yy = y - 58; yy > y - 90; yy -= 6) { ctx.beginPath(); ctx.moveTo(x - 56, yy); ctx.lineTo(x + 56, yy); ctx.stroke(); }
+    ctx.fillStyle = '#5a5248'; ctx.beginPath(); ctx.moveTo(x - 74, y - 56); ctx.lineTo(x, y - 100); ctx.lineTo(x + 74, y - 56); ctx.lineTo(x + 68, y - 52); ctx.lineTo(x, y - 92); ctx.lineTo(x - 68, y - 52); ctx.closePath(); ctx.fill(); // weites Dach
+    for (const wx of [-36, 18]) { ctx.fillStyle = '#fff'; ctx.fillRect(x + wx - 2, y - 52, 22, 20); win(x + wx, y - 50, 18, 16, lit); ctx.fillStyle = '#3d7a3a'; ctx.fillRect(x + wx - 7, y - 52, 5, 20); ctx.fillRect(x + wx + 20, y - 52, 5, 20); }
+    win(x - 7, y - 82, 14, 12, lit);
+    ctx.fillStyle = '#7a4a26'; ctx.fillRect(x - 58, y - 32, 116, 4); for (let bx = x - 56; bx <= x + 56; bx += 8) ctx.fillRect(bx, y - 32, 2.5, 10); ctx.fillRect(x - 58, y - 23, 116, 2.5); // Balkon
+    ctx.fillStyle = '#3d7a3a'; ctx.fillRect(x - 56, y - 36, 112, 4);
+    ctx.fillStyle = '#e8303a'; for (let i = 0; i < 22; i++) { ctx.beginPath(); ctx.arc(x - 54 + i * 5.1, y - 37 - (i % 2) * 1.5, 2.3, 0, 7); ctx.fill(); } // Geranien
+    door(x, y, 16, 18, '#5b3a1e');
+    ctx.fillStyle = '#7d7468'; ctx.fillRect(x + 34, y - 104, 9, 20);
+    flagPole(x + 64, y, 72, 18, o.id || 0);
+  },
+  uhrturm(x, y, o) {
+    ellipse(x + 6, y, 30, 7, 'rgba(0,0,0,.24)');
+    const g = ctx.createLinearGradient(x - 20, 0, x + 20, 0); g.addColorStop(0, '#ebe0c8'); g.addColorStop(1, '#b8a888');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - 21, y); ctx.lineTo(x - 18, y - 124); ctx.lineTo(x + 18, y - 124); ctx.lineTo(x + 21, y); ctx.fill();
+    ctx.fillStyle = '#5b3a1e'; ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x - 7, y - 16); ctx.arc(x, y - 16, 7, Math.PI, 0); ctx.lineTo(x + 7, y); ctx.fill();
+    win(x - 4, y - 52, 8, 12); win(x - 4, y - 76, 8, 12);
+    ctx.fillStyle = '#8e3a2a'; ctx.beginPath(); ctx.moveTo(x - 24, y - 122); ctx.lineTo(x, y - 168); ctx.lineTo(x + 24, y - 122); ctx.closePath(); ctx.fill(); // Spitzdach
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.moveTo(x, y - 168); ctx.lineTo(x + 24, y - 122); ctx.lineTo(x, y - 122); ctx.fill();
+    flagPole(x, y - 166, 16, 12, o.id);
+    const cy = y - 103; // Zifferblatt mit echter Uhrzeit
+    ellipse(x, cy, 14, 14, '#2a3a5a'); ellipse(x, cy, 12, 12, '#fffaf0');
+    ctx.fillStyle = '#c9a227'; for (let i = 0; i < 12; i++) { const a = i / 6 * Math.PI; ctx.beginPath(); ctx.arc(x + Math.sin(a) * 10, cy - Math.cos(a) * 10, i % 3 ? 0.8 : 1.4, 0, 7); ctx.fill(); }
+    const now = new Date(), m = now.getMinutes() + now.getSeconds() / 60, hh = (now.getHours() % 12) + m / 60;
+    line('#222', 2, x, cy, x + Math.sin(hh / 6 * Math.PI) * 6, cy - Math.cos(hh / 6 * Math.PI) * 6);
+    line('#222', 1.3, x, cy, x + Math.sin(m / 30 * Math.PI) * 9.5, cy - Math.cos(m / 30 * Math.PI) * 9.5);
+    line('#d52b1e', 0.8, x, cy, x + Math.sin(now.getSeconds() / 30 * Math.PI) * 10, cy - Math.cos(now.getSeconds() / 30 * Math.PI) * 10);
+    ellipse(x, cy, 1.5, 1.5, '#d52b1e');
+  },
+  // --- auf dem See (lokale Koordinaten, Blick nach rechts) ---
+  schwan(x, y) {
+    ellipse(x, y, 12, 3, 'rgba(255,255,255,.35)');
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x - 12, y - 4); ctx.quadraticCurveTo(x - 14, y - 12, x - 4, y - 9); ctx.quadraticCurveTo(x + 8, y - 10, x + 8, y - 3); ctx.quadraticCurveTo(x, y + 1, x - 12, y - 4); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.moveTo(x + 5, y - 6); ctx.quadraticCurveTo(x + 12, y - 12, x + 6, y - 18); ctx.quadraticCurveTo(x + 4, y - 23, x + 9, y - 23); ctx.stroke();
+    ctx.fillStyle = '#f08a24'; ctx.beginPath(); ctx.moveTo(x + 10, y - 24); ctx.lineTo(x + 15, y - 22); ctx.lineTo(x + 10, y - 21.5); ctx.fill();
+    ellipse(x + 9, y - 23.5, 0.8, 0.8, '#111');
+  },
+  segelboot(x, y) {
+    ellipse(x, y + 1, 24, 4, 'rgba(255,255,255,.3)');
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x - 20, y - 8); ctx.lineTo(x + 22, y - 8); ctx.lineTo(x + 14, y); ctx.lineTo(x - 16, y); ctx.fill();
+    ctx.fillStyle = '#3d6b8f'; ctx.fillRect(x - 18, y - 5, 36, 2);
+    line('#6b4a2b', 1.8, x, y - 8, x, y - 50);
+    ctx.fillStyle = '#fbf6ea'; ctx.beginPath(); ctx.moveTo(x + 1.5, y - 48); ctx.quadraticCurveTo(x + 18, y - 30, x + 20, y - 11); ctx.lineTo(x + 1.5, y - 11); ctx.fill();
+    ctx.fillStyle = '#d52b1e'; ctx.beginPath(); ctx.moveTo(x - 1.5, y - 42); ctx.lineTo(x - 1.5, y - 11); ctx.lineTo(x - 15, y - 11); ctx.fill();
+    swissFlag(x, y - 57, 7, 0);
+  },
+  dampfschiff(x, y, o) {
+    ellipse(x, y + 2, 54, 6, 'rgba(255,255,255,.3)');
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x - 50, y - 12); ctx.lineTo(x + 54, y - 12); ctx.lineTo(x + 44, y); ctx.lineTo(x - 46, y); ctx.fill();
+    ctx.fillStyle = '#2a3a5a'; ctx.fillRect(x - 47, y - 4, 92, 3);
+    ctx.fillStyle = '#f4f1e8'; ctx.fillRect(x - 38, y - 24, 72, 12); ctx.fillStyle = '#7a4e2a'; ctx.fillRect(x - 40, y - 26, 76, 3);
+    ctx.fillStyle = '#8fc0e0'; for (let i = 0; i < 8; i++) ctx.fillRect(x - 34 + i * 8.5, y - 21, 5, 6);
+    ctx.fillStyle = '#e8e3d6'; ctx.beginPath(); ctx.arc(x - 4, y - 10, 13, Math.PI, 0); ctx.fill(); // Radkasten
+    ctx.strokeStyle = '#7a4e2a'; ctx.lineWidth = 1; for (let i = 0; i < 6; i++) { const a = Math.PI + i / 5 * Math.PI; ctx.beginPath(); ctx.moveTo(x - 4, y - 10); ctx.lineTo(x - 4 + Math.cos(a) * 13, y - 10 + Math.sin(a) * 13); ctx.stroke(); }
+    ctx.fillStyle = '#e8b830'; ctx.fillRect(x + 8, y - 44, 8, 18); ctx.fillStyle = '#222'; ctx.fillRect(x + 8, y - 46, 8, 3);
+    for (let i = 0; i < 4; i++) { const k = (time * 0.4 + i / 4) % 1; ellipse(x + 12 - k * 30, y - 50 - k * 22, 4 + k * 8, 3 + k * 6, `rgba(90,90,90,${0.5 * (1 - k)})`); }
+    line('#666', 1.2, x - 48, y - 12, x - 48, y - 30); swissFlag(x - 48, y - 30, 10, o.id);
+  },
+  ballon(x, y, o) {
+    const R = 30;
+    line('#7a4e2a', 1, x - 14, y + 26, x - 7, y + 46); line('#7a4e2a', 1, x + 14, y + 26, x + 7, y + 46);
+    ctx.fillStyle = '#9b6a3a'; rrect(x - 8, y + 44, 16, 12, 2); ctx.fill(); ctx.fillStyle = '#7a4e2a'; ctx.fillRect(x - 8, y + 44, 16, 2.5);
+    if ((time + o.id) % 5 < 0.6) { ellipse(x, y + 36, 3, 6, '#ffb52e'); ellipse(x, y + 38, 1.6, 3, '#fff3b0'); }
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, R, Math.PI * 0.85, Math.PI * 0.15); ctx.quadraticCurveTo(x + R * 0.75, y + R * 0.9, x + 8, y + 30); ctx.lineTo(x - 8, y + 30); ctx.quadraticCurveTo(x - R * 0.75, y + R * 0.9, x - R * Math.cos(Math.PI * 0.15), y + R * Math.sin(Math.PI * 0.15)); ctx.closePath();
+    ctx.fillStyle = '#d52b1e'; ctx.fill(); ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; for (const dx of [-24, 18]) ctx.fillRect(x + dx, y - R, 6, R * 2.2);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 14, 8, 24); ctx.fillRect(x - 12, y - 6, 24, 8);
+    const g = ctx.createRadialGradient(x - 12, y - 14, 2, x, y, R * 1.2); g.addColorStop(0, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(0,0,0,.25)'); ctx.fillStyle = g; ctx.fillRect(x - R, y - R, R * 2, R * 2.2);
+    ctx.restore();
+  },
+};
+
 function render() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   calcZoom();
   const vw = W / ZOOM, vh = H / ZOOM, cam = (p, v, w) => v >= w ? (w - v) / 2 : clamp(p - v / 2, 0, w - v); // kleiner als Bildschirm: mittig
-  const camX = cam(G.px, vw, WORLD.w * T), camY = cam(G.py - 30, vh, WORLD.h * T);
+  const camX = cam(G.px, vw, WORLD.w * T), camY = cam(G.py - 30 + ALPS * T, vh, (WORLD.h + ALPS) * T) - ALPS * T; // oben: Alpen-Kulisse
   ctx.fillStyle = '#3f6e2a'; ctx.fillRect(0, 0, W, H);
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
+  drawAlps();
   // Wege
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
     ctx.strokeStyle = c; ctx.lineWidth = w;
     for (const p of WORLD.h > WORLD_H0 ? PATHS.concat(PATHS_SOUTH) : PATHS) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
+  drawLake(); lakeDecos();
   // Weide-Zaun
   const pa = { x: PASTURE.x * T, y: PASTURE.y * T, w: PASTURE.w * T, h: PASTURE.h * T };
   ctx.fillStyle = 'rgba(140,200,90,.18)'; ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
@@ -1110,10 +1541,19 @@ function render() {
   ctx.setLineDash([]);
   for (const t of G.things) if (t.type === 'feld') drawField(t);
   // nach y sortiert zeichnen
-  const list = G.things.filter(t => t.type !== 'feld').map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]]);
+  const list = G.things.filter(t => t.type !== 'feld').map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
+    G.deco.filter(d => DECOS[d.type].where === 'land').map(d => [d.y, d]));
+  const gh = G.carry && ghostPos();
+  if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, t] of list) {
     if (!t) drawPlayer();
+    else if (t.ghost) { // Vorschau: so würde es stehen
+      const ok = decoSpotOk(t.x, t.y);
+      ctx.globalAlpha = 0.85; ellipse(t.x, t.y, 22, 8, ok ? 'rgba(80,200,80,.45)' : 'rgba(220,50,40,.5)');
+      ctx.globalAlpha = 0.6; DECO_DRAW[t.ghost](t.x, t.y, { id: 0 }); ctx.globalAlpha = 1;
+    }
+    else if (DECOS[t.type] && !THINGS[t.type]) DECO_DRAW[t.type](t.x, t.y, t);
     else if (t.type === 'baum') drawTree(t);
     else if (t.type === 'kuh') drawCow(t);
     else (DRAW[t.type] || DRAW.default)(t.x, t.y, t);
@@ -1152,6 +1592,7 @@ function render() {
     ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(G.px, hy, 12, 0, 7); ctx.stroke();
     ctx.strokeStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(G.px, hy, 12, -Math.PI / 2, -Math.PI / 2 + harvest.p * Math.PI * 2); ctx.stroke();
   }
+  balloons();
   for (const f of floaters) { ctx.globalAlpha = clamp(1.6 - f.t, 0, 1); label(f.x, f.y, f.text, 18); }
   ctx.globalAlpha = 1;
   // Bildschirm-Joystick
