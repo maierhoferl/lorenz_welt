@@ -2,6 +2,13 @@
 // Français (Suisse romande / Genève). Schlüssel in ui = deutscher Originaltext aus game.js / index.html.
 var TR = {
   ui: {
+    // Familien (Startbildschirm)
+    "Familie {}": "Famille {}",
+    "Neue Familie": "Nouvelle famille",
+    "Welche Familie spielt?": "Quelle famille joue ?",
+    "Familien": "Familles",
+    "Familie:": "Famille :",
+    "z. B. Muster": "p. ex. Dupont",
     "wird beim Händler verkauft": "vendu chez le marchand",
     "Spediteur": "transporteur",
     "Zutat aus einem anderen Reiter": "ingrédient d’un autre onglet",

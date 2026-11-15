@@ -2,6 +2,13 @@
 // Italiano (Ticino). Le chiavi in ui = testo tedesco originale di game.js / index.html.
 var TR = {
   ui: {
+    // Familien (Startbildschirm)
+    "Familie {}": "Famiglia {}",
+    "Neue Familie": "Nuova famiglia",
+    "Welche Familie spielt?": "Quale famiglia gioca?",
+    "Familien": "Famiglie",
+    "Familie:": "Famiglia:",
+    "z. B. Muster": "p. es. Rossi",
     "wird beim Händler verkauft": "venduto dal commerciante",
     "Spediteur": "spedizioniere",
     "Zutat aus einem anderen Reiter": "ingrediente da un’altra scheda",

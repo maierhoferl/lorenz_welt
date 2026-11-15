@@ -59,8 +59,18 @@ async function api(path, body) {
 }
 const hasPin = p => online ? p.hasPin : !!p.pinHash;
 
+// Startbildschirm: zuerst die Familie, dann ihre Spieler. Profile ohne fam gehören zur Standard-Familie M.
+let fam = null, newFam = null;
+const famOf = p => p.fam || 'M';
 function drawSelect() {
-  $('#plist').innerHTML = profiles.map((p, i) =>
+  if (fam == null) {
+    const fams = [...new Set(['M', ...profiles.map(famOf)])];
+    $('#plist').innerHTML = fams.map(f => `<button class="pcard fam" data-fam="${esc(f)}">🏡<b>${$t`Familie ${esc(f)}`}</b><small>👦🏼 × ${profiles.filter(p => famOf(p) === f).length}</small></button>`).join('') +
+      (online ? `<i class="brk"></i><button class="pcard add" data-newfam>＋<b>${$t`Neue Familie`}</b></button>` : '');
+    $('#whosub').textContent = $t`Welche Familie spielt?`;
+    return;
+  }
+  $('#plist').innerHTML = `<button class="pcard add" data-fams>←<b>${$t`Familien`}</b></button><i class="brk"></i>` + profiles.map((p, i) => famOf(p) !== fam ? '' :
     `<div class="pwrap"><button class="pcard" data-i="${i}"><canvas class="pav" data-av="${i}"></canvas><b>${esc(p.name)}</b><small>${hasPin(p) ? $t`🔒 ${p.age} Jahre` : $t`✨ neu`}</small></button><button class="pedit" data-edit="${i}" title="${$t`🎨 Aussehen`}">🎨</button></div>`).join('') +
     (online ? `<i class="brk"></i><button class="pcard add" data-add>＋<b>${$t`Neuer Spieler`}</b></button>` : '');
   $('#whosub').textContent = online ? $t`Wer spielt?` : $t`Wer spielt? (offline – Spielstand nur auf diesem Gerät)`;
@@ -82,7 +92,12 @@ async function renderSelect() {
 $('#plist').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.edit != null) return openAvatar(profiles[+b.dataset.edit]);
-  if (b.dataset.add != null) { $('#plist').hidden = true; $('#addform').hidden = false; $('#newname').value = ''; $('#newname').focus(); return; }
+  if (b.dataset.fam != null) { fam = b.dataset.fam; return drawSelect(); }
+  if (b.dataset.fams != null) { fam = null; return drawSelect(); }
+  if (b.dataset.add != null || b.dataset.newfam != null) {
+    newFam = b.dataset.newfam != null; $('#famrow').hidden = !newFam; $('#newfam').required = newFam; $('#newfam').value = '';
+    $('#plist').hidden = true; $('#addform').hidden = false; $('#newname').value = ''; (newFam ? $('#newfam') : $('#newname')).focus(); return;
+  }
   openPin(profiles[+b.dataset.i]);
 };
 $('#newage').innerHTML = Array.from({ length: 12 }, (_, i) => `<option${i + 5 === 8 ? ' selected' : ''}>${i + 5}</option>`).join('');
@@ -91,9 +106,10 @@ $('#addform').onsubmit = async e => {
   e.preventDefault();
   const name = $('#newname').value.trim(); if (!name) return;
   try {
-    const p = await api('/profiles', { name, age: +$('#newage').value });
-    profiles.push(p); saveProfiles(); openPin(p);
-  } catch (err) { alert(err.code === 'full' ? 'Es gibt schon zu viele Spieler.' : 'Hat nicht geklappt – ist das Internet an?'); }
+    const f = newFam ? $('#newfam').value.trim() || 'M' : fam;
+    const p = await api('/profiles', { name, age: +$('#newage').value, fam: f });
+    profiles.push(p); saveProfiles(); fam = famOf(p); openPin(p);
+  } catch (err) { alert(err.code === 'full' ? $t`Es gibt schon zu viele Spieler.` : $t`Hat nicht geklappt – ist das Internet an?`); }
 };
 for (const b of document.querySelectorAll('[data-back]')) b.onclick = renderSelect;
 

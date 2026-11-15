@@ -2,6 +2,13 @@
 // English. Keys in ui = original German text from game.js / index.html.
 var TR = {
   ui: {
+    // Familien (Startbildschirm)
+    "Familie {}": "{} family",
+    "Neue Familie": "New family",
+    "Welche Familie spielt?": "Which family is playing?",
+    "Familien": "Families",
+    "Familie:": "Family:",
+    "z. B. Muster": "e.g. Smith",
     "wird beim Händler verkauft": "sold at the trader",
     "Spediteur": "haulier",
     "Zutat aus einem anderen Reiter": "ingredient from another tab",

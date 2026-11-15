@@ -25,6 +25,7 @@
   h1 { font-size: clamp(40px, 9vw, 76px); margin:0; color:#fff; text-shadow: 0 4px 0 #8a1a12, 0 8px 20px rgba(0,0,0,.35); letter-spacing:1px; }
   .sub { margin:0; color:#fff; font-size:22px; text-shadow:0 2px 3px rgba(0,0,0,.4); }
   #plist { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; max-width:760px; }
+  .pcard.fam { font-size:52px; }
   .pwrap { position:relative; display:inline-block; }
   .pav { width:90px; height:96px; }
   .pedit { position:absolute; top:-8px; right:-8px; width:40px; height:40px; border:0; border-radius:50%; font-size:20px; background:#fff; box-shadow:0 3px 0 #b8925f, 0 4px 10px rgba(0,0,0,.2); }
@@ -128,6 +129,7 @@
   <div id="langs"></div>
   <form id="addform" class="panel" hidden>
     <b>Neuer Spieler</b>
+    <label id="famrow" hidden>Familie: <input id="newfam" maxlength="20" placeholder="z. B. Muster" autocomplete="off"></label>
     <input id="newname" maxlength="14" placeholder="Name" required autocomplete="off">
     <label>Alter: <select id="newage"></select></label>
     <button class="btn">Los geht's!</button>

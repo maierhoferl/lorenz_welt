@@ -5,7 +5,7 @@
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'content-type': 'application/json' };
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: CORS });
 const DEFAULT = [{ id: 'lorenz', name: 'Lorenz', age: 9 }, { id: 'adrian', name: 'Adrian', age: 7 }];
-const MAX_FAILS = 5, LOCK_MS = 2 * 60e3, TTL = 10 * 60e3, MAX_SAVE = 300e3, MAX_PROFILES = 30;
+const MAX_FAILS = 5, LOCK_MS = 2 * 60e3, TTL = 10 * 60e3, MAX_SAVE = 300e3, MAX_PROFILES = 100;
 
 const get = async (db, k) => { const r = await db.prepare('SELECT v FROM kv WHERE k=?').bind(k).first(); return r ? JSON.parse(r.v) : null; };
 const put = (db, k, v) => db.prepare('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind(k, JSON.stringify(v)).run();
@@ -37,13 +37,13 @@ export default {
     const profiles = (await get(db, 'profiles')) || DEFAULT;
 
     if (path === '/profiles' && req.method === 'GET')
-      return json(profiles.map(({ pinHash, ...p }) => ({ ...p, hasPin: !!pinHash })));
+      return json(profiles.map(({ pinHash, ...p }) => ({ fam: 'M', ...p, hasPin: !!pinHash }))); // ohne fam: Standard-Familie M
 
     if (path === '/profiles') {
-      const name = String(body.name || '').trim().slice(0, 14), age = Math.min(16, Math.max(5, body.age | 0));
+      const name = String(body.name || '').trim().slice(0, 14), age = Math.min(16, Math.max(5, body.age | 0)), fam = String(body.fam || 'M').trim().slice(0, 20) || 'M';
       if (!name) return json({ error: 'name' }, 400);
       if (profiles.length >= MAX_PROFILES) return json({ error: 'full' }, 400);
-      const p = { id: 'p' + now.toString(36) + Math.random().toString(36).slice(2, 6), name, age };
+      const p = { id: 'p' + now.toString(36) + Math.random().toString(36).slice(2, 6), name, age, fam };
       profiles.push(p); await put(db, 'profiles', profiles);
       return json({ ...p, hasPin: false });
     }
