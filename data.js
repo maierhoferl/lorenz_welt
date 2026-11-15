@@ -44,6 +44,21 @@ const ITEMS = {
   filet:        { name: 'Fischfilet',     icon: '🍣', price: 26 },
   raeucherfisch: { name: 'Räucherfisch',  icon: '🐠', price: 45 },
   knusperli:    { name: 'Fischknusperli', icon: '🍤', price: 120 },
+  // Tierhof (ab Land-Stufe 30)
+  eier:       { name: 'Eier',        icon: '🥚', price: 6 },
+  fleisch:    { name: 'Fleisch',     icon: '🥩', price: 12 },
+  cervelat:   { name: 'Cervelat',    icon: '🌭', price: 36 },
+  zopf:       { name: 'Butterzopf',  icon: '🥨', price: 48 },
+  meringue:   { name: 'Meringues',   icon: '☁️', price: 32 },
+  cordonbleu: { name: 'Cordon bleu', icon: '🍖', price: 150 },
+  // Import-Terminal (ab Land-Stufe 35)
+  kakao:       { name: 'Rohkakao',          icon: '🫘', price: 10 },
+  kakaomasse:  { name: 'Kakaomasse',        icon: '🟫', price: 44 },
+  schokolade:  { name: 'Milchschokolade',   icon: '🍫', price: 125 },
+  schoggitorte: { name: 'Schokoladetörtchen', icon: '🧁', price: 320 },
+  kaffee:      { name: 'Rohkaffee',         icon: '🫛', price: 9 },
+  roestkaffee: { name: 'Röstkaffee',        icon: '☕', price: 28 },
+  kafi:        { name: 'Milchkaffee',       icon: '🥛', price: 80 },
 };
 
 const THINGS = {
@@ -104,6 +119,50 @@ const THINGS = {
   seebeiz: { kind: 'factory', name: 'Seebeiz', icon: '🍤', area: 'dorf', price: 3000, land: 20,
     in: { filet: 2, mehl: 1 }, item: 'knusperli', n: 1, time: 12,
     info: 'Eine „Beiz“ ist in der Schweiz ein gemütliches Restaurant. In der Seebeiz gibt es Fischknusperli: Fischstücke werden in Mehl und Teig gewendet und in heissem Öl ausgebacken, bis sie goldbraun und knusprig sind. Dazu gibt es Zitrone und Pommes frites.' },
+  // ----- Tierhof: ab Land-Stufe 30, im Osten. Masthühner und Säuli geben beide Fleisch für die Metzgerei -----
+  huhn: { kind: 'grow', name: 'Hühnerstall', icon: '🐔', area: 'tierhof', price: 2500, land: 30,
+    item: 'eier', n: 6, time: 30, tool: 'stall',
+    info: 'Ein Huhn legt fast jeden Tag ein Ei – auch ohne Hahn! Dann schlüpft aber kein Küken. Hühner scharren mit den Füssen im Boden und picken Körner, Würmer und Käfer. Nachts schlafen sie auf einer Stange, weil sie dort vor dem Fuchs sicher sind.' },
+  masthuhn: { kind: 'grow', name: 'Masthühner-Stall', icon: '🐓', area: 'tierhof', price: 3000, land: 30,
+    item: 'fleisch', n: 3, time: 40, tool: 'stall',
+    info: 'Masthühner sind Hühner, die nicht Eier legen, sondern schnell gross werden – für Pouletfleisch. In der Schweiz müssen sie genug Platz, Tageslicht und Sitzstangen haben. Viele dürfen auch nach draussen auf die Wiese.' },
+  schwein: { kind: 'grow', name: 'Säulistall', icon: '🐖', area: 'tierhof', price: 3500, land: 30,
+    item: 'fleisch', n: 5, time: 55, tool: 'stall',
+    info: 'Schweine („Säuli“) sind sehr schlau – schlauer als Hunde! Sie können nicht schwitzen. Darum suhlen sie sich im Schlamm: Der kühlt und schützt die Haut vor Sonnenbrand und Insekten. Mit ihrer Rüsselnase riechen sie Futter tief im Boden.' },
+  metzgerei: { kind: 'factory', name: 'Metzgerei', icon: '🌭', area: 'dorf', price: 4000, land: 30,
+    in: { fleisch: 2 }, item: 'cervelat', n: 1, time: 8,
+    info: 'Der Metzger (Fleischer) verarbeitet Fleisch von Schweinen, Rindern und Hühnern. Für Würste wird das Fleisch fein gehackt, gewürzt und in eine lange Haut gefüllt. Der Cervelat ist die Nationalwurst der Schweiz – am 1. August und beim Wandern wird er über dem Feuer gebraten.' },
+  zopfbeck: { kind: 'factory', name: 'Zopf-Beck', icon: '🥨', area: 'dorf', price: 4500, land: 30,
+    in: { mehl: 2, eier: 2, milch: 1 }, item: 'zopf', n: 1, time: 10,
+    info: 'Der Butterzopf gehört in der Schweiz zum Sonntags-Zmorge! Der Teig aus Mehl, Milch, Butter, Hefe und Ei wird in Stränge gerollt und geflochten – wie ein Haarzopf. Vor dem Backen streicht man ihn mit Eigelb an, darum glänzt er so schön goldbraun.' },
+  meringuerie: { kind: 'factory', name: 'Meringue-Küche', icon: '☁️', area: 'dorf', price: 5000, land: 30,
+    in: { eier: 3 }, item: 'meringue', n: 1, time: 9,
+    info: 'Für Meringues trennt man das Eiweiss vom Eigelb und schlägt es mit Zucker steif – Luftbläschen machen es weiss und schaumig. Dann trocknen die Häufchen stundenlang im lauwarmen Ofen. Erfunden wurden sie angeblich in Meiringen im Berner Oberland. Mit Rahm sind sie ein Klassiker!' },
+  cordonbleu_beiz: { kind: 'factory', name: 'Cordon-bleu-Beiz', icon: '🍖', area: 'dorf', price: 8000, land: 30,
+    in: { fleisch: 1, kaese: 1, eier: 1, mehl: 1 }, item: 'cordonbleu', n: 1, time: 14,
+    info: 'Ein Cordon bleu ist ein dünnes Schnitzel, gefüllt mit Käse (und Schinken). Es wird zuerst in Mehl, dann in verquirltem Ei und zuletzt in Paniermehl gewendet und in der Pfanne goldbraun gebraten. Wenn man hineinschneidet, läuft der Käse heraus – in der Schweiz ein Lieblingsessen!' },
+  // ----- Import-Terminal: ab Land-Stufe 35, ganz im Osten. Kakao und Kaffee wachsen nicht in der Schweiz – sie kommen per Container -----
+  kakaoimport: { kind: 'grow', name: 'Kakao-Container', icon: '🫘', area: 'terminal', price: 6000, land: 35,
+    item: 'kakao', n: 6, time: 45, tool: 'terminal',
+    info: 'Kakaobäume wachsen nur, wo es das ganze Jahr warm und feucht ist – zum Beispiel in Ghana oder Ecuador. Die Bohnen stecken in grossen Früchten, die direkt am Stamm hängen. Sie werden vergoren, getrocknet und in Säcken per Schiff nach Europa gebracht, dann per Rheinschiff oder Zug in die Schweiz.' },
+  kaffeeimport: { kind: 'grow', name: 'Kaffee-Container', icon: '🫛', area: 'terminal', price: 5500, land: 35,
+    item: 'kaffee', n: 6, time: 40, tool: 'terminal',
+    info: 'Kaffee wächst als rote Kirsche an einem Strauch, zum Beispiel in Brasilien, Kolumbien oder Äthiopien. In jeder Kirsche stecken zwei grüne Bohnen. Roh riechen sie nach Gras – erst beim Rösten bekommen sie Farbe und Duft. Die Schweiz röstet sehr viel Kaffee für die ganze Welt!' },
+  kakaoroesterei: { kind: 'factory', name: 'Kakao-Rösterei', icon: '🔥', area: 'dorf', price: 6500, land: 35,
+    in: { kakao: 3 }, item: 'kakaomasse', n: 1, time: 8,
+    info: 'Die Kakaobohnen werden bei etwa 130 °C geröstet, dann geknackt: Die Schale fliegt weg, übrig bleiben die Kakaosplitter. Mühlen mahlen sie so fein, dass das Fett darin schmilzt – es entsteht eine dicke, bittere, braune Flüssigkeit: die Kakaomasse.' },
+  schoggifabrik: { kind: 'factory', name: 'Schoggi-Fabrik', icon: '🍫', area: 'dorf', price: 9000, land: 35,
+    in: { kakaomasse: 2, milch: 2 }, item: 'schokolade', n: 1, time: 12,
+    info: 'Kakaomasse, Zucker, Kakaobutter und Milchpulver werden gemischt und in der Conche stundenlang gerührt und gewärmt. Das hat Rodolphe Lindt 1879 in Bern erfunden – so wurde Schokolade zartschmelzend. Die Milchschokolade hat Daniel Peter aus Vevey erfunden. Dann wird sie in Tafelformen gegossen.' },
+  schoggikonditorei: { kind: 'factory', name: 'Konditorei: Schoggi-Törtchen', icon: '🧁', area: 'dorf', price: 12000, land: 35,
+    in: { schokolade: 2, mehl: 1, eier: 1 }, item: 'schoggitorte', n: 1, time: 14,
+    info: 'Für Schokoladetörtchen schmilzt der Konditor die Schoggi langsam im warmen Wasserbad – zu heiss, und sie wird krümelig. Dann rührt er Eier, Zucker und Mehl darunter, füllt kleine Förmchen und bäckt sie kurz. Innen bleiben sie schön weich und saftig.' },
+  kaffeeroesterei: { kind: 'factory', name: 'Kaffee-Rösterei', icon: '☕', area: 'dorf', price: 6000, land: 35,
+    in: { kaffee: 2 }, item: 'roestkaffee', n: 1, time: 7,
+    info: 'In einer drehenden Trommel werden die grünen Bohnen bei über 200 °C geröstet. Plötzlich knacken sie wie Popcorn („First Crack“)! Je länger man röstet, desto dunkler und kräftiger wird der Kaffee.' },
+  kafistube: { kind: 'factory', name: 'Kafi-Stube', icon: '🥛', area: 'dorf', price: 7500, land: 35,
+    in: { roestkaffee: 2, milch: 1 }, item: 'kafi', n: 1, time: 8,
+    info: 'Die gerösteten Bohnen werden frisch gemahlen. Heisses Wasser läuft mit Druck durchs Kaffeepulver – das gibt Espresso. Dazu kommt viel aufgeschäumte warme Milch: fertig ist die „Schale“, wie man in der Schweiz zum Milchkaffee sagt.' },
   // ----- freischaltbar: erst im Laden, wenn eine Endstation gebaut wurde (UNLOCKS) -----
   zentrifuge: { kind: 'factory', name: 'Milch-Zentrifuge', icon: '🌀', area: 'dorf', price: 350,
     in: { milch: 3 }, item: 'sahne', n: 1, time: 6,
@@ -187,6 +246,18 @@ const TOOLS = {
     { name: 'Netz', speed: 5, price: 1500, info: 'Ein Netz hat Maschen in einer bestimmten Grösse: Grosse Fische bleiben hängen, kleine schwimmen durch und können weiterwachsen.' },
     { name: 'Fischpumpe', speed: 20, price: 8000, auto: true, info: 'Eine Pumpe saugt die Fische mit viel Wasser sanft durch ein dickes Rohr in einen Sortierer. FÄNGT AUTOMATISCH!' },
   ]},
+  stall: { name: 'Stallarbeit', icon: '🧺', land: 30, levels: [
+    { name: 'Hände', speed: 1, price: 0, info: 'Eier einzeln aus dem Nest holen und Futter mit der Schaufel verteilen – das braucht Zeit.' },
+    { name: 'Eierkorb', speed: 2, price: 800, info: 'Ein Drahtkorb mit Polster: Da passen viele Eier hinein, ohne dass sie zerbrechen.' },
+    { name: 'Futterautomat', speed: 5, price: 3000, info: 'Ein Silo füllt das Futter von selbst in lange Rinnen nach. Die Tiere haben immer genug, und du sparst viele Wege.' },
+    { name: 'Stallroboter', speed: 20, price: 12000, auto: true, info: 'Förderbänder rollen die Eier aus den Nestern zur Sammelstelle, ein Roboter fährt durch den Stall und verteilt Futter und Stroh. ARBEITET AUTOMATISCH!' },
+  ]},
+  terminal: { name: 'Container-Umschlag', icon: '🏗️', land: 35, levels: [
+    { name: 'Hände', speed: 1, price: 0, info: 'Die schweren Jutesäcke einzeln aus dem Container schleppen – puh!' },
+    { name: 'Sackkarre', speed: 2, price: 2000, info: 'Zwei Räder und ein Griff: Man kippt den Sack nach hinten, dann rollt er fast von selbst.' },
+    { name: 'Gabelstapler', speed: 5, price: 7000, info: 'Zwei Gabeln fahren unter die Palette und heben sie mit Hydraulik hoch. Hinten hat der Stapler ein schweres Gegengewicht, damit er nicht nach vorne kippt.' },
+    { name: 'Containerkran', speed: 20, price: 25000, auto: true, info: 'Ein riesiger Portalkran hebt ganze Container vom Zug oder Schiff – 30 Tonnen auf einmal. Ein Computer weiss genau, wo jeder Container steht. ARBEITET AUTOMATISCH!' },
+  ]},
   // Angestellter Transportunternehmer: holt alle <every> s bis zu <cap> Endprodukte (Ware, die kein Gebäude weiterverarbeitet) und verkauft sie
   spedition: { name: 'Spediteur', icon: '🚚', levels: [
     { name: 'Kein Spediteur', cap: 0, price: 0, info: 'Noch trägst du alle fertigen Waren selbst zum Händler.' },
@@ -247,18 +318,21 @@ const DECOS = {
 const LAND_PRICES = [120, 300, 700, 1500, 3000];
 
 // Bereiche in Kacheln; Plätze werden reihenweise belegt. base + per*Landstufe = freie Plätze
-// Ist das Raster voll, geht es im Neuland südlich der Welt weiter (ex = Spalte, ec = Spalten dort)
+// Ist das Raster voll, geht es im Neuland weiter – abwechselnd im Süden (ex = Spalte, ec = Spalten dort)
+// und im Osten (ey = Zeile, 2 Reihen pro Bereich, wächst nach rechts ab dem Ostrand). So wird die Welt breiter UND länger.
 const AREAS = {
-  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 7,   dy: 5, base: 2, per: 2, ex: 4,  ec: 2 },
-  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3, ex: 18, ec: 5 },
-  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3, ex: 33, ec: 3 },
-  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2, ex: 46, ec: 2 },
+  acker: { name: 'Acker',     x: 4,  y: 13, cols: 2, rows: 5, dx: 7,   dy: 5, base: 2, per: 2, ex: 4,  ec: 2 , ey: 4 },
+  obst:  { name: 'Obstgarten', x: 4, y: 4,  cols: 9, rows: 2, dx: 2.8, dy: 3, base: 4, per: 3, ex: 18, ec: 5 , ey: 14 },
+  weide: { name: 'Weide',      x: 41, y: 6, cols: 5, rows: 3, dx: 3,   dy: 3, base: 2, per: 3, ex: 33, ec: 3 , ey: 20 },
+  dorf:  { name: 'Dorf',       x: 22, y: 31, cols: 5, rows: 2, dx: 7,  dy: 7, base: 2, per: 2, ex: 46, ec: 2 , ey: 28 },
   // from = erst ab dieser Land-Stufe; liegt im Osten, die Welt wird dafür breiter
-  weinberg:  { name: 'Weinberg',    x: 63, y: 5,  cols: 3, rows: 5, dx: 4,   dy: 3.5, base: 3, per: 2, from: 10, ex: 60, ec: 2 },
-  fischerei: { name: 'Fischteiche', x: 64, y: 26, cols: 3, rows: 4, dx: 4.5, dy: 4,   base: 2, per: 2, from: 20, ex: 69, ec: 2 },
+  weinberg:  { name: 'Weinberg',    x: 63, y: 5,  cols: 3, rows: 5, dx: 4,   dy: 3.5, base: 3, per: 2, from: 10, ex: 60, ec: 2 , ey: 42 },
+  fischerei: { name: 'Fischteiche', x: 64, y: 26, cols: 3, rows: 4, dx: 4.5, dy: 4,   base: 2, per: 2, from: 20, ex: 69, ec: 2 , ey: 49 },
+  tierhof:   { name: 'Tierhof',     x: 81, y: 7,  cols: 3, rows: 4, dx: 5,   dy: 4.5, base: 3, per: 2, from: 30, ex: 78, ec: 3 , ey: 57 },
+  terminal:  { name: 'Import-Terminal', x: 98, y: 9, cols: 2, rows: 5, dx: 6,  dy: 5,   base: 2, per: 2, from: 35, ex: 93, ec: 2 , ey: 66 },
 };
-const EAST_LAND = 10, WORLD_W_EAST = 77; // ab Land-Stufe 10 wächst die Welt nach Osten
-const PATHS_EAST = [[[50, 30], [61, 30], [61, 4]]];
+// Die Welt wird nach Osten breiter, sobald ein östlicher Bereich dazukommt (siehe fitWorld). Wege: [ab Land-Stufe, Weg]
+const PATHS_EAST = [[10, [[50, 30], [61, 30], [61, 4]]], [30, [[61, 23], [77, 23], [77, 4]]], [35, [[77, 23], [94, 23], [94, 5]]]];
 // Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
 const HOF_LV = [2, 5, 10, 15, 20];
 const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
@@ -294,7 +368,7 @@ const STAGES = [
 
 // Wege (Kacheln) für die Optik
 // Weg ins Neuland im Süden (erscheint, sobald dort Plätze liegen)
-const PATHS_SOUTH = [[[32, 30], [32, 44]], [[4, 44], [56, 44]]];
+const PATHS_SOUTH = [[[32, 30], [32, 44]], [[4, 44], [96, 44]]];
 const PATHS = [
   [[29, 13], [29, 18], [23, 18], [23, 24]],
   [[29, 18], [36, 18], [36, 24]],

@@ -236,12 +236,26 @@ function slotsAvail(area) { const a = AREAS[area], f = a.from || 0; return G.lan
 function slotPos(area, i) {
   const a = AREAS[area], j = i - a.cols * a.rows;
   if (j < 0) return { x: (a.x + (i % a.cols) * a.dx) * T, y: (a.y + Math.floor(i / a.cols) * a.dy) * T };
-  return { x: (a.ex + (j % a.ec) * a.dx) * T, y: (WORLD_H0 + 3 + Math.floor(j / a.ec) * a.dy) * T }; // Neuland im Süden
+  const h = j >> 1; // gerade: Süden, ungerade: Osten
+  if (j % 2 === 0) return { x: (a.ex + (h % a.ec) * a.dx) * T, y: (WORLD_H0 + 3 + Math.floor(h / a.ec) * a.dy) * T };
+  return { x: (ostX() + 2 + Math.floor(h / 2) * a.dx) * T, y: (a.ey + (h % 2) * a.dy) * T };
 }
 // ponytail: Welt wächst nur nach Süden; bei sehr viel Land wird sie lang, aber nie zu eng
+// Gülle-Verteiler (ab Land-Stufe 20): sammelt Dung von den Tieren und düngt die Weizenfelder → doppelte Ernte
+const FELD_N = THINGS.feld.n, MIST = ['kuh', 'schwein', 'huhn', 'masthuhn'];
+const guelleOn = () => !!G.guelle && G.things.some(t => MIST.includes(t.type));
+// Ostrand der freigeschalteten Bereiche: dort beginnt das Neuland im Osten
+const ostX = () => Math.max(60, ...Object.values(AREAS).filter(a => G.land >= (a.from || 0)).map(a => Math.ceil(a.x + (a.cols - 1) * a.dx + 6)));
+function relayout() { // Plätze neu setzen – das Neuland im Osten rückt nach, wenn ein neuer Bereich dazukommt
+  for (const t of G.things) {
+    const p = slotPos(THINGS[t.type].area, t.slot); Object.assign(t, p);
+    if (t.type === 'kuh' && dist(t.cx, t.cy, p.x, p.y) > 6 * T) Object.assign(t, { cx: p.x, cy: p.y, tx: p.x, ty: p.y });
+  }
+}
 function fitWorld() {
-  WORLD.w = G.land >= EAST_LAND ? WORLD_W_EAST : 60;
-  WORLD.h = Math.max(WORLD_H0, ...Object.keys(AREAS).map(a => slotPos(a, slotsAvail(a) - 1).y / T + 2)); }
+  const last = Object.keys(AREAS).flatMap(a => [1, 2].filter(k => slotsAvail(a) >= k).map(k => slotPos(a, slotsAvail(a) - k))); // letzter Süd- und Ost-Platz
+  WORLD.w = Math.max(ostX(), ...last.map(p => Math.ceil(p.x / T + 4)));
+  WORLD.h = Math.max(WORLD_H0, ...last.map(p => p.y / T + 2)); }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
   for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i)) return i;
@@ -276,6 +290,7 @@ function loadGame(server) {
     G.deco = (G.deco || []).filter(d => DECOS[d.type]);
     if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
+    relayout();
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
     if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
@@ -371,7 +386,7 @@ function update(dt) {
   const ox = G.px, oy = G.py;
   G.px = clamp(G.px + mx * sp * dt, T, (WORLD.w - 1) * T);
   if (inLake(G.px, G.py)) G.px = ox; // nicht in den See laufen – am Ufer entlang rutschen
-  fitWorld();
+  fitWorld(); THINGS.feld.n = guelleOn() ? FELD_N * 2 : FELD_N; // ponytail: jedes Frame gesetzt, so stimmt's auch nach Laden/Kauf
   G.py = clamp(G.py + my * sp * dt, T * 1.5, (WORLD.h - 0.5) * T);
   if (inLake(G.px, G.py)) G.py = oy;
   moving = ml > 0.1;
@@ -538,7 +553,7 @@ function reach(t) {
     const d = THINGS.feld, dx = Math.max(0, Math.abs(G.px - p.x) - d.w * T / 2), dy = Math.max(0, Math.abs(G.py - p.y) - d.h * T / 2);
     return Math.hypot(dx, dy) < T * 0.4 ? Math.hypot(dx, dy) : 1e9;
   }
-  const r = { baum: 1.3, kuh: 1.4, rebe: 1.6, fischteich: 1.9 }[t.type] || 2.4;
+  const r = { baum: 1.3, kuh: 1.4, rebe: 1.6, fischteich: 1.9, huhn: 1.7, masthuhn: 1.7, schwein: 1.7, kakaoimport: 1.8, kaffeeimport: 1.8 }[t.type] || 2.4;
   const d = dist(G.px, G.py, p.x, p.y - (r > 2 ? T * 0.3 : 0));
   return d < r * T ? d : 1e9;
 }
@@ -720,6 +735,10 @@ function shopList() {
       },
     });
   }
+  if (G.land >= 20) tabs[1].push({ icon: '💩', name: $t`Gülle-Verteiler`, price: 3000, can: !G.guelle,
+    desc: $t`Doppelte Ernte auf allen Weizenfeldern`, note: G.guelle ? $t`✅ Schon gekauft` : $t`braucht Tiere, die Dung machen (Kühe, Säuli, Hühner)`,
+    info: $t`Kuhfladen und Mist werden in einer grossen Grube gesammelt und mit Wasser zu Gülle verrührt. Der Bauer fährt sie mit dem Güllefass aufs Feld. Darin stecken Stickstoff, Phosphor und Kalium – Futter für die Pflanzen! So wächst der Weizen viel kräftiger. Es stinkt zwar, aber nur ein paar Tage.`,
+    buy: () => { G.guelle = 1; toast(guelleOn() ? $t`💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!` : $t`💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!`); AU.sfx('grow'); } });
   if (G.unlocks < UNLOCKS.length) tabs[1].push({ icon: '🔒', name: $t`Geheimes Rezept`, price: 0, can: false,
     desc: $t`Bau eine Endstation – ein Gebäude, dessen Ware nirgends weiterverarbeitet wird (z. B. Konditorei). Dann kommt ein neues Produkt dazu!`,
     info: $t`Jedes Mal, wenn du eine neue Endstation baust, lernst du ein neues Rezept mit mehreren Verarbeitungs-Schritten.` });
@@ -742,11 +761,15 @@ function shopList() {
     icon: '🗺️', name: $t`Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: $t`Mehr Platz für Felder, Bäume, Kühe und Gebäude`, info: $t`Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.`,
     buy: () => {
-      G.land++; fitWorld(); toast(WORLD.h > WORLD_H0 ? $t`🗺️ Neues Land im Süden ⬇️ – folge dem Weg! Mit ➖ siehst du die ganze Welt.` : $t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
+      G.land++; fitWorld(); relayout(); toast(WORLD.h > WORLD_H0 ? $t`🗺️ Neues Land im Süden ⬇️ und Osten ➡️ – folge den Wegen! Mit ➖ siehst du die ganze Welt.` : $t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
       const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
       for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Osten ➡️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
   });
+  if (G.land >= 20) tabs[3].push({ icon: '⛪', name: $t`Kirche`, price: 20000, can: !G.kirche,
+    desc: $t`Steht neben deinem Bauernhof`, note: G.kirche ? $t`✅ Schon gekauft` : '',
+    info: $t`Fast jedes Schweizer Dorf hat eine Kirche mit einem hohen Turm. Die Turmuhr zeigt allen die Zeit, und die Glocken läuten zum Mittag und am Sonntag. Früher hörte man sie bis weit auf die Felder hinaus.`,
+    buy: () => { G.kirche = 1; toast($t`⛪ Deine Kirche steht jetzt neben dem Bauernhof!`); AU.sfx('grow'); } });
   for (const [k, d] of Object.entries(DECOS)) {
     const full = d.max && decoCount(k) >= d.max, busy = d.where === 'land' && G.carry;
     tabs[4].push({ icon: d.icon, name: d.name, price: d.price, info: d.info, can: !full && !busy,
@@ -841,7 +864,7 @@ function openPlan() {
     if (dm && s > dm * 1.8) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
     if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
-    if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name).join(', ')}.`);
+    if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`);
   }
   tips.sort((a, b) => b.v - a.v);
   for (const k of vis) {
@@ -921,7 +944,7 @@ function drawField(t) {
   const d = THINGS.feld, w = d.w * T, h = d.h * T, x0 = t.x - w / 2, y0 = t.y - h / 2;
   const g = t.ripe ? 1 : t.timer / d.time;
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(x0 + 4, y0 + 6, w, h);
-  ctx.fillStyle = '#7d5a37'; ctx.fillRect(x0, y0, w, h);
+  ctx.fillStyle = guelleOn() ? '#5e4128' : '#7d5a37'; ctx.fillRect(x0, y0, w, h); // gedüngt = dunkle Erde
   ctx.strokeStyle = '#664628'; ctx.lineWidth = 2;
   for (let y = y0 + 6; y < y0 + h; y += 9) { ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke(); }
   if (!fieldCache.has(t.id)) {
@@ -1015,6 +1038,8 @@ const DRAW = {
   hof(x, y) { // Alpen-Bauernhof, wächst mit der Land-Stufe (HOF_LV)
     const lv = hofLv(), fl = lv >= 3 ? 2 : 1;
     if (lv >= 5) kapelle(x + 190, y - 4);
+    if (G.kirche) kirche(x + 300, y - 4);
+    if (G.guelle) guelle(x - 456, y + 144);
     if (lv >= 2) speicher(x - 205, y - 4);
     if (lv >= 1) for (let i = 0; i < 4; i++) for (let j = 0; j < 5 - (i % 2); j++) { ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 4.5, 4.5, '#b07a42'); ellipse(x - 148 + j * 9 + (i % 2) * 4.5, y - 5 - i * 8, 2, 2, '#e3c08a'); } // Holzbeige
     // Stall mit Heuboden
@@ -1152,6 +1177,52 @@ DRAW.fischteich = (x, y, t) => {
   ctx.fillStyle = '#a07a4a'; ctx.fillRect(x + 22, y - 6, 34, 8); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + 50, y + 2, 3, 6); // Steg
   if (t.store > 0) crate(x + 80, y + 4, '#5a8fb8', Math.min(t.store, 12));
 };
+// Hühnerhof: Hüsli mit Rampe, Hühner picken im Gehege. Masthühner sind weiss, Legehennen braun.
+function chicken(x, y, c, ph) {
+  const p = Math.max(0, Math.sin(ph)) * 4; // picken
+  ellipse(x, y - 7, 7, 5.5, c); ellipse(x + 6, y - 12 + p, 3.6, 3.6, c);
+  ctx.fillStyle = '#d8332a'; ctx.fillRect(x + 5, y - 17 + p, 3, 2.5); ctx.fillStyle = '#e8a030'; ctx.beginPath(); ctx.moveTo(x + 9, y - 12 + p); ctx.lineTo(x + 12, y - 11 + p); ctx.lineTo(x + 9, y - 10 + p); ctx.fill();
+  line('#e8a030', 1.2, x - 2, y - 2, x - 2, y + 1, x + 1, y - 2, x + 1, y + 1);
+}
+function coop(x, y, t, hen) {
+  const d = THINGS[t.type], g = t.ripe ? 1 : t.timer / d.time;
+  ellipse(x, y, 66, 10, 'rgba(0,0,0,.2)'); ellipse(x, y - 4, 62, 16, '#c9b27a'); // Scharrplatz
+  ctx.fillStyle = '#c0552f'; ctx.fillRect(x - 58, y - 46, 40, 30); ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.moveTo(x - 63, y - 44); ctx.lineTo(x - 38, y - 62); ctx.lineTo(x - 13, y - 44); ctx.fill();
+  ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 43, y - 30, 10, 14); line('#9b7040', 3, x - 33, y - 16, x - 20, y - 4); // Türchen + Rampe
+  for (const px of [-58, -22]) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x + px, y - 16, 4, 16); }
+  line('#b8b8b0', 1, x - 10, y - 24, x + 62, y - 24); for (let px = -10; px <= 62; px += 12) line('#8a6a43', 2, x + px, y - 26, x + px, y + 2); // Zaun
+  for (let i = 0; i < 2 + Math.round(g * 3); i++) chicken(x + 4 + i * 12, y - 2 + (i % 2) * 6, hen ? '#a8582a' : '#f4f1e8', time * 4 + i * 1.9 + t.id);
+  if (t.store > 0) crate(x + 78, y + 4, hen ? '#f2e6cf' : '#d86a5a', Math.min(t.store, 12));
+}
+DRAW.huhn = (x, y, t) => coop(x, y, t, true);
+DRAW.masthuhn = (x, y, t) => coop(x, y, t, false);
+DRAW.schwein = (x, y, t) => {
+  const g = t.ripe ? 1 : t.timer / THINGS.schwein.time;
+  ellipse(x, y, 66, 10, 'rgba(0,0,0,.2)'); ellipse(x + 8, y - 6, 56, 16, '#7a5a3a'); ellipse(x + 14, y - 6, 22, 7, '#5e4329'); // Suhle
+  ctx.fillStyle = '#9b6a3a'; ctx.fillRect(x - 60, y - 40, 34, 34); ctx.fillStyle = '#5a5248'; ctx.beginPath(); ctx.moveTo(x - 64, y - 38); ctx.lineTo(x - 43, y - 54); ctx.lineTo(x - 22, y - 38); ctx.fill();
+  ctx.fillStyle = '#e8c35a'; ctx.fillRect(x - 54, y - 22, 22, 16); // Stroh
+  for (let i = 0; i < 1 + Math.round(g * 2); i++) { // Säuli wackeln im Schlamm
+    const px = x - 6 + i * 22, py = y - 2 + (i % 2) * 5, w = Math.sin(time * 3 + i + t.id) * 1.5;
+    ellipse(px, py - 9, 12, 8, '#f2a7b0'); ellipse(px + 11 + w, py - 11, 6, 5.5, '#f2a7b0'); ellipse(px + 16 + w, py - 10, 2.6, 2.2, '#e0808e');
+    ctx.fillStyle = '#e0808e'; ctx.beginPath(); ctx.moveTo(px + 8 + w, py - 16); ctx.lineTo(px + 10 + w, py - 21); ctx.lineTo(px + 13 + w, py - 16); ctx.fill();
+    ellipse(px + 12 + w, py - 12, 1, 1, '#222'); for (const lx of [-7, -2, 4, 8]) line('#e0808e', 2.5, px + lx, py - 3, px + lx, py + 1);
+    line('#e0808e', 1.5, px - 12, py - 10, px - 15, py - 13, px - 13, py - 14);
+  }
+  line('#8a6a43', 2, x - 24, y - 20, x + 66, y - 20); for (let px = -24; px <= 66; px += 15) line('#6b4a2b', 3, x + px, y - 24, x + px, y + 2);
+  if (t.store > 0) crate(x + 80, y + 4, '#d86a5a', Math.min(t.store, 12));
+};
+// Import-Terminal: Container auf Schienen, Säcke davor (mehr Säcke = bald bereit)
+function container(x, y, t, c, sack) {
+  const g = t.ripe ? 1 : t.timer / THINGS[t.type].time;
+  ellipse(x, y, 70, 9, 'rgba(0,0,0,.22)'); line('#7d7468', 3, x - 70, y - 2, x + 70, y - 2); line('#7d7468', 3, x - 70, y + 4, x + 70, y + 4); // Gleise
+  ctx.fillStyle = c; ctx.fillRect(x - 60, y - 52, 92, 48); ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 9; i++) ctx.fillRect(x - 56 + i * 10, y - 50, 3, 44);
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('IMPORT', x - 14, y - 36);
+  wheel(x - 44, y - 2, 5); wheel(x + 16, y - 2, 5);
+  for (let i = 0; i < Math.round(g * 4); i++) { const sx = x + 44 + (i % 2) * 14, sy = y - Math.floor(i / 2) * 10; ctx.fillStyle = '#c8a46a'; rrect(sx - 7, sy - 12, 14, 12, 3); ctx.fill(); ellipse(sx, sy - 6, 3, 3, sack); }
+  if (t.store > 0) crate(x + 84, y + 4, sack, Math.min(t.store, 12));
+}
+DRAW.kakaoimport = (x, y, t) => container(x, y, t, '#c0552f', '#5a3220');
+DRAW.kaffeeimport = (x, y, t) => container(x, y, t, '#2f6a8f', '#3f6a2f');
 // ---- Alpenstil: Holzhaus auf gemauertem Sockel, flaches weites Dach mit Steinen ----
 function alpHouse(x, y, w, base, up, rh) { // gibt die Oberkante der Wand zurück
   ellipse(x + 8, y, w / 2 + 16, 10, 'rgba(0,0,0,.22)');
@@ -1188,8 +1259,31 @@ function kapelle(x, y) {
   ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.moveTo(x - 8, y); ctx.lineTo(x - 8, y - 20); ctx.arc(x, y - 20, 8, Math.PI, 0); ctx.lineTo(x + 8, y); ctx.fill();
   ellipse(x, y - 38, 5, 5, '#bfe0f5');
 }
+function guelle(x, y) { // Güllegrube (runder Betontank) mit Güllefass, das zum Acker fährt
+  ellipse(x, y, 44, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#a8a39a'; ctx.fillRect(x - 36, y - 30, 72, 30); ellipse(x, y - 30, 36, 9, '#5e4128'); ellipse(x, y, 36, 9, '#a8a39a');
+  if (guelleOn()) for (let i = 0; i < 3; i++) { const k = (time * 0.5 + i / 3) % 1; ellipse(x - 10 + i * 10, y - 34 - k * 26, 3 + k * 4, 2 + k * 3, `rgba(150,120,60,${0.4 * (1 - k)})`); } // es duftet 😄
+  const fx = x - 66; // Güllefass auf Rädern
+  ctx.fillStyle = '#2f6a3a'; ctx.beginPath(); ctx.ellipse(fx, y - 18, 20, 11, 0, 0, 7); ctx.fill(); wheel(fx - 8, y - 4, 6); wheel(fx + 8, y - 4, 6);
+  line('#555', 2, fx - 20, y - 12, fx - 28, y - 6);
+}
+function kirche(x, y) { // Dorfkirche mit Turmuhr und Spitzhelm (Kauf ab Land-Stufe 20)
+  ellipse(x + 6, y, 62, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#f4efe4'; ctx.fillRect(x - 22, y - 62, 76, 62); // Schiff
+  ctx.fillStyle = '#7a3b2a'; ctx.beginPath(); ctx.moveTo(x - 28, y - 60); ctx.lineTo(x + 16, y - 96); ctx.lineTo(x + 60, y - 60); ctx.fill();
+  for (const wx of [x + 8, x + 34]) { ctx.fillStyle = '#bfe0f5'; ctx.beginPath(); ctx.moveTo(wx - 5, y - 18); ctx.lineTo(wx - 5, y - 42); ctx.arc(wx, y - 42, 5, Math.PI, 0); ctx.lineTo(wx + 5, y - 18); ctx.fill(); }
+  ctx.fillStyle = '#ebe4d6'; ctx.fillRect(x - 44, y - 140, 30, 140); // Turm
+  ctx.fillStyle = '#2a2a2a'; ctx.fillRect(x - 36, y - 132, 14, 14); // Glockenstube
+  ctx.save(); ctx.translate(x - 29, y - 132); ctx.rotate(Math.sin(time * 1.8) * 0.3); ctx.fillStyle = '#d9a83a'; ctx.beginPath(); ctx.moveTo(-5, 11); ctx.lineTo(5, 11); ctx.lineTo(3, 2); ctx.lineTo(-3, 2); ctx.fill(); ctx.restore();
+  ellipse(x - 29, y - 100, 10, 10, '#fff'); ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x - 29, y - 100, 10, 0, 7); ctx.stroke(); // Turmuhr
+  const h = new Date(), a = (h.getHours() % 12 + h.getMinutes() / 60) / 6 * Math.PI, m = h.getMinutes() / 30 * Math.PI;
+  line('#2a2a2a', 2, x - 29, y - 100, x - 29 + Math.sin(a) * 5, y - 100 - Math.cos(a) * 5); line('#2a2a2a', 1.5, x - 29, y - 100, x - 29 + Math.sin(m) * 8, y - 100 - Math.cos(m) * 8);
+  ctx.fillStyle = '#4f6f5a'; ctx.beginPath(); ctx.moveTo(x - 48, y - 140); ctx.lineTo(x - 29, y - 196); ctx.lineTo(x - 10, y - 140); ctx.fill(); // Spitzhelm
+  line('#e8c35a', 2, x - 29, y - 196, x - 29, y - 212); line('#e8c35a', 2, x - 35, y - 206, x - 23, y - 206);
+  ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.moveTo(x - 38, y); ctx.lineTo(x - 38, y - 22); ctx.arc(x - 29, y - 22, 9, Math.PI, 0); ctx.lineTo(x - 20, y); ctx.fill();
+}
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { rebe: 62, fischteich: 50, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
@@ -1427,7 +1521,7 @@ function flagPole(x, y, h, s, ph = 0) {
 }
 
 // ---- Alpen-Panorama (Kulisse nördlich der Welt, y < 0) ----
-const alps = (() => {
+const makeAlps = () => {
   const Wp = WORLD.w * T, r = seeded(42), step = 12;
   const peaks = (n, hMin, hMax, wMin, wMax) => Array.from({ length: n }, (_, i) => ({ x: (i + 0.15 + r() * 0.7) / n * Wp, h: hMin + r() * (hMax - hMin), wl: wMin + r() * (wMax - wMin), wr: wMin + r() * (wMax - wMin) }));
   const ridge = (pk, base, rough) => {
@@ -1442,7 +1536,8 @@ const alps = (() => {
   near.push({ x: Wp * 0.64, h: 300, wl: 120, wr: 210, horn: true }); // das grosse Horn
   const firs = Array.from({ length: 70 }, () => [r() * Wp, r(), 0.5 + r() * 0.45]);
   return { Wp, far, near, farR: ridge(far, -40, 10), nearR: ridge(near, -6, 14), firs, horn: near.at(-1) };
-})();
+};
+let alps = makeAlps();
 const hillY = x => -34 + 14 * Math.sin(x * 0.0035 + 1) + 8 * Math.sin(x * 0.011 + 2);
 function ridgeAt(R, x) { const i = clamp(Math.round((x + 12) / 12), 0, R.length - 1); return R[i][1]; }
 function mountainRange(R, pk, base, c1, c2, snowY) {
@@ -1460,6 +1555,7 @@ function mountainRange(R, pk, base, c1, c2, snowY) {
   ctx.restore();
 }
 function drawAlps() {
+  if (alps.Wp !== WORLD.w * T) alps = makeAlps(); // Welt breiter geworden
   const top = -ALPS * T, Wp = alps.Wp;
   let g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
   ctx.fillStyle = g; ctx.fillRect(0, top, Wp, -top + 2);
@@ -1773,7 +1869,7 @@ function render() {
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
     ctx.strokeStyle = c; ctx.lineWidth = w;
-    for (const p of PATHS.concat(WORLD.h > WORLD_H0 ? PATHS_SOUTH : [], G.land >= EAST_LAND ? PATHS_EAST : [])) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+    for (const p of PATHS.concat(WORLD.h > WORLD_H0 ? PATHS_SOUTH : [], WORLD.w > ostX() ? [G.land >= 10 ? [[61, 23], [ostX(), 23], [ostX(), 2], [ostX(), WORLD.h - 1]] : [[50, 30], [ostX(), 30], [ostX(), 2], [ostX(), WORLD.h - 1]]] : [], PATHS_EAST.filter(([l]) => G.land >= l).map(([, p]) => p))) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
   }
   drawLake(); lakeDecos();
   // Weide-Zaun
