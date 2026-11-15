@@ -89,7 +89,7 @@ var TR = {
     '{} ist da!': '{} è arrivato!',
     'Schau auf den {}see 🌊': 'Guarda il lago di {} 🌊', 'Schau in den Himmel ☁️': 'Guarda il cielo ☁️', 'Schau hinauf in die Berge 🏔️': 'Guarda su in montagna 🏔️',
     'Du trägst jetzt: {}. Lauf dorthin, wo es stehen soll, und tippe 📍 Hier abstellen!': 'Stai portando: {}. Vai dove deve stare e tocca 📍 Metti qui!',
-    '👦🏼 {} · {} Jahre': '👦🏼 {} · {} anni', 'Fr.': 'fr.', 'Münzen': 'Monete', 'leer': 'vuota',
+    '👦🏼 {} · {} Jahre': '👦🏼 {} · {} anni', 'Fr.': 'fr.', 'leer': 'vuota',
     'Lauf dorthin, wo es stehen soll.': 'Vai dove deve stare.', 'Hier ist kein Platz.': 'Qui non c’è posto.', 'Geh auf eine freie Wiese.': 'Vai su un prato libero.',
     '📍 Hier abstellen': '📍 Metti qui', 'Deko – macht nichts, ist aber schön! 😊': 'Decorazione – non fa niente, ma è bella! 😊', '✋ Umstellen': '✋ Sposta',
     '🤖 {} erntet automatisch · Lager {}/{} {}': '🤖 {} raccoglie da solo · magazzino {}/{} {}',

@@ -646,13 +646,10 @@ function soundLevels() {
 }
 
 // =================== HUD ===================
-const NOTES = [[1000, '#9a7cc4'], [200, '#b98557'], [100, '#5f97d6'], [50, '#6fb46b'], [20, '#e0646e'], [10, '#efc93f']]; // Farben der Schweizer Banknoten
 function hud() {
   if (!G) return;
   $('#who').textContent = $t`👦🏼 ${P.name} · ${age()} Jahre`;
-  let m = G.money, notes = '';
-  for (const [v, c] of NOTES) { let k = Math.floor(m / v); m -= k * v; k = Math.min(k, 6); while (k--) notes += `<span class="note" style="background:${c}">${v}</span>`; }
-  $('#money').innerHTML = `💰 ${G.money} ${$t`Fr.`}<span class="notes">${notes}${m ? `<span title="${$t`Münzen`}">🪙${m}</span>` : ''}</span>`;
+  $('#money').textContent = `💰 ${G.money} ${$t`Fr.`}`;
   const inv = Object.entries(G.inv).map(([k, n]) => `${ITEMS[k].icon}${n}`).join(' ');
   $('#bag').innerHTML = `${TOOLS.tragen.icon} ${inv || `<small>${$t`leer`}</small>`} <small>(${bagCount()}/${bagCap()})</small>`;
   // Info-Leiste zum nächsten Ort

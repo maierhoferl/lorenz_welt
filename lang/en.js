@@ -89,7 +89,7 @@ var TR = {
     '{} ist da!': '{} is here!',
     'Schau auf den {}see 🌊': 'Look at Lake {} 🌊', 'Schau in den Himmel ☁️': 'Look up at the sky ☁️', 'Schau hinauf in die Berge 🏔️': 'Look up into the mountains 🏔️',
     'Du trägst jetzt: {}. Lauf dorthin, wo es stehen soll, und tippe 📍 Hier abstellen!': "You're carrying: {}. Walk to where it should go and tap 📍 Put down here!",
-    '👦🏼 {} · {} Jahre': '👦🏼 {} · {} years', 'Fr.': 'CHF', 'Münzen': 'Coins', 'leer': 'empty',
+    '👦🏼 {} · {} Jahre': '👦🏼 {} · {} years', 'Fr.': 'CHF', 'leer': 'empty',
     'Lauf dorthin, wo es stehen soll.': 'Walk to where it should go.', 'Hier ist kein Platz.': 'No room here.', 'Geh auf eine freie Wiese.': 'Go to a free patch of meadow.',
     '📍 Hier abstellen': '📍 Put down here', 'Deko – macht nichts, ist aber schön! 😊': "Decoration – it doesn't do anything, but it's pretty! 😊", '✋ Umstellen': '✋ Move',
     '🤖 {} erntet automatisch · Lager {}/{} {}': '🤖 {} harvests automatically · storage {}/{} {}',
