@@ -232,8 +232,28 @@ function save(cloud) {
 function startGame(p, key, server) {
   P = p; KEY = key; pin = null; loadGame(server); AU.init(); show('game'); resize();
   shopDismiss = false; near = null; lastNear = null;
+  pt = playTime(); if (pt.s >= (pt.lim || LIMIT)) timeUp();
   hud(); toast(`Willkommen, ${P.name}! Lauf mit den Pfeiltasten ${'ontouchstart' in window ? 'oder wisch über den Bildschirm' : '(oder WASD)'}.`);
 }
+// ---- Tageslimit: 30 Min. pro Spieler und Tag, Eltern-Code gibt je 5 Min. dazu ----
+const LIMIT = 30 * 60, PARENT = 'lorenzmaierhofer'; // ponytail: Klartext im Client – hält Kinder auf, nicht DevTools/localStorage
+const today = () => new Date().toLocaleDateString('sv');
+const playTime = () => { const t = store.get('lw_time_' + P.id); return t?.d === today() ? t : { d: today(), s: 0 }; };
+let pt = null;
+function tickTime(dt) {
+  if (pt.d !== today()) pt = { d: today(), s: 0 };
+  const before = pt.s; pt.s += dt;
+  if (Math.floor(pt.s / 5) !== Math.floor(before / 5)) store.set('lw_time_' + P.id, pt);
+  if (before < LIMIT - 300 && pt.s >= LIMIT - 300) toast('⏰ Noch 5 Minuten Spielzeit für heute!');
+  if (pt.s >= (pt.lim || LIMIT)) timeUp();
+}
+function timeUp() { store.set('lw_time_' + P.id, pt); save(true); closeModals(); $('#tupass').value = ''; $('#tumsg').textContent = ''; show('timeup'); }
+$('#tuform').onsubmit = e => {
+  e.preventDefault();
+  if ($('#tupass').value !== PARENT) { $('#tumsg').textContent = 'Falscher Code'; return; }
+  pt.lim = pt.s + 5 * 60; store.set('lw_time_' + P.id, pt); show('game'); resize();
+};
+$('#tuexit').onclick = () => $('#bexit').click();
 $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
@@ -1624,7 +1644,7 @@ function render() {
 let last = 0;
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
-  if (G && !$('#game').hidden) { update(dt); render(); }
+  if (G && !$('#game').hidden) { update(dt); render(); tickTime(dt); }
   requestAnimationFrame(loop);
 }
 renderSelect();

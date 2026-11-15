@@ -135,6 +135,18 @@
   <p id="recmsg"></p>
 </section>
 
+<section id="timeup" class="screen" hidden>
+  <div class="big">⏰</div>
+  <h2 style="color:#fff;text-align:center;text-shadow:0 2px 4px rgba(0,0,0,.4);margin:0">Genug gespielt für heute! Morgen geht's weiter.</h2>
+  <form id="tuform" class="panel">
+    <b>Eltern-Code</b>
+    <input id="tupass" type="password" autocomplete="off" placeholder="Code">
+    <button class="btn">Weiterspielen</button>
+    <p id="tumsg" style="margin:0;color:var(--red);font-weight:700"></p>
+  </form>
+  <button id="tuexit" class="btn alt">Spieler wechseln</button>
+</section>
+
 <section id="game" class="screen" hidden>
   <canvas id="cv"></canvas>
   <div id="hud">
