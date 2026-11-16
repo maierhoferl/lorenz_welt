@@ -3066,18 +3066,20 @@ function lakeLive() { // Wellen, Schilf, Steg, Name – über dem See aus dem Hi
   ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5; const r = seeded(11);
   for (let i = 0; i < 26; i++) {
     const wx = cx + (r() - 0.5) * LAKE.rx * 2 * T, wy = cy + (r() - 0.5) * LAKE.ry * 2 * T, k = (time * 0.4 + r()) % 1;
+    if (Math.abs(wx - 7 * T) < 56 && Math.abs(wy - 25.3 * T) < 34) continue; // nicht übers Schloss
     ctx.globalAlpha = Math.sin(k * Math.PI); ctx.beginPath(); ctx.arc(wx, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.arc(wx + 12, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.globalAlpha = 1; ctx.restore();
   // Jet d'eau: Fontäne im See, Wind weht die Gischt nach rechts
   const jx = 14 * T, jy = 27.6 * T, H = 125 + Math.sin(time * 3) * 4, q = seeded(29);
-  ellipse(jx + 2, jy, 16, 4, 'rgba(255,255,255,.6)');
+  ellipse(jx + 2, jy, 26, 6, 'rgba(255,255,255,.6)'); ellipse(jx + 2, jy - 2, 14, 4, 'rgba(255,255,255,.8)'); // Schaum am Fuss
   const jg = ctx.createLinearGradient(0, jy - H, 0, jy); jg.addColorStop(0, 'rgba(255,255,255,.25)'); jg.addColorStop(1, 'rgba(255,255,255,.95)');
-  ctx.fillStyle = jg; ctx.beginPath(); ctx.moveTo(jx - 3, jy); ctx.quadraticCurveTo(jx - 1, jy - H * 0.6, jx + 6, jy - H); ctx.lineTo(jx + 12, jy - H + 6); ctx.quadraticCurveTo(jx + 3, jy - H * 0.5, jx + 4, jy); ctx.fill();
-  for (let i = 0; i < 24; i++) { const k = (time * 0.7 + q()) % 1, o = q() * 8; ctx.globalAlpha = 0.7 * (1 - k); ellipse(jx + 8 + k * 26 + o, jy - H + 4 + k * k * (H - 6), 3 + k * 4, 3 + k * 4, '#fff'); } // Gischt fällt
+  ctx.fillStyle = jg; ctx.beginPath(); ctx.moveTo(jx - 7, jy); ctx.quadraticCurveTo(jx - 4, jy - H * 0.6, jx + 3, jy - H); ctx.lineTo(jx + 17, jy - H + 8); ctx.quadraticCurveTo(jx + 8, jy - H * 0.5, jx + 9, jy); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(jx + 1, jy); ctx.quadraticCurveTo(jx + 1, jy - H * 0.6, jx + 8, jy - H + 3); ctx.stroke(); // heller Kern
+  for (let i = 0; i < 40; i++) { const k = (time * 0.7 + q()) % 1, o = q() * 14; ctx.globalAlpha = 0.75 * (1 - k); ellipse(jx + 6 + k * 36 + o, jy - H + 2 + k * k * (H - 6), 4 + k * 7, 4 + k * 7, '#fff'); } // Gischt fällt
   ctx.globalAlpha = 1;
   // Schilf am Ufer
-  for (const a of [2.4, 2.6, 0.5, 0.65, 4.1]) {
+  for (const a of [2.4, 2.6, 0.5, 0.65, 5.3]) {
     const rr = LAKE.rx * lakeR(a) - 0.1, x = (LAKE.x + Math.cos(a) * rr) * T, y = (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T;
     for (let i = 0; i < 6; i++) { const sx = x + i * 4 - 10, sw = Math.sin(time * 1.6 + i) * 2; line('#5f8a3a', 1.6, sx, y + 4, sx + sw, y - 16 - (i % 3) * 4); ellipse(sx + sw, y - 16 - (i % 3) * 4, 1.6, 4, '#7a4e2a'); }
   }
