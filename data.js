@@ -58,6 +58,13 @@ const ITEMS = {
   kaffee:      { name: 'Rohkaffee',         icon: '🫛', price: 9 },
   roestkaffee: { name: 'Röstkaffee',        icon: '☕', price: 28 },
   kafi:        { name: 'Milchkaffee',       icon: '🥛', price: 80 },
+  // neue Rezepte aus vorhandenen Zutaten
+  glace:        { name: 'Glace',            icon: '🍦', price: 44 },
+  magronen:     { name: 'Älplermagronen',   icon: '🥘', price: 90 },
+  rahmmeringue: { name: 'Meringues mit Doppelrahm', icon: '🍨', price: 115 },
+  malz:         { name: 'Malz',             icon: '🌱', price: 14 },
+  malztrunk:    { name: 'Malztrunk',        icon: '🫗', price: 120 },
+  schoggifondue: { name: 'Schoggifondue',   icon: '🍡', price: 210 },
 };
 
 const THINGS = {
@@ -193,6 +200,25 @@ const THINGS = {
   tortenmeister: { kind: 'factory', name: 'Tortenmeister', icon: '🎂', area: 'dorf', price: 1000,
     in: { kuchen: 2, sahne: 2 }, item: 'torte', n: 1, time: 16,
     info: 'Ein Konditor-Meister schneidet Böden quer durch und füllt sie mit Sahne und Früchten. Kalte Sahne wird mit dem Schneebesen steif geschlagen: Dabei werden winzige Luftbläschen ins Fett eingeschlossen. Zum Schluss wird verziert – mit Spritzbeutel, Schokolade und Früchten. Konditor ist ein eigener Beruf mit 3 Jahren Lehre!' },
+  // ----- neue Rezepte aus vorhandenen Zutaten -----
+  gelateria: { kind: 'factory', name: 'Gelateria', icon: '🍦', area: 'dorf', price: 700,
+    in: { milch: 2, sahne: 1 }, item: 'glace', n: 1, time: 7,
+    info: 'Glace sagt man in der Schweiz für Speiseeis. Rahm, Milch und Zucker werden gemischt und gefroren – aber dabei ständig gerührt! So bleiben die Eiskristalle winzig, und es kommt Luft hinein: Die Glace wird cremig statt hart wie ein Eiswürfel. Früher kühlte man mit Eis und Salz: Salz lässt Eis schmelzen, und beim Schmelzen wird es noch kälter – bis −20 °C!' },
+  sennhuette: { kind: 'factory', name: 'Sennhütte', icon: '🛖', area: 'dorf', price: 900,
+    in: { nudeln: 1, kaese: 1, apfel: 2 }, item: 'magronen', n: 1, time: 12,
+    info: 'Auf der Alp kocht der Senn, was er gerade hat: Magronen (Hörnli), Kartoffeln, Käse und Rahm, obendrauf Röstzwiebeln. Und dazu? Apfelmus! Süss und salzig zusammen schmeckt erstaunlich gut. Die Nudeln kamen mit italienischen Arbeitern in die Alpen, die vor rund 140 Jahren den Gotthardtunnel bauten – „Magronen“ kommt von „Maccheroni“.' },
+  gruyerestube: { kind: 'factory', name: 'Greyerzer Stübli', icon: '🏰', area: 'dorf', price: 6000, land: 30,
+    in: { meringue: 2, sahne: 1 }, item: 'rahmmeringue', n: 1, time: 9,
+    info: 'Im Greyerzerland (Gruyère) isst man Meringues mit Doppelrahm. Der hat mindestens 45 % Fett – so dick, dass der Löffel darin stehen bleibt! Normaler Vollrahm hat etwa 35 %. Über dem Städtchen thront das Schloss Gruyères, fast 800 Jahre alt.' },
+  maelzerei: { kind: 'factory', name: 'Mälzerei', icon: '🌱', area: 'dorf', price: 6000, land: 35,
+    in: { weizen: 3 }, item: 'malz', n: 1, time: 8,
+    info: 'Malz ist gekeimtes Getreide (meist Gerste, auch Weizen). Die Körner baden in Wasser, bis ein kleiner Keim herauswächst. Dabei wachen Enzyme auf – winzige Helfer, die die Stärke im Korn in süssen Malzzucker zerschneiden. Dann trocknet heisse Luft in der Darre das Grünmalz, damit es nicht weiterwächst. Probier es selbst: Kau lange auf einem Stück Brot – es wird süss, weil dein Speichel dasselbe macht!' },
+  malzfabrik: { kind: 'factory', name: 'Malztrunk-Fabrik', icon: '💪', area: 'dorf', price: 10000, land: 35,
+    in: { malz: 1, kakaomasse: 1, milch: 2, eier: 1 }, item: 'malztrunk', n: 1, time: 10,
+    info: 'Der Berner Apotheker Albert Wander mischte 1904 Malzextrakt, Milch, Eier und Kakao zu einem Pulver – so entstand die „Ovo“. Sie sollte Kinder und Kranke stärken. Damit es ein Pulver wird, trocknet man die dicke Masse im Vakuum: Ohne Luftdruck kocht Wasser schon bei viel tieferer Temperatur weg, und der Geschmack bleibt erhalten.' },
+  schoggistube: { kind: 'factory', name: 'Schoggifondue-Stübli', icon: '🍡', area: 'dorf', price: 11000, land: 35,
+    in: { schokolade: 1, sahne: 1, apfel: 3 }, item: 'schoggifondue', n: 1, time: 10,
+    info: 'Schoggi schmilzt bei etwa 34 °C – knapp unter deiner Körpertemperatur. Darum zergeht sie im Mund, aber in der Hand meistens nicht. Fürs Schoggifondue schmilzt man Schokolade mit Rahm im Caquelon, spiesst Apfelschnitze auf lange Gabeln und tunkt sie ein. Aber nicht zu heiss: Sonst verbrennt die Schoggi und wird krümelig!' },
 };
 
 // Freischalten: Wird eine Endstation gebaut (ihre Ware verarbeitet niemand weiter, z. B. Konditorei),
@@ -203,6 +229,8 @@ const UNLOCKS = [
   ['pizzeria'],
   ['griessmuehle', 'nudelfabrik', 'trattoria'],
   ['tortenmeister'],
+  ['gelateria'],
+  ['sennhuette'],
 ];
 
 const TOOLS = {

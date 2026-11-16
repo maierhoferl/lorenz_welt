@@ -326,6 +326,7 @@ function loadGame(server) {
     relayout(); fitWorld();
     fixDeco();
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
+    G.unlocks = Math.max(G.unlocks, Math.min(Object.keys(G.fin).length, UNLOCKS.length)); // jede Endstation schaltet 1 Kette frei – auch Ketten, die erst später ins Spiel kamen
     if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
 }
@@ -1874,8 +1875,91 @@ DRAW.tortenmeister = (x, y, t) => { // das ganze Haus ist eine Torte
   ellipse(x + 9, y - 106, 5, 5, '#d8232a'); line('#4f7a2f', 1.5, x + 9, y - 111, x + 12, y - 116);
   sign(x, y - 140, bname(t));
 };
+// Neue Rezepte
+DRAW.gelateria = (x, y, t) => { // Riesen-Cornet auf dem Dach – es tropft!
+  house(x - 20, y, 92, 58, '#fde8ef', '#7fc8c0', 24); win(x - 56, y - 44, 20, 16, t.working); door(x - 8, y, 18, 30, '#e07a9a');
+  awning(x - 20, y - 58, 92, '#f28aa8', '#fff', 8);
+  const cx = x - 20, cy = y - 80;
+  ctx.fillStyle = '#d9a35a'; ctx.beginPath(); ctx.moveTo(cx - 13, cy - 30); ctx.lineTo(cx + 13, cy - 30); ctx.lineTo(cx, cy); ctx.fill();
+  for (let i = -1; i <= 1; i++) line('rgba(120,70,20,.5)', 1, cx + i * 7 - 6, cy - 30, cx + i * 7 + 4, cy - 12); // Waffelmuster
+  ellipse(cx, cy - 33, 14, 9, '#f5a3c7'); ellipse(cx - 1, cy - 44, 12, 8, '#fff6e0'); ellipse(cx + 1, cy - 54, 9, 7, '#7d4a2a'); ellipse(cx + 3, cy - 62, 3, 3, '#d8232a');
+  const k = (time * 0.35) % 1; ellipse(cx + 10 - k * 3, cy - 28 + k * 22, 2, 2.5 + k, '#f5a3c7'); // Tropfen
+  const [hx, hy] = hand(x + 40, y, 1.2); person(x + 40, y, '#3a6fd8', null, 1.2); // Kind mit Glace …
+  ctx.fillStyle = '#d9a35a'; ctx.beginPath(); ctx.moveTo(hx - 3, hy - 4); ctx.lineTo(hx + 3, hy - 4); ctx.lineTo(hx, hy + 3); ctx.fill(); ellipse(hx, hy - 6, 3.5, 3, '#a6e070');
+  ellipse(x + 58, y - 1, 5, 2.5, '#f5a3c7'); pet(x + 70, y + 2, '#c08a50', true); // … die andere Kugel ist runtergefallen, der Hund freut sich
+  sign(x - 20, y - 66, bname(t));
+};
+DRAW.sennhuette = (x, y, t) => { // Alphütte: der Senn rührt im Kupferkessi, die Kuh schaut ums Eck
+  const cw = Math.sin(time * 1.4 + t.id) * 2; // Kuh nickt
+  ellipse(x - 76, y - 28 + cw, 9, 8, '#fff'); ellipse(x - 79, y - 31 + cw, 4, 3, '#222'); ellipse(x - 82, y - 22 + cw, 6, 4, '#f2b6b0');
+  ellipse(x - 74, y - 37 + cw, 4, 2, '#fff'); ellipse(x - 80, y - 29 + cw, 1, 1, '#222');
+  house(x - 24, y, 88, 54, '#8a5a35', '#6a6560', 22);
+  for (let i = 1; i < 6; i++) line('rgba(40,20,10,.35)', 1, x - 68, y - i * 9, x + 20, y - i * 9); // Holzbalken
+  for (const sx of [-48, -24, 0]) ellipse(x + sx, y - 70, 6, 3, '#8f8a84'); // Steine halten das Dach bei Sturm fest
+  win(x - 56, y - 40, 16, 14, t.working); door(x - 16, y, 18, 30, '#4a2f1e');
+  const kx = x + 46;
+  line('#3a3a3a', 3, kx - 20, y, kx - 16, y - 50); line('#3a3a3a', 3, kx + 20, y, kx + 16, y - 50); line('#3a3a3a', 3, kx - 18, y - 48, kx + 18, y - 48); line('#3a3a3a', 1.5, kx, y - 48, kx, y - 40);
+  if (t.working) flames(kx, y + 2, 3, 6);
+  ctx.fillStyle = '#c8783a'; ctx.beginPath(); ctx.arc(kx, y - 30, 14, 0, Math.PI); ctx.fill(); ellipse(kx, y - 30, 14, 3.5, '#f2d78a');
+  puffs(kx, y - 34, t.working, '255,255,255', 0.6);
+  const a = phase(t), sx = kx + 28, arm = 0.8;
+  ctx.save(); ctx.translate(sx, 0); ctx.scale(-1, 1); person(0, y, '#3a6fd8', '#222', arm); ctx.restore(); // Senn im blauen Edelweisshemd
+  line('#6b4423', 2.5, sx - 3 - Math.cos(arm) * 9, y - 18 - Math.sin(arm) * 9, kx + Math.cos(a * 2) * 7, y - 31); // Kelle rührt
+  sign(x - 24, y - 64, bname(t));
+};
+DRAW.gruyerestube = (x, y, t) => { // Schlösschen mit Turm; im Doppelrahm steht der Löffel
+  house(x - 10, y, 88, 56, '#e6dccb', '#b5523a', 24); win(x - 44, y - 42, 18, 16, t.working); door(x - 4, y, 18, 30, '#6b4423');
+  const tx = x + 46; ctx.fillStyle = '#d8cdb8'; ctx.fillRect(tx - 14, y - 82, 28, 82); // Turm
+  for (let i = 0; i < 4; i++) ctx.fillRect(tx - 14 + i * 8, y - 88, 5, 6);
+  ctx.fillStyle = '#b5523a'; ctx.beginPath(); ctx.moveTo(tx - 17, y - 86); ctx.lineTo(tx + 17, y - 86); ctx.lineTo(tx, y - 122); ctx.fill();
+  line('#555', 1.5, tx, y - 122, tx, y - 132); ctx.fillStyle = '#d52b1e'; ctx.fillRect(tx, y - 132 + Math.sin(time * 3) * 0.6, 9, 5); // Fähnli
+  win(tx - 6, y - 64, 12, 16, t.working);
+  const bx = x - 10, by = y - 84; // Schüssel auf dem Dach
+  meringue(bx - 18, by + 2, 9);
+  ellipse(bx + 6, by, 15, 5, '#7fa7c9'); ctx.fillStyle = '#7fa7c9'; ctx.beginPath(); ctx.arc(bx + 6, by, 15, 0, Math.PI); ctx.fill(); ellipse(bx + 6, by, 13, 3.5, '#fff6dc');
+  ctx.save(); ctx.translate(bx + 6, by - 2); ctx.rotate(0.15 + Math.sin(time * 0.7) * 0.03); line('#b8c0c8', 3, 0, 0, 0, -22); ellipse(0, -24, 3.5, 5, '#b8c0c8'); ctx.restore(); // steht von allein!
+  sign(x - 10, y - 64, bname(t));
+};
+DRAW.maelzerei = (x, y, t) => { // Darre mit Lüftungshaube; davor keimen die Körner
+  house(x - 30, y, 84, 56, '#efe3c8', '#8a5a3a', 22); win(x - 62, y - 42, 18, 14, t.working); door(x - 24, y, 18, 30);
+  const dx = x + 32; ctx.fillStyle = '#c4704f'; ctx.fillRect(dx - 15, y - 90, 30, 90); bricks(dx - 15, y - 90, 30, 90); // Darre
+  ctx.save(); ctx.translate(dx, y - 90); ctx.rotate(Math.sin(time * 0.8) * (t.working ? 0.12 : 0.03)); // Haube dreht sich im Wind
+  ctx.fillStyle = '#e8e2d4'; ctx.beginPath(); ctx.moveTo(-19, 0); ctx.lineTo(19, 0); ctx.lineTo(0, -26); ctx.fill(); ctx.restore();
+  puffs(dx, y - 112, t.working, '240,230,200', 0.6);
+  ellipse(x + 64, y - 2, 18, 5, '#e3c27a'); // Körnerhaufen …
+  for (let i = 0; i < 6; i++) { const sx = x + 50 + i * 5.5, h = 4 + Math.abs(Math.sin(time * 0.6 + i)) * 5; line('#6aa23c', 1.5, sx, y - 4, sx + 1, y - 4 - h); ellipse(sx + 2, y - 4 - h, 1.8, 1, '#8ccf55'); } // … und alle keimen
+  const a = phase(t), w = Math.sin(a * 1.5) * 10; person(x + 64 + w, y + 10, '#8a5530', '#e8c35a', -0.4); line('#6b4423', 2, x + 70 + w, y - 5, x + 78 + w, y + 6); // Mälzer wendet mit dem Rechen
+  sign(x - 26, y - 62, bname(t));
+};
+DRAW.malzfabrik = (x, y, t) => { // Riesen-Tasse auf dem Dach; der Gewichtheber hat schon getrunken
+  house(x - 22, y, 96, 60, '#f6e6c8', '#e07a24', 24); win(x - 62, y - 46, 18, 16, t.working); win(x - 34, y - 46, 18, 16, t.working); door(x - 8, y, 18, 30, '#7a3b2a');
+  const cx = x - 26, cy = y - 92;
+  ctx.strokeStyle = '#3a6fd8'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx + 15, cy - 4, 6, -1.3, 1.3); ctx.stroke();
+  ctx.fillStyle = '#3a6fd8'; rrect(cx - 15, cy - 14, 30, 22, 6); ctx.fill(); ellipse(cx, cy - 13, 13, 3, '#8a5530'); puffs(cx, cy - 16, t.working, '255,255,255', 0.6);
+  const up = t.working ? Math.abs(Math.sin(phase(t) * 1.4)) : 0.2, px = x + 52, by = y - 26 - up * 12; // Hantel hoch, Hantel runter
+  line('#3a3a4a', 3, px - 3, y, px - 4, y - 9); line('#3a3a4a', 3, px + 3, y, px + 4, y - 9);
+  ctx.fillStyle = '#e07a24'; rrect(px - 5, y - 21, 10, 13, 3); ctx.fill();
+  line('#f1c9a5', 2.5, px - 4, y - 18, px - 10, by); line('#f1c9a5', 2.5, px + 4, y - 18, px + 10, by);
+  ellipse(px, y - 25, 5, 5, '#f1c9a5'); ellipse(px + 2, y - 26, 0.9, 0.9, '#222'); line('#222', 1, px - 1, y - 22.5, px + 3, y - 22.5);
+  line('#555', 2.5, px - 18, by, px + 18, by); for (const s of [-1, 1]) ellipse(px + s * 18, by, 3.5, 7, '#2a2a2a');
+  if (t.working && up > 0.9) { ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('💪', px + 22, by - 8); }
+  sign(x - 22, y - 66, bname(t));
+};
+DRAW.schoggistube = (x, y, t) => { // Caquelon auf dem Dach: ein Apfelschnitz taucht ein und wieder auf
+  house(x - 18, y, 96, 58, '#fbeedd', '#6b3a20', 26); win(x - 56, y - 44, 20, 16, t.working); win(x - 4, y - 44, 20, 16, t.working); door(x - 30, y, 16, 28, '#6b3a20');
+  ctx.fillStyle = '#6b3a20'; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.ellipse(x - 60 + i * 12, y - 58, 4, 4 + (i % 3) * 2.5, 0, 0, 7); ctx.fill(); } // Schoggi tropft vom Dach
+  const cx = x - 18, cy = y - 92;
+  if (t.working) flames(cx, cy + 18, 2, 7);
+  ctx.fillStyle = '#c0552f'; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI); ctx.fill(); ellipse(cx, cy, 18, 4.5, '#5a3220'); line('#c0552f', 4, cx + 16, cy + 2, cx + 30, cy - 2);
+  const d = t.working ? Math.max(0, Math.sin(phase(t) * 1.6)) * 14 : 6, fx = cx - 6, fy = cy - 6 - d; // Gabel mit Apfelschnitz
+  line('#999', 1.5, fx, fy, fx - 14, fy - 30);
+  ellipse(fx, fy, 5, 3.5, '#f3e6b8'); ctx.save(); ctx.beginPath(); ctx.rect(fx - 6, fy, 12, 6); ctx.clip(); ellipse(fx, fy, 5, 3.5, '#5a3220'); ctx.restore(); // halb schoggiert
+  const m = Math.sin(time * 0.9 + t.id), dir = Math.cos(time * 0.9 + t.id) > 0 ? 1 : -1;
+  mouse(x + 54 + m * 10, y + 4, dir, '#5a3220'); // die Maus hat sich einen Schoggi-Brocken geschnappt
+  sign(x - 18, y - 66, bname(t));
+};
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { gelateria: 130, sennhuette: 96, gruyerestube: 136, maelzerei: 128, malzfabrik: 120, schoggistube: 122, meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
