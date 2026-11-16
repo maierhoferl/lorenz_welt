@@ -812,6 +812,40 @@ function hud() {
   set(`<div><b>${d.icon || ''} ${d.name}</b><div>${st}</div>${w}</div><button>${$t`ℹ️ Wie geht das?`}</button>`, () => showInfo(t));
 }
 
+// =================== Land-Fest: grosse Animation, wenn eine Land-Stufe etwas Neues bringt ===================
+function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
+  const f = [];
+  for (const [k, a] of Object.entries(AREAS)) if (a.from === l) {
+    const th = Object.values(THINGS).filter(t => t.land === l && !UNLOCKS.flat().some(u => THINGS[u] === t)), tl = Object.values(TOOLS).find(t => t.land === l);
+    f.push({ ic: th.find(t => t.area === k)?.icon || '🎉', t: $t`Neues Gebiet im Süden: ${a.name}!`,
+      d: th.map(t => `${t.icon} ${t.name}`).concat(tl ? [`${tl.icon} ${tl.name}`] : []).join(' · ') });
+  }
+  const i = HOF_LV.indexOf(l);
+  if (i >= 0) f.push({ ic: '🏡', t: $t`Dein Bauernhof bekommt ${HOF_ADD[i]}!`, d: $t`Lauf hin und schau ihn dir an!` });
+  if (SHOP_LV.includes(l) || i === 1 || i === 3) f.push({ ic: '🏪', t: $t`Laden und Händler ziehen in grössere Häuser!`, d: $t`Mehr Regale, mehr Kundschaft, mehr Geld 💰` });
+  if (l === 20) f.push({ ic: '⛪', t: $t`Neu im Laden: Kirche und Gülle-Verteiler`, d: $t`Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩` });
+  const nb = TOWN.find(b => b.lv === l);
+  if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
+  else if (TOWN.some(b => l > b.lv && (l - b.lv) % 40 === 0 && (b.f0 || 1) + (l - b.lv) / 40 <= (b.max || (b.k === 'chalet' ? 3 : 4)))) f.push({ ic: '🏗️', t: $t`Im Städtchen wird ein Haus höher!`, d: $t`Ein Stock mehr – bis zu den Wolken? ☁️` });
+  return f;
+}
+const FUN = [$t`Die Kühe rufen: Muuuh-ega! 🐄`, $t`Sogar die Geissen machen einen Freudensprung! 🐐`, $t`Die Hühner gackern vor Stolz! 🐔`, $t`Das Murmeli pfeift dir ein Ständchen! 🎶`, $t`Der Nachbar staunt mit offenem Mund! 😮`, $t`Die Säuli wälzen sich vor Freude im Dreck! 🐖`];
+function fest(l, f) {
+  let nx = l + 1; while (nx < l + 60 && !landFeats(nx).length) nx++;
+  let pv = l - 1; while (pv > 0 && !landFeats(pv).length) pv--;
+  const el = $('#fest'), conf = Array.from({ length: 40 }, (_, k) => `<i style="left:${Math.random() * 100}%;background:hsl(${k * 37} 85% 58%);animation-delay:${Math.random() * 1.5}s;animation-duration:${2.5 + Math.random() * 2}s"></i>`).join('');
+  el.innerHTML = `${conf}<div class="fbox"><div class="fbig">${f.map(x => `<span>${x.ic}</span>`).join('')}</div>
+    <h2>${$t`Land-Stufe ${l}!`}</h2>
+    ${f.map((x, k) => `<div class="feat" style="animation-delay:${0.6 + k * 0.35}s"><span>${x.ic}</span><div><b>${x.t}</b><small>${x.d}</small></div></div>`).join('')}
+    <p class="fun">${FUN[l % FUN.length]}</p>
+    <div class="prog"><i style="--w:${Math.round(100 * (l - pv) / (nx - pv))}%"></i></div>
+    <small>${$t`Super gemacht! Nächste Überraschung bei Land-Stufe ${nx} 🎁`}</small>
+    <button class="btn" data-ok>${$t`Juhui, weiter!`}</button></div>`;
+  el.hidden = false; AU.sfx('grow'); setTimeout(() => AU.sfx('cash'), 700);
+  speak(`${$t`Land-Stufe ${l}!`} ${f.map(x => x.t).join(' ')} ${FUN[l % FUN.length]}`);
+  el.querySelector('[data-ok]').onclick = () => { el.hidden = true; window.speechSynthesis?.cancel(); };
+}
+
 // =================== Fenster: Info, Laden, Plan ===================
 function closeModals() { for (const id of ['#shop', '#plan', '#info']) $(id).hidden = true; shopDismiss = true; }
 function modal(el, title, body, extraHead = '') {
@@ -893,13 +927,9 @@ function shopList() {
     icon: '🗺️', name: $t`Land Stufe ${G.land + 1}`, price: lp, can: true,
     desc: $t`Mehr Platz für Felder, Bäume, Kühe und Gebäude`, info: $t`Mit mehr Land kannst du deine Welt vergrössern. Bauern kaufen oder pachten Land von Nachbarn.`,
     buy: () => {
-      G.land++; fitWorld(); relayout(); fixDeco(); toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
-      const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
-      if (SHOP_LV.includes(G.land)) toast($t`🏪 Laden und Händler sind gewachsen!`);
-      const nb = TOWN.find(b => b.lv === G.land); if (nb) toast($t`🏘️ Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`);
-      else if (TOWN.some(b => G.land > b.lv && (G.land - b.lv) % 40 === 0 && townFloors(b) > townFloors({ ...b, lv: b.lv + 1 }))) toast($t`🏗️ Im Städtchen wird ein Haus höher!`);
-      if (i === 1 || i === 3) setTimeout(() => toast($t`🏪 Laden und Händler ziehen in grössere Häuser!`), 2500);
-      for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Süden ⬇️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
+      G.land++; fitWorld(); relayout(); fixDeco();
+      const f = landFeats(G.land);
+      if (f.length) { closeModals(); fest(G.land, f); } else toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
     },
   });
   if (G.land >= 20) tabs[3].push({ icon: '⛪', name: $t`Kirche`, price: 20000, can: !G.kirche, neu: !G.kirche,

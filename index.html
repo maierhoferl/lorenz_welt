@@ -118,6 +118,26 @@
   #plan .probs .imp { font-size:12px; font-weight:800; text-align:right; white-space:nowrap; }
   #plan .probs .imp i { display:block; height:6px; margin:0 0 3px auto; border-radius:3px; background:#3d8b2f; }
   .legend { font-size:13px; display:flex; gap:14px; flex-wrap:wrap; margin:6px 0; }
+  #fest { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; padding:16px; overflow:hidden;
+    background:radial-gradient(circle, rgba(255,220,120,.55), rgba(0,0,0,.6) 70%); animation: ffade .4s; }
+  #fest > i { position:absolute; top:-20px; width:12px; height:18px; border-radius:3px; animation: fall linear infinite; }
+  .fbox { position:relative; background:var(--paper); border:5px solid #f0a020; border-radius:28px; padding:18px 20px; width:min(560px, 100%); max-height:100%; overflow:auto;
+    text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.5); animation: tin .6s cubic-bezier(.3,1.6,.6,1); display:flex; flex-direction:column; gap:10px; }
+  .fbig { font-size:clamp(64px, 18vw, 110px); line-height:1.1; display:flex; justify-content:center; gap:8px; }
+  .fbig span { display:inline-block; animation: pop .8s cubic-bezier(.3,1.8,.5,1) both, wob 2s .8s ease-in-out infinite; }
+  .fbig span:nth-child(2) { animation-delay:.2s, 1s; } .fbig span:nth-child(3) { animation-delay:.4s, 1.2s; }
+  .fbox h2 { margin:0; font-size:clamp(30px, 8vw, 44px); color:var(--ch); text-shadow:0 3px 0 #f0c060; animation: pop .6s .2s both; }
+  .feat { display:flex; gap:12px; align-items:center; text-align:left; background:#fff; border-radius:16px; padding:10px 12px; box-shadow:0 3px 0 #e0cfa8; animation: slide .5s both; }
+  .feat > span { font-size:40px; } .feat b { display:block; font-size:18px; } .feat small { font-size:14px; opacity:.8; }
+  .fbox .fun { margin:0; font-size:18px; font-weight:700; color:var(--green); }
+  .prog { height:16px; border-radius:8px; background:#e6d6b5; overflow:hidden; }
+  .prog i { display:block; height:100%; width:var(--w); background:linear-gradient(90deg, #f0a020, var(--ch)); border-radius:8px; animation: grow 1.5s .8s both; }
+  @keyframes ffade { from { opacity:0; } }
+  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); } }
+  @keyframes pop { from { transform:scale(0) rotate(-30deg); opacity:0; } }
+  @keyframes wob { 50% { transform:translateY(-10px) rotate(6deg); } }
+  @keyframes slide { from { transform:translateX(-40px); opacity:0; } }
+  @keyframes grow { from { width:0; } }
 </style>
 </head>
 <body>
@@ -199,6 +219,7 @@
   <div id="shop" class="modal" hidden></div>
   <div id="plan" class="modal" hidden></div>
   <div id="info" class="modal" hidden></div>
+  <div id="fest" hidden></div>
 </section>
 
 <script>
