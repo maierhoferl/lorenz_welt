@@ -1866,7 +1866,7 @@ const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
 const harvTool = () => harvest && THINGS[harvest.t.type].tool;
-const onTractor = () => G.tools.tragen === 4 && !harvest; // beim Ernten steigt man ab
+const onTractor = () => G.tools.tragen >= 4 && !harvest; // beim Ernten steigt man ab
 const liftH = () => harvTool() === 'obst' && G.tools.obst === 3 ? 26 : onTractor() ? 12 : 0;
 function wheel(x, y, r) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = '#a8a8a8'; ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, 7); ctx.fill(); }
 function line(c, w, ...pts) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[0], pts[1]); ctx.stroke(); }
@@ -1930,7 +1930,7 @@ function gearFront(D) {
 // Vorderachse hält Abstand zur Kupplung, Hinterachse zur Vorderachse.
 const hasCart = () => G.tools.tragen === 3 || onTractor();
 const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1; return [tx - (tx - x) / l * d, ty - (ty - y) / l * d]; };
-function cartDims(s) { const t = onTractor(); return { k: (t ? 18 : 6) * s, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
+function cartDims(s) { const t = onTractor(), k = (t ? 18 : 6) * s; if (t) s *= 1 + (G.tools.tragen - 4) * 0.25; return { k, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
 function trailCart() {
   if (!hasCart()) { cart.on = false; return; }
   const c = cartDims(0.85 + G.stage * 0.09), ux = Math.cos(trH), uy = Math.sin(trH);
@@ -1993,17 +1993,19 @@ function drawTruck(k) {
   if (k.icons) { ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.fillText(k.icons, ...P(-L / 2 + 5, 0, 44)); }
 }
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
+const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782']]; // Stufe 4/5/6: grün, rot, blau
 function tractorParts(x, y, s) {
+  const [c1, c2, c3] = TR_COL[G.tools.tragen - 4] || TR_COL[0];
   const P = proj(x, y, s), { ux, uy } = P, box = (...a) => box3(P, ...a);
   const part = (a, b, d) => ({ y: P(a, b)[1], d });
   const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * s, ux, uy); });
   const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * s, ...P(a, b, 15), ...P(a, b, 58)));
   const shadow = { y: -Infinity, d: () => { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-14, 15], [38, 12], [38, -12], [-14, -15]]) ctx.lineTo(...P(a, b)); ctx.fill(); } };
   return [shadow, whl(0, 13, 12), whl(0, -13, 12), whl(30, 9, 7), whl(30, -9, 7),
-    part(0, 0, () => box(-9, 7, 9, 8, 7, '#38a35b', '#2f8f4e')), // Sitzkasten
-    part(21, 0, () => { box(6, 36, 6, 8, 13, '#38a35b', '#2f8f4e'); line('#333', 2.5 * s, ...P(30, 0, 21), ...P(30, 0, 31 + Math.abs(Math.sin(time * 12)) * 2)); }), // Motorhaube + Auspuff
+    part(0, 0, () => box(-9, 7, 9, 8, 7, c1, c2)), // Sitzkasten
+    part(21, 0, () => { box(6, 36, 6, 8, 13, c1, c2); line('#333', 2.5 * s, ...P(30, 0, 21), ...P(30, 0, 31 + Math.abs(Math.sin(time * 12)) * 2)); }), // Motorhaube + Auspuff
     post(-8, 9), post(-8, -9), post(6, 9), post(6, -9),
-    { y: Infinity, d: () => box(-10, 8, 11, 58, 3, '#38a35b', '#26794a') }]; // Dach
+    { y: Infinity, d: () => box(-10, 8, 11, 58, 3, c1, c3) }]; // Dach
 }
 // Bein mit Knie (2-Glied-IK) in der Ebene quer-Versatz b: Fuss schwingt nach vorn und hebt ab, Standbein bleibt am Boden.
 // Rechnet in (vorne, unten) wie in der Seitenansicht und projiziert dann in 3D.

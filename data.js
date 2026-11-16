@@ -232,6 +232,8 @@ const TOOLS = {
     { name: 'Schubkarre', cap: 50, price: 60, info: 'Ein Hebel auf Rädern! Die Last liegt nah am Rad, darum musst du nur einen Teil des Gewichts heben.' },
     { name: 'Leiterwagen', cap: 100, price: 200, info: 'Vier Räder tragen das ganze Gewicht – du musst nur noch ziehen.' },
     { name: 'Traktor mit Anhänger', cap: 240, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
+    { name: 'Grosser Traktor mit Kipper', cap: 500, price: 3000, info: 'Ein Kipper hat unter der Ladefläche einen Hydraulikzylinder. Er drückt die Mulde schräg nach oben – und die ganze Ladung rutscht auf einmal hinaus.' },
+    { name: 'Riesentraktor mit Allrad', cap: 1000, price: 10000, info: 'Allradantrieb: Der Motor treibt alle vier Räder an, nicht nur die hinteren. So rutscht der schwere Traktor auch im Schlamm nicht. Mit GPS lenkt er sogar fast von selbst geradeaus.' },
   ]},
   reben: { name: 'Trauben-Ernte', icon: '🍇', land: 10, levels: [
     { name: 'Hände', speed: 1, price: 0, info: 'Trauben mit der Hand abreissen – dabei platzen viele Beeren.' },

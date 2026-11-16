@@ -230,6 +230,8 @@ var TR = {
       ['Carriola', 'Una leva su una ruota! Il carico sta vicino alla ruota, così sollevi solo una parte del peso.'],
       ['Carretto', 'Quattro ruote portano tutto il peso – devi solo tirare.'],
       ['Trattore con rimorchio', 'Un motore diesel: il carburante brucia nel cilindro e spinge un pistone. L’albero motore lo trasforma in rotazione, che col cambio fa girare le enormi ruote.'],
+      ['Grande trattore con ribaltabile', 'Un ribaltabile ha un cilindro idraulico sotto il cassone. Spinge il cassone in alto in obliquo – e tutto il carico scivola fuori in un colpo.'],
+      ['Trattore gigante a quattro ruote motrici', 'Trazione integrale: il motore muove tutte e quattro le ruote, non solo quelle dietro. Così il trattore pesante non slitta nemmeno nel fango. Col GPS va dritto quasi da solo.'],
     ]],
     reben: ['Vendemmia', [
       ['Mani', 'Staccare i grappoli a mano – molti acini scoppiano.'],

@@ -230,6 +230,8 @@ var TR = {
       ['Brouette', 'Un levier sur roue ! La charge est près de la roue, donc tu ne soulèves qu’une partie du poids.'],
       ['Char à ridelles', 'Quatre roues portent tout le poids – tu n’as plus qu’à tirer.'],
       ['Tracteur avec remorque', 'Un moteur diesel : le carburant brûle dans le cylindre et pousse un piston. Le vilebrequin en fait une rotation qui, par la boîte de vitesses, fait tourner les énormes roues.'],
+      ['Gros tracteur avec benne', 'Une benne a un vérin hydraulique sous son plateau. Il pousse la benne vers le haut en biais – et tout le chargement glisse dehors d’un coup.'],
+      ['Tracteur géant à quatre roues motrices', 'Quatre roues motrices : le moteur entraîne les quatre roues, pas seulement celles de derrière. Ainsi le lourd tracteur ne patine pas, même dans la boue. Avec le GPS, il roule presque tout seul en ligne droite.'],
     ]],
     reben: ['Vendanges', [
       ['Mains', 'Arracher les grappes à la main – beaucoup de grains éclatent.'],

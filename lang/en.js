@@ -230,6 +230,8 @@ var TR = {
       ['Wheelbarrow', 'A lever on a wheel! The load sits close to the wheel, so you only lift part of the weight.'],
       ['Handcart', 'Four wheels carry all the weight – you only have to pull.'],
       ['Tractor with trailer', 'A diesel engine: fuel burns in the cylinder and pushes a piston. The crankshaft turns that into rotation, which drives the huge wheels through the gearbox.'],
+      ['Big tractor with tipper', 'A tipper has a hydraulic cylinder under its bed. It pushes the bin up at an angle – and the whole load slides out at once.'],
+      ['Giant four-wheel-drive tractor', 'Four-wheel drive: the engine drives all four wheels, not just the rear ones. So the heavy tractor does not slip even in mud. With GPS it almost steers straight on its own.'],
     ]],
     reben: ['Grape harvest', [
       ['Hands', 'Pulling grapes off by hand – lots of berries burst.'],
