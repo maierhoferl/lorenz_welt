@@ -2996,7 +2996,7 @@ function drawHill(a, end) {
 }
 // Wie am Lac Léman: Berge steigen am Nordufer steil aus dem Wasser (Blick wie von Lausanne zu den Savoyer Alpen),
 // der Fluss mündet dazwischen wie die Rhone, davor Schloss Chillon. [x, Fuss-y, Höhe, halbe Breite links, rechts, Zacken] in Kacheln, hinten → vorn
-const LEMAN = [[4.6, 25, 4.4, 3.6, 3, 3], [1.4, 25.6, 3.6, 2.6, 2.2, 1], [7.6, 25.3, 2.4, 1.7, 1.1, 0], [0.3, 28.8, 2.6, 1.6, 2.6, 0]];
+const LEMAN = [[4.6, 25, 4.4, 3.6, 3, 3, 1], [1.4, 25.6, 3.6, 2.6, 2.2, 1], [7.6, 25.3, 2.4, 1.7, 1.1, 0, 1], [0.3, 28.8, 2.6, 1.6, 2.6, 0]]; // letzte Zahl 1 = Lavaux-Reben am Hang
 const inMts = (x, y) => LEMAN.some(([mx, f, h, wl, wr]) => { const d = x / T - mx, s = d < 0 ? wl : wr; return Math.abs(d) < s && y / T < f + 0.6 && y / T > f - h * (1 - Math.abs(d) / s); });
 function lemanPath([x, f, h, wl, wr, n], k = 1) { // k = -0.5: Spiegelbild im See
   const r = seeded(Math.round(x * 7) + 3), X = x * T, F = f * T, base = k > 0 ? F + 0.6 * T : F;
@@ -3010,10 +3010,19 @@ function lemanPath([x, f, h, wl, wr, n], k = 1) { // k = -0.5: Spiegelbild im Se
 }
 function lemanMts() {
   for (const m of LEMAN) {
-    const [x, f, h, wl, wr] = m, X = x * T, F = f * T, top = F - h * T, r = seeded(Math.round(x * 5));
+    const [x, f, h, wl, wr, , lav] = m, X = x * T, F = f * T, top = F - h * T, r = seeded(Math.round(x * 5));
     const g = ctx.createLinearGradient(0, top, 0, F); g.addColorStop(0, '#9aa0aa'); g.addColorStop(0.45, '#7f8681'); g.addColorStop(0.72, '#4f7a45'); g.addColorStop(1, '#3a6533');
     lemanPath(m); ctx.fillStyle = g; ctx.fill();
     ctx.save(); ctx.clip();
+    if (lav) { // Lavaux: Rebterrassen mit Trockenmäuerchen am unteren Hang, Oberkante leicht gewellt
+      const edge = xx => F - h * T * 0.45 + Math.sin(xx * 0.05 + x) * 6;
+      ctx.fillStyle = '#86b04e'; ctx.beginPath(); ctx.moveTo(X - wl * T, F + T); for (let xx = X - wl * T; xx <= X + wr * T; xx += 8) ctx.lineTo(xx, edge(xx)); ctx.lineTo(X + wr * T, F + T); ctx.fill();
+      for (let y = F - h * T * 0.45 + 6, i = 0; y < F + T; y += 9, i++) for (let xx = X - wl * T + (i % 2) * 4; xx < X + wr * T; xx += 8) {
+        if (y < edge(xx) + 3) continue;
+        ctx.fillStyle = '#ddd0a6'; ctx.fillRect(xx, y, 8, 2); // Mäuerchen
+        ctx.fillStyle = '#3f6e2a'; ctx.fillRect(xx + 2, y - 5, 3, 4); // Rebstock
+      }
+    }
     if (h > 3) { ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(X - wl * T, top - 20); for (let d = -wl * T; d <= wr * T; d += 10) ctx.lineTo(X + d, top + h * T * 0.28 + Math.sin(d * 0.09 + x) * 7); ctx.lineTo(X + wr * T, top - 20); ctx.fill(); } // Schnee
     ctx.fillStyle = 'rgba(20,30,50,.18)'; ctx.beginPath(); ctx.moveTo(X, top); ctx.lineTo(X + wr * T, F + T); ctx.lineTo(X + wr * 0.1 * T, F + T); ctx.fill(); // Schattenseite (Licht von links)
     ctx.restore();
@@ -3060,6 +3069,13 @@ function lakeLive() { // Wellen, Schilf, Steg, Name – über dem See aus dem Hi
     ctx.globalAlpha = Math.sin(k * Math.PI); ctx.beginPath(); ctx.arc(wx, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.arc(wx + 12, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.globalAlpha = 1; ctx.restore();
+  // Jet d'eau: Fontäne im See, Wind weht die Gischt nach rechts
+  const jx = 14 * T, jy = 27.6 * T, H = 125 + Math.sin(time * 3) * 4, q = seeded(29);
+  ellipse(jx + 2, jy, 16, 4, 'rgba(255,255,255,.6)');
+  const jg = ctx.createLinearGradient(0, jy - H, 0, jy); jg.addColorStop(0, 'rgba(255,255,255,.25)'); jg.addColorStop(1, 'rgba(255,255,255,.95)');
+  ctx.fillStyle = jg; ctx.beginPath(); ctx.moveTo(jx - 3, jy); ctx.quadraticCurveTo(jx - 1, jy - H * 0.6, jx + 6, jy - H); ctx.lineTo(jx + 12, jy - H + 6); ctx.quadraticCurveTo(jx + 3, jy - H * 0.5, jx + 4, jy); ctx.fill();
+  for (let i = 0; i < 24; i++) { const k = (time * 0.7 + q()) % 1, o = q() * 8; ctx.globalAlpha = 0.7 * (1 - k); ellipse(jx + 8 + k * 26 + o, jy - H + 4 + k * k * (H - 6), 3 + k * 4, 3 + k * 4, '#fff'); } // Gischt fällt
+  ctx.globalAlpha = 1;
   // Schilf am Ufer
   for (const a of [2.4, 2.6, 0.5, 0.65, 4.1]) {
     const rr = LAKE.rx * lakeR(a) - 0.1, x = (LAKE.x + Math.cos(a) * rr) * T, y = (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T;
