@@ -496,6 +496,29 @@ const AREAS = {
 const HOF_LV = [2, 5, 10, 15, 20];
 const SHOP_LV = [30, 40, 50, 60]; // danach wachsen Laden und Händler weiter in die Höhe
 const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
+// Ab Land-Stufe 25 wächst der Hof zur kleinen Stadt: bei lv kommt ein Gebäude dazu (Kacheln, x/y = Mitte unten),
+// alle 40 Stufen bekommt es einen Stock mehr (f0 = Stöcke am Anfang, max = höchstens). Reihen: hinter dem Hof, am Hofweg, Osttasche, links vom Bach.
+const TOWN = [
+  { lv: 25, x: 7.4, y: 12.3, k: 'haus' },
+  { lv: 30, x: 8.5, y: 5.6, k: 'chalet' },
+  { lv: 35, x: 9.15, y: 12.3, k: 'amt', name: 'Schule', icon: '🏫', wall: '#f2e2b8', sign: '#2f6fc4' },
+  { lv: 40, x: 6.75, y: 5.6, k: 'chalet' },
+  { lv: 45, x: 12.65, y: 12.3, k: 'amt', name: 'Post', icon: '📯', wall: '#f4efe4', sign: '#f2c21a' },
+  { lv: 50, x: 10.25, y: 5.6, k: 'haus' },
+  { lv: 55, x: 1.6, y: 9, k: 'chalet' },
+  { lv: 60, x: 14.4, y: 12.3, k: 'amt', name: 'Gemeindehaus', icon: '🏛️', wall: '#efe6d2', sign: '#d52b1e', flag: 1 },
+  { lv: 65, x: 12, y: 5.6, k: 'haus' },
+  { lv: 70, x: 16.5, y: 14.9, k: 'amt', name: 'Feuerwehr', icon: '🚒', wall: '#e9e2d6', sign: '#d52b1e', garage: 1 },
+  { lv: 75, x: 5, y: 5.6, k: 'chalet' },
+  { lv: 80, x: 10.9, y: 12.3, k: 'haus' },
+  { lv: 90, x: 13.75, y: 5.6, k: 'amt', name: 'Hotel', icon: '⭐', wall: '#f6ead0', sign: '#6b4fa3', f0: 2, max: 5 },
+  { lv: 100, x: 16.15, y: 12.3, k: 'amt', name: 'Spital', icon: '🏥', wall: '#f7f7f4', sign: '#3a9a5a' },
+  { lv: 110, x: 1.6, y: 6.6, k: 'chalet' },
+  { lv: 120, x: 15.5, y: 5.6, k: 'amt', name: 'Bibliothek', icon: '📚', wall: '#e8d8c0', sign: '#8a5a30' },
+  { lv: 130, x: 16.5, y: 17.5, k: 'amt', name: 'Kino', icon: '🎬', wall: '#3f3a4a', sign: '#e8303a' },
+  { lv: 140, x: 1.6, y: 11.4, k: 'haus' },
+  { lv: 150, x: 17.25, y: 5.6, k: 'amt', name: 'Museum', icon: '🖼️', wall: '#ece4d4', sign: '#4f6f5a' },
+];
 const PASTURE = { x: 19.2, y: 27.5, w: 10, h: 6.6 }; // Zaun (Kacheln), w wächst mit der Weide (fitWorld)
 
 // Feste Orte (Kacheln, x/y = Mitte unten)

@@ -696,6 +696,7 @@ function decoSpotOk(x, y) {
     }
   }
   for (const p of paths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; if (x > (Math.min(ax, bx) - 0.8) * T && x < (Math.max(ax, bx) + 0.8) * T && y > (Math.min(ay, by) - 0.6) * T && y < (Math.max(ay, by) + 1) * T) return false; } // nicht auf den Weg
+  if (townOn().some(b => Math.abs(x - b.x * T) < 1.1 * T && y > (b.y - 1.6) * T && y < (b.y + 0.5) * T)) return false; // Häuser vom Städtchen
   if (lotOn() && x > (LOT.x - 0.4) * T && x < (LOT.x + LOT.cols * LOT.bay + 1) * T && y > (LOT.y - 0.2) * T && y < (LOT.rows[1] + 1.4) * T) return false; // Parkplatz
   if (x > PASTURE.x * T - 20 && x < (PASTURE.x + PASTURE.w) * T + 20 && y > PASTURE.y * T - 20 && y < (PASTURE.y + PASTURE.h) * T + 30) return false;
   return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
@@ -895,6 +896,8 @@ function shopList() {
       G.land++; fitWorld(); relayout(); fixDeco(); toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
       const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
       if (SHOP_LV.includes(G.land)) toast($t`🏪 Laden und Händler sind gewachsen!`);
+      const nb = TOWN.find(b => b.lv === G.land); if (nb) toast($t`🏘️ Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`);
+      else if (TOWN.some(b => G.land > b.lv && (G.land - b.lv) % 40 === 0 && townFloors(b) > townFloors({ ...b, lv: b.lv + 1 }))) toast($t`🏗️ Im Städtchen wird ein Haus höher!`);
       if (i === 1 || i === 3) setTimeout(() => toast($t`🏪 Laden und Händler ziehen in grössere Häuser!`), 2500);
       for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Süden ⬇️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
@@ -1526,6 +1529,29 @@ function flowers(x0, x1, y) { ctx.fillStyle = '#6b4423'; ctx.fillRect(x0, y, x1 
 function balcony(x, w, y) {
   ctx.fillStyle = '#7a4a26'; ctx.fillRect(x - w / 2 - 4, y - 2, w + 8, 4); for (let bx = x - w / 2; bx <= x + w / 2; bx += 8) ctx.fillRect(bx, y - 2, 2.5, 12); ctx.fillRect(x - w / 2 - 4, y + 8, w + 8, 2.5);
   flowers(x - w / 2, x + w / 2, y - 4);
+}
+// ---- Hof → Städtchen (TOWN) ----
+const townOn = () => TOWN.filter(b => G.land >= b.lv);
+const townFloors = b => Math.min(b.max || (b.k === 'chalet' ? 3 : 4), (b.f0 || 1) + Math.floor((G.land - b.lv) / 40));
+const TOWN_WALL = ['#f3e3c3', '#e9c9a8', '#d9e4ea', '#f2d0c4', '#e4e9c8', '#f6f1e4'], TOWN_ROOF = ['#8a3b2a', '#6f4a3a', '#5a5f66', '#a0522d'];
+function drawTown(b) {
+  const x = b.x * T, y = b.y * T, f = townFloors(b), n = b.lv / 5;
+  if (b.k === 'chalet') {
+    const top = alpHouse(x, y, 62, 14, 22 * f, 18);
+    for (let i = 0; i < f; i++) { for (const wx of [-22, 8]) shutterWin(x + wx, top + 4 + i * 22, 14, 11); flowers(x - 24, x + 24, top + 20 + i * 22); }
+    door(x, y, 12, 14, '#5b3a1e'); return;
+  }
+  const w = b.k === 'haus' ? 60 : 78, fh = 24, h = 24 + f * fh;
+  house(x, y, w, h, b.wall || TOWN_WALL[n % TOWN_WALL.length], TOWN_ROOF[n % TOWN_ROOF.length], f > 3 ? 14 : 22);
+  const cols = b.k === 'haus' ? 2 : 3;
+  for (let i = 0; i < f; i++) for (let j = 0; j < cols; j++) { const wx = x - w / 2 + (j + 0.5) * w / cols - 7; b.k === 'haus' ? shutterWin(wx, y - h + 6 + i * fh, 14, 12) : win(wx, y - h + 6 + i * fh, 14, 13); }
+  if (b.garage) for (const gx of [-20, 20]) { ctx.fillStyle = '#c8241a'; ctx.fillRect(x + gx - 15, y - 22, 30, 22); for (let py = y - 18; py < y; py += 5) line('rgba(0,0,0,.25)', 1, x + gx - 15, py, x + gx + 15, py); }
+  else door(x, y, 14, 20, '#5b3a1e');
+  if (b.flag) flagPole(x + w / 2 - 8, y - h - 6, 30, 14, b.lv);
+  if (b.name) { // Schild über dem Eingang
+    const t = `${$t([b.name]).toUpperCase()} ${b.icon}`; ctx.font = '800 10px system-ui'; const tw = ctx.measureText(t).width + 10;
+    ctx.fillStyle = b.sign; rrect(x - tw / 2, y - h - 2, tw, 15, 4); ctx.fill(); ctx.textAlign = 'center'; ctx.fillStyle = b.sign === '#f2c21a' ? '#222' : '#fff'; ctx.fillText(t, x, y - h + 9);
+  }
 }
 // ---- Laden & Händler: Ausbaustufen ----
 function haendlerMann(x, y) { // y = Schultern
@@ -3049,13 +3075,14 @@ function render() {
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]));
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, t] of list) {
     if (!t) drawPlayer();
     else if (t.truck) drawTruck(t.truck);
+    else if (t.town) drawTown(t.town);
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
       ctx.globalAlpha = 0.85; ellipse(t.x, t.y, 22, 8, ok ? 'rgba(80,200,80,.45)' : 'rgba(220,50,40,.5)');

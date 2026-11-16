@@ -127,6 +127,7 @@ var TR = {
     "💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!": "💩 Tes champs sont fertilisés – double récolte de blé !",
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 L’épandeur est prêt – achète des animaux pour avoir du fumier !",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 Ta ferme s’agrandit : {} !', '🏪 Laden und Händler sind gewachsen!': '🏪 Le magasin et le marchand se sont agrandis !', '🎉 Neu im Süden ⬇️: {}! Schau im Laden.': '🎉 Nouveau au sud ⬇️ : {} ! Regarde au magasin.',
+    '🏘️ Dein Hof wächst zum Städtchen: {}!': '🏘️ Ta ferme devient une petite ville : {} !', 'ein neues Haus': 'une nouvelle maison', '🏗️ Im Städtchen wird ein Haus höher!': '🏗️ Une maison de la petite ville grandit !', 'Schule': 'École', 'Post': 'Poste', 'Gemeindehaus': 'Mairie', 'Feuerwehr': 'Pompiers', 'Hotel': 'Hôtel', 'Spital': 'Hôpital', 'Bibliothek': 'Bibliothèque', 'Kino': 'Cinéma', 'Museum': 'Musée',
     'Du stellst es hin, wo du willst': 'Tu le poses où tu veux', 'Schwimmt auf dem See': 'Nage sur le lac', 'Fliegt über deine Welt': 'Vole au-dessus de ton monde',
     'Fährt in die Berge': 'Monte dans les montagnes', 'Neu': 'Nouveau', '✅ Schon gekauft': '✅ Déjà acheté', 'Stell zuerst {} ab': 'Pose d’abord {}', 'Hast du schon {}×': 'Tu en as déjà {}×',
     '🌱 Tiere & Pflanzen': '🌱 Animaux & plantes', '🏭 Gebäude': '🏭 Bâtiments', '🔧 Werkzeuge': '🔧 Outils', '🗺️ Land': '🗺️ Terrain', '🏔️ Deko': '🏔️ Déco',

@@ -127,6 +127,7 @@ var TR = {
     "💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!": "💩 I tuoi campi sono concimati – raccolto di grano doppio!",
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 Lo spandiliquame è pronto – compra animali per avere letame!",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 La tua fattoria si ingrandisce: {}!', '🏪 Laden und Händler sind gewachsen!': '🏪 Il negozio e il commerciante sono cresciuti!', '🎉 Neu im Süden ⬇️: {}! Schau im Laden.': '🎉 Novità a sud ⬇️: {}! Guarda nel negozio.',
+    '🏘️ Dein Hof wächst zum Städtchen: {}!': '🏘️ La tua fattoria diventa una cittadina: {}!', 'ein neues Haus': 'una casa nuova', '🏗️ Im Städtchen wird ein Haus höher!': '🏗️ Una casa della cittadina diventa più alta!', 'Schule': 'Scuola', 'Post': 'Posta', 'Gemeindehaus': 'Municipio', 'Feuerwehr': 'Pompieri', 'Hotel': 'Hotel', 'Spital': 'Ospedale', 'Bibliothek': 'Biblioteca', 'Kino': 'Cinema', 'Museum': 'Museo',
     'Du stellst es hin, wo du willst': 'Lo metti dove vuoi', 'Schwimmt auf dem See': 'Galleggia sul lago', 'Fliegt über deine Welt': 'Vola sopra il tuo mondo',
     'Fährt in die Berge': 'Sale in montagna', 'Neu': 'Nuovo', '✅ Schon gekauft': '✅ Già comprato', 'Stell zuerst {} ab': 'Prima metti giù {}', 'Hast du schon {}×': 'Ne hai già {}×',
     '🌱 Tiere & Pflanzen': '🌱 Animali & piante', '🏭 Gebäude': '🏭 Edifici', '🔧 Werkzeuge': '🔧 Attrezzi', '🗺️ Land': '🗺️ Terreno', '🏔️ Deko': '🏔️ Decorazioni',

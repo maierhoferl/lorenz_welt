@@ -127,6 +127,7 @@ var TR = {
     "💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!": "💩 Your fields are being fertilised – double wheat harvest now!",
     "💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!": "💩 The slurry spreader is ready – buy animals so there is dung!",
     '🏡 Dein Bauernhof wird ausgebaut: {}!': '🏡 Your farm is growing: {}!', '🏪 Laden und Händler sind gewachsen!': '🏪 The shop and the trader have grown!', '🎉 Neu im Süden ⬇️: {}! Schau im Laden.': '🎉 New in the south ⬇️: {}! Have a look in the shop.',
+    '🏘️ Dein Hof wächst zum Städtchen: {}!': '🏘️ Your farm is growing into a little town: {}!', 'ein neues Haus': 'a new house', '🏗️ Im Städtchen wird ein Haus höher!': '🏗️ A house in the town is getting taller!', 'Schule': 'School', 'Post': 'Post office', 'Gemeindehaus': 'Town hall', 'Feuerwehr': 'Fire station', 'Hotel': 'Hotel', 'Spital': 'Hospital', 'Bibliothek': 'Library', 'Kino': 'Cinema', 'Museum': 'Museum',
     'Du stellst es hin, wo du willst': 'You put it wherever you like', 'Schwimmt auf dem See': 'Floats on the lake', 'Fliegt über deine Welt': 'Flies over your world',
     'Fährt in die Berge': 'Goes up into the mountains', 'Neu': 'New', '✅ Schon gekauft': '✅ Already bought', 'Stell zuerst {} ab': 'Put down {} first', 'Hast du schon {}×': 'You have {}× already',
     '🌱 Tiere & Pflanzen': '🌱 Animals & plants', '🏭 Gebäude': '🏭 Buildings', '🔧 Werkzeuge': '🔧 Tools', '🗺️ Land': '🗺️ Land', '🏔️ Deko': '🏔️ Decoration',
