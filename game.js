@@ -446,12 +446,12 @@ function update(dt) {
   if (joy) { const dx = joy.x - joy.x0, dy = joy.y - joy.y0, l = Math.hypot(dx, dy); if (l > 8) { mx = dx / Math.max(l, 50); my = dy / Math.max(l, 50); } }
   const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   const sp = 4.6 * T * (1 + G.stage * 0.06);
-  const ox = G.px, oy = G.py;
+  const ox = G.px, oy = G.py, solid = (x, y) => inLake(x, y) || inMts(x, y) && !inMts(ox, oy); // wer (alter Spielstand) im Berg steht, darf hinaus
   G.px = clamp(G.px + mx * sp * dt, T, (WORLD.w - 1) * T);
-  if (inLake(G.px, G.py)) G.px = ox; // nicht in den See laufen – am Ufer entlang rutschen
+  if (solid(G.px, G.py)) G.px = ox; // nicht in den See oder Berg laufen – am Ufer entlang rutschen
   fitWorld(); THINGS.feld.n = guelleOn() ? FELD_N * 2 : FELD_N; // ponytail: jedes Frame gesetzt, so stimmt's auch nach Laden/Kauf
   G.py = clamp(G.py + my * sp * dt, T * 1.5, (WORLD.h - 0.5) * T);
-  if (inLake(G.px, G.py)) G.py = oy;
+  if (solid(G.px, G.py)) G.py = oy;
   moving = ml > 0.1;
   amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 10); // Schritt weich ein-/ausblenden
   if (moving) { // dreht sich (der Traktor langsamer) in die Laufrichtung
@@ -685,7 +685,7 @@ const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k 
 const ghostPos = () => ({ x: G.px + Math.cos(trH) * 46, y: G.py + 2 + Math.sin(trH) * 46 });
 let nearDeco = null;
 function decoSpotOk(x, y) {
-  if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6) || nearRiver(x, y, 0.6 * T)) return false;
+  if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6) || inMts(x, y) || nearRiver(x, y, 0.6 * T)) return false;
   for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
   for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko
     if (k === 'weide') continue;
@@ -2994,6 +2994,44 @@ function drawHill(a, end) {
   for (let r = 0; r < a.rows; r++) { const y = (a.y + r * a.dy) * T + 12; ctx.fillStyle = 'rgba(50,80,25,.3)'; ctx.fillRect(x0, y + 4, x1 - x0, 5); ctx.fillStyle = '#c9b88e'; ctx.fillRect(x0, y, x1 - x0, 5); } // Terrassen-Mäuerchen
   ctx.restore();
 }
+// Wie am Lac Léman: Berge steigen am Nordufer steil aus dem Wasser (Blick wie von Lausanne zu den Savoyer Alpen),
+// der Fluss mündet dazwischen wie die Rhone, davor Schloss Chillon. [x, Fuss-y, Höhe, halbe Breite links, rechts, Zacken] in Kacheln, hinten → vorn
+const LEMAN = [[4.6, 25, 4.4, 3.6, 3, 3], [1.4, 25.6, 3.6, 2.6, 2.2, 1], [7.6, 25.3, 2.4, 1.7, 1.1, 0], [0.3, 28.8, 2.6, 1.6, 2.6, 0]];
+const inMts = (x, y) => LEMAN.some(([mx, f, h, wl, wr]) => { const d = x / T - mx, s = d < 0 ? wl : wr; return Math.abs(d) < s && y / T < f + 0.6 && y / T > f - h * (1 - Math.abs(d) / s); });
+function lemanPath([x, f, h, wl, wr, n], k = 1) { // k = -0.5: Spiegelbild im See
+  const r = seeded(Math.round(x * 7) + 3), X = x * T, F = f * T, base = k > 0 ? F + 0.6 * T : F;
+  ctx.beginPath(); ctx.moveTo(X - wl * T, base);
+  for (let d = -wl; d <= wr; d += 0.12) {
+    let y = h * (1 - Math.abs(d) / (d < 0 ? wl : wr));
+    for (let i = 0; i < n; i++) y = Math.max(y, h * (0.92 + 0.08 * (i % 2)) - Math.abs(d - (i - (n - 1) / 2) * 0.55) * 2.2); // Zacken wie die Dents du Midi
+    ctx.lineTo(X + d * T, F - (y + (r() - 0.5) * 0.15 * Math.min(1, y)) * T * k);
+  }
+  ctx.lineTo(X + wr * T, base); ctx.closePath();
+}
+function lemanMts() {
+  for (const m of LEMAN) {
+    const [x, f, h, wl, wr] = m, X = x * T, F = f * T, top = F - h * T, r = seeded(Math.round(x * 5));
+    const g = ctx.createLinearGradient(0, top, 0, F); g.addColorStop(0, '#9aa0aa'); g.addColorStop(0.45, '#7f8681'); g.addColorStop(0.72, '#4f7a45'); g.addColorStop(1, '#3a6533');
+    lemanPath(m); ctx.fillStyle = g; ctx.fill();
+    ctx.save(); ctx.clip();
+    if (h > 3) { ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(X - wl * T, top - 20); for (let d = -wl * T; d <= wr * T; d += 10) ctx.lineTo(X + d, top + h * T * 0.28 + Math.sin(d * 0.09 + x) * 7); ctx.lineTo(X + wr * T, top - 20); ctx.fill(); } // Schnee
+    ctx.fillStyle = 'rgba(20,30,50,.18)'; ctx.beginPath(); ctx.moveTo(X, top); ctx.lineTo(X + wr * T, F + T); ctx.lineTo(X + wr * 0.1 * T, F + T); ctx.fill(); // Schattenseite (Licht von links)
+    ctx.restore();
+    for (let d = -wl + 0.2; d < wr; d += 0.45) { const tx = X + d * T, ty = F + 0.6 * T + r() * 6; if (!inLake(tx, ty, 0.45)) tanne(tx, ty, 0.55 + r() * 0.25); } // Wald am Fuss, wo kein Wasser ist
+  }
+}
+function chillon(x, y) { // Schloss Chillon auf seinem Felsen im See
+  ellipse(x + 4, y + 3, 40, 9, '#5f5a53'); ellipse(x, y, 36, 7, '#8a847a');
+  const wall = '#e6dfcf', roof = '#9a4a32';
+  ctx.fillStyle = roof; ctx.fillRect(x - 31, y - 26, 62, 5);
+  ctx.fillStyle = wall; ctx.fillRect(x - 30, y - 22, 60, 22); // Ringmauer
+  for (const [dx, w, h] of [[-25, 11, 34], [-3, 16, 50], [22, 10, 30]]) { // Türme, in der Mitte der Bergfried
+    ctx.fillStyle = wall; ctx.fillRect(x + dx - w / 2, y - h, w, h);
+    ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x + dx - w / 2 - 2, y - h); ctx.lineTo(x + dx, y - h - w * 1.3); ctx.lineTo(x + dx + w / 2 + 2, y - h); ctx.fill();
+  }
+  ctx.fillStyle = '#5a5248'; for (const [dx, dy] of [[-27, -24], [-5, -40], [-13, -12], [7, -12], [20, -20]]) ctx.fillRect(x + dx, y + dy, 3, 5); // Fenster
+  ctx.fillStyle = 'rgba(20,30,50,.13)'; ctx.fillRect(x + 6, y - 22, 24, 22); // Schattenseite
+}
 function lakePath(m) {
   ctx.beginPath();
   for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, rr = LAKE.rx * lakeR(a) + m; ctx.lineTo((LAKE.x + Math.cos(a) * rr) * T, (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T); }
@@ -3002,13 +3040,16 @@ function lakePath(m) {
 function drawLake() {
   const cx = LAKE.x * T, cy = LAKE.y * T;
   lakePath(0.45); ctx.fillStyle = '#dccb98'; ctx.fill();
+  lemanMts(); // vor dem Wasser: ihr Fuss verschwindet im See
   lakePath(0.12); ctx.fillStyle = '#8fc7d8'; ctx.fill();
   const g = ctx.createRadialGradient(cx - 40, cy - 20, 10, cx, cy, LAKE.rx * T); g.addColorStop(0, '#4fb0e0'); g.addColorStop(1, '#2a70ad');
   lakePath(0); ctx.fillStyle = g; ctx.fill();
   ctx.save(); lakePath(0); ctx.clip();
   // Spiegelung der Berge und kleine Wellen
+  ctx.fillStyle = 'rgba(25,55,85,.22)'; for (const m of LEMAN) { lemanPath(m, -0.5); ctx.fill(); }
   ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(cx - 60, cy - 50, 120, 22, -0.1, 0, 7); ctx.fill();
   ctx.restore();
+  chillon(7 * T, 25.45 * T);
 }
 function lakeLive() { // Wellen, Schilf, Steg, Name – über dem See aus dem Hintergrund-Cache
   const cx = LAKE.x * T, cy = LAKE.y * T;
