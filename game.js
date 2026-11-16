@@ -669,7 +669,7 @@ function reach(t) {
     const d = THINGS.feld, dx = Math.max(0, Math.abs(G.px - p.x) - d.w * T / 2), dy = Math.max(0, Math.abs(G.py - p.y) - d.h * T / 2);
     return Math.hypot(dx, dy) < T * 0.4 ? Math.hypot(dx, dy) : 1e9;
   }
-  const r = { baum: 1.3, kuh: 1.4, rebe: 1.6, fischteich: 1.9, huhn: 1.7, masthuhn: 1.7, schwein: 1.7, kakaoimport: 1.8, kaffeeimport: 1.8, bienenhaus: 1.7, kartoffelfeld: 1.9, kastanienbaum: 1.4, geiss: 1.7, ruebenfeld: 1.9, kirschbaum: 1.4 }[t.type] || 2.4;
+  const r = { baum: 1.3, kuh: 1.4, rebe: 1.6, fischteich: 1.9, huhn: 1.7, masthuhn: 1.7, schwein: 1.7, kakaoimport: 1.8, kaffeeimport: 1.8, bienenhaus: 1.7, kartoffelfeld: 1.9, kastanienbaum: 1.4, geiss: 1.7, ruebenfeld: 1.9, kirschbaum: 1.4, erdbeerfeld: 1.9, schaf: 1.7, maisfeld: 1.9, kraeuterbeet: 1.9, wald: 1.4, kuerbisfeld: 1.9, quelle: 1.7 }[t.type] || 2.4;
   const d = dist(G.px, G.py, p.x, p.y - (r > 2 ? T * 0.3 : 0));
   return d < r * T ? d : 1e9;
 }
@@ -2279,8 +2279,194 @@ DRAW.kirschtorte_beck = (x, y, t) => { // Torte mit Rautenmuster; oben sitzt ein
   const h = Math.max(0, Math.sin(time * 0.8 + t.id)) * 14; ellipse(cx + 22 + h, cy - 22, 5, 4, '#8a6a4a'); ellipse(cx + 18 + h, cy - 25, 3, 3, '#8a6a4a'); ellipse(cx + 17 + h, cy - 26, 0.8, 0.8, '#222');
   sign(x - 16, y - 64, bname(t));
 };
+// ---- Land-Stufen 70–100 ----
+DRAW.erdbeerfeld = (x, y, t) => { // Erdbeeren auf Stroh; eine Schnecke hat sich die grösste geschnappt
+  rowCrop(x, y, t, '#3f8a3a', '#5cae4a', '#3f8a3a', '#5cae4a', '#e8283a', 0.9);
+  const s = (time * 3 + t.id * 7) % 40; ellipse(x - 48 + s, y + 6, 6, 2.5, '#c8b890'); ellipse(x - 50 + s, y + 3, 4, 4, '#a8743a'); line('#a8743a', 1, x - 43 + s, y + 4, x - 41 + s, y); // Schnecke kriecht
+};
+DRAW.kraeuterbeet = (x, y, t) => { // Chrüter mit lila Blüten, ein Schmetterling flattert drüber
+  rowCrop(x, y, t, '#5a8a4a', '#8ab06a', '#4f7f42', '#9ac07a', '#a87ad8', 0.85);
+  const a = time * 1.3 + t.id, bx = x + Math.cos(a) * 40, by = y - 40 + Math.sin(a * 2.3) * 8, f = Math.abs(Math.sin(time * 14)) * 4 + 1;
+  ellipse(bx - f, by, f, 3, '#f29a2e'); ellipse(bx + f, by, f, 3, '#f29a2e'); line('#333', 1.5, bx, by - 3, bx, by + 3);
+};
+DRAW.kuerbisfeld = (x, y, t) => { // Ranken mit Kürbissen; einer ist riesig, eine Maus wohnt drin
+  const g = grown(t);
+  ctx.fillStyle = '#7a5636'; rrect(x - 66, y - 34, 140, 38, 8); ctx.fill();
+  ctx.strokeStyle = '#4f8a36'; ctx.lineWidth = 2; ctx.beginPath(); for (let r = 0; r < 2; r++) { ctx.moveTo(x - 60, y - 22 + r * 16); for (let i = 1; i <= 8; i++) ctx.quadraticCurveTo(x - 64 + i * 16, y - 30 + r * 16 + (i % 2) * 12, x - 60 + i * 16, y - 22 + r * 16); } ctx.stroke();
+  for (let i = 0; i < 6; i++) ellipse(x - 52 + i * 22, y - 26 + (i % 2) * 16, 7, 5, '#5cae4a');
+  for (let i = 0; i < 4; i++) { const px = x - 44 + i * 30, py = y - 14 + (i % 2) * 8, r = (3 + g * 8) * (i === 2 ? 1.6 : 1), c = g > 0.6 ? '#f28a1e' : '#c8c03a';
+    ellipse(px, py, r * 1.2, r, c); ellipse(px - r * 0.4, py, r * 0.35, r * 0.95, 'rgba(0,0,0,.12)'); ellipse(px + r * 0.4, py, r * 0.35, r * 0.95, 'rgba(0,0,0,.12)'); line('#4a6a2a', 2, px, py - r, px + 2, py - r - 4); }
+  if (g > 0.6) { ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(x + 16, y - 8, 3, Math.PI, 0); ctx.fill(); ellipse(x + 16, y - 9, 1.8, 1.8, '#9a9a9a'); } // Mäuseloch im Riesenkürbis
+  if (t.store > 0) crate(x + 86, y + 4, '#f28a1e', Math.min(t.store, 12));
+};
+DRAW.maisfeld = (x, y, t) => { // hohe Maisstängel; ein Rabe sitzt obendrauf und lacht
+  const g = grown(t), h = 12 + g * 50;
+  ctx.fillStyle = '#7a5636'; rrect(x - 66, y - 18, 140, 22, 6); ctx.fill();
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 9; c++) {
+    const px = x - 60 + c * 16 + r * 8, py = y - 12 + r * 10, sw = Math.sin(time * 1.5 + c + r) * 2;
+    line('#5a9a3a', 3, px, py, px + sw, py - h); line('#6cbf45', 2, px, py - h * 0.5, px + 9, py - h * 0.65); line('#6cbf45', 2, px, py - h * 0.35, px - 9, py - h * 0.5);
+    if (g > 0.5) { ellipse(px + 3, py - h * 0.55, 3, 6, t.ripe ? '#f2cf3b' : '#a8c86a'); line('#c8903a', 1, px + 3, py - h * 0.55 - 6, px + 5, py - h * 0.55 - 10); }
+    if (g > 0.7) line('#d8c06a', 1.5, px + sw, py - h, px + sw - 3, py - h - 6, px + sw, py - h, px + sw + 3, py - h - 6);
+  }
+  const rx = x + 40, ry = y - 12 - h - 6, k = Math.sin(time * 4 + t.id) > 0.7; ellipse(rx, ry, 7, 5, '#222'); ellipse(rx + 6, ry - 4, 4, 4, '#222'); ctx.fillStyle = '#e8b02e'; ctx.beginPath(); ctx.moveTo(rx + 9, ry - 5); ctx.lineTo(rx + 15, ry - (k ? 6 : 4)); ctx.lineTo(rx + 9, ry - 2); ctx.fill();
+  if (t.store > 0) crate(x + 86, y + 4, '#f2cf3b', Math.min(t.store, 12));
+};
+function sheep(x, y, ph, nose = '#2a2a2a') { // wollig wie eine Wolke, Schwarznase aus dem Wallis
+  const k = Math.sin(ph) * 1.2;
+  for (const [dx, dy] of [[-6, -10], [0, -12], [6, -10], [-3, -7], [4, -7]]) ellipse(x + dx, y + dy, 6, 5, '#f4f2ea');
+  ellipse(x + 11, y - 13 + k, 4, 4.5, nose); ellipse(x + 9, y - 17 + k, 3.5, 2.5, '#f4f2ea'); ellipse(x + 13, y - 14 + k, 0.9, 0.9, '#fff');
+  for (const lx of [-6, -2, 4, 7]) line(nose, 2, x + lx, y - 4, x + lx, y + 1);
+}
+DRAW.schaf = (x, y, t) => { // Stall, Schafe; eines ist frisch geschoren und friert
+  const g = grown(t);
+  ellipse(x, y, 66, 10, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = '#8a6a4a'; ctx.fillRect(x - 62, y - 36, 40, 32); ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.moveTo(x - 66, y - 34); ctx.lineTo(x - 42, y - 50); ctx.lineTo(x - 18, y - 34); ctx.fill();
+  ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 48, y - 22, 12, 18);
+  for (let i = 0; i < 1 + Math.round(g * 2); i++) sheep(x - 6 + i * 22, y + 2 - (i % 2) * 5, time * 4 + i * 2 + t.id, i === 1 ? '#f4f2ea' : '#2a2a2a');
+  const s = Math.sin(time * 30) * 0.8; ellipse(x + 60 + s, y - 8, 7, 5, '#f2c8b8'); ellipse(x + 69 + s, y - 12, 3.5, 4, '#2a2a2a'); for (const lx of [-4, 4]) line('#2a2a2a', 2, x + 60 + lx + s, y - 4, x + 60 + lx + s, y + 1); // nackt und bibbernd
+  if (t.store > 0) crate(x + 86, y + 4, '#f4f2ea', Math.min(t.store, 12));
+};
+function fir(x, y, h, c) { ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 3, y - 10, 6, 10); ctx.fillStyle = c; for (let i = 0; i < 3; i++) { const w = h * (0.45 - i * 0.1), yy = y - 8 - i * h * 0.26; ctx.beginPath(); ctx.moveTo(x - w, yy); ctx.lineTo(x, yy - h * 0.45); ctx.lineTo(x + w, yy); ctx.fill(); } }
+DRAW.wald = (x, y, t) => { // Tannen wachsen nach, ein Specht klopft, Baumstumpf mit Jahrringen
+  const g = grown(t);
+  ellipse(x, y, 50, 9, 'rgba(0,0,0,.22)');
+  fir(x - 22, y - 4, 70 + g * 20, '#2a5a2e'); fir(x + 14, y, 60 + g * 30, '#2f6a33'); fir(x - 2, y + 6, 22 + g * 30, '#3d7d3a');
+  ellipse(x + 34, y + 2, 7, 3, '#c8a06a'); ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 0.8; for (const r of [2, 4, 6]) { ctx.beginPath(); ctx.ellipse(x + 34, y + 2, r, r * 0.4, 0, 0, 7); ctx.stroke(); }
+  const k = Math.sin(time * 20 + t.id) > 0 ? 1 : 0; ellipse(x + 17 - k, y - 30, 3, 4, '#222'); ellipse(x + 17 - k, y - 34, 2, 2, '#c8102e'); line('#555', 1.5, x + 15 - k, y - 31, x + 12 - k, y - 31); // Specht
+  if (t.ripe) for (let i = 0; i < 3; i++) { ctx.fillStyle = '#a8743a'; ctx.fillRect(x - 40, y - 2 - i * 5, 22, 5); ellipse(x - 40, y + 0.5 - i * 5, 2.5, 2.5, '#d8b07a'); }
+  if (t.store > 0) crate(x + 50, y + 4, '#a8743a', Math.min(t.store, 12));
+};
+DRAW.quelle = (x, y, t) => { // Wasser sprudelt aus dem Fels in einen Holztrog, ein Frosch badet
+  const g = grown(t);
+  ellipse(x, y, 66, 10, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = '#8a8478'; ctx.beginPath(); ctx.moveTo(x - 64, y); ctx.lineTo(x - 52, y - 40); ctx.lineTo(x - 30, y - 50); ctx.lineTo(x - 12, y - 34); ctx.lineTo(x - 4, y); ctx.fill();
+  ctx.fillStyle = '#6a655c'; ctx.beginPath(); ctx.arc(x - 26, y - 26, 6, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(140,200,240,.9)'; ctx.lineWidth = 2 + g * 3; ctx.beginPath(); ctx.moveTo(x - 22, y - 26); ctx.quadraticCurveTo(x + 2, y - 28, x + 8, y - 14); ctx.stroke();
+  for (let i = 0; i < 3; i++) { const k = (time * 2 + i / 3) % 1; ellipse(x + 8 + Math.sin(i * 3) * 3, y - 14 + k * 6, 1.5, 1.5, `rgba(255,255,255,${1 - k})`); }
+  ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 4, y - 14, 50, 14); ctx.fillStyle = 'rgba(110,180,230,.95)'; ctx.fillRect(x - 1, y - 12, 44, 3);
+  const j = Math.max(0, Math.sin(time * 1.2 + t.id)) * 10; ellipse(x + 30, y - 14 - j, 5, 3.5, '#4f9a36'); ellipse(x + 28, y - 17 - j, 1.4, 1.4, '#fff'); ellipse(x + 32, y - 17 - j, 1.4, 1.4, '#fff'); // Frosch hüpft
+  if (t.store > 0) crate(x + 80, y + 4, '#8ac8f0', Math.min(t.store, 12));
+};
+function stdHouse(x, y, t, wall, roof, dc) { house(x - 16, y, 98, 58, wall, roof, 24); win(x - 54, y - 44, 18, 14, t.working); win(x + 8, y - 44, 18, 14, t.working); door(x - 22, y, 18, 30, dc); }
+DRAW.shakebar = (x, y, t) => { // Riesenglas mit Röhrli auf dem Dach – es wird geschlürft, bis es leer ist
+  stdHouse(x, y, t, '#fdeef2', '#e8708a'); const cx = x - 16, cy = y - 84, lv = t.working ? 0.3 + 0.7 * (1 - (phase(t) / 6.28 % 1)) : 1;
+  ctx.fillStyle = 'rgba(220,235,245,.8)'; ctx.fillRect(cx - 12, cy - 32, 24, 32); ctx.fillStyle = '#f2a0b8'; ctx.fillRect(cx - 11, cy - 31 * lv, 22, 31 * lv); ellipse(cx, cy - 31 * lv, 11, 3, '#fbe0e8');
+  line('#e83a5a', 3, cx + 4, cy - 10, cx + 10, cy - 46, cx + 18, cy - 46); ellipse(cx - 6, cy - 33, 5, 4, '#e8283a');
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.toertlibeck = (x, y, t) => { // Riesentörtli auf dem Dach, eine Wespe kreist
+  stdHouse(x, y, t, '#fbf2e4', '#c8433a'); const cx = x - 16, cy = y - 86;
+  ctx.fillStyle = '#d8a050'; ctx.beginPath(); ctx.moveTo(cx - 22, cy - 8); ctx.lineTo(cx + 22, cy - 8); ctx.lineTo(cx + 16, cy + 4); ctx.lineTo(cx - 16, cy + 4); ctx.fill();
+  ellipse(cx, cy - 8, 22, 5, '#f8e8a8'); for (let i = 0; i < 5; i++) { ellipse(cx - 14 + i * 7, cy - 11 - (i % 2) * 2, 4, 4.5, '#e8283a'); ellipse(cx - 15 + i * 7, cy - 13 - (i % 2) * 2, 1.2, 1.2, 'rgba(255,255,255,.7)'); }
+  const a = time * 3 + t.id, bx = cx + Math.cos(a) * 26, by = cy - 20 + Math.sin(a * 2) * 5; ellipse(bx, by, 3, 2, '#f2c21e'); line('#222', 1, bx - 1, by - 2, bx - 1, by + 2); ellipse(bx, by - 2.5, 2, 1.4, 'rgba(255,255,255,.85)');
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.spinnerei = (x, y, t) => { // Spinnrad auf dem Dach dreht sich; ein Schaf schaut, wo seine Wolle hin ist
+  stdHouse(x, y, t, '#f2e8d8', '#7a5a8a'); const cx = x - 20, cy = y - 100, a = phase(t) * 3;
+  ctx.strokeStyle = '#8a5a30'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.stroke(); ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < 6; i++) { ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a + i) * 15, cy + Math.sin(a + i) * 15); } ctx.stroke();
+  line('#8a5a30', 3, cx - 8, cy + 16, cx, cy, cx + 8, cy + 16); line('#c8a8e0', 2, cx + 15, cy, cx + 30, cy - 6); ellipse(cx + 32, cy - 6, 5, 4, '#c8a8e0');
+  sheep(x + 52, y + 2, time * 3 + t.id);
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.strickstube = (x, y, t) => { // Riesen-Zipfelchappe auf dem Dach, der Bommel wackelt
+  stdHouse(x, y, t, '#f6efe4', '#3a6fd8'); const cx = x - 16, cy = y - 84, w = Math.sin(time * 2 + t.id) * 6;
+  ctx.fillStyle = '#d8232a'; ctx.beginPath(); ctx.moveTo(cx - 20, cy); ctx.quadraticCurveTo(cx - 6, cy - 30, cx + 14 + w, cy - 36); ctx.quadraticCurveTo(cx + 6, cy - 18, cx + 20, cy); ctx.fill();
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(cx - 21, cy - 5, 42, 6); for (let i = 0; i < 4; i++) ctx.fillRect(cx - 14 + i * 8, cy - 14 - i * 3, 5, 2);
+  ellipse(cx + 15 + w, cy - 38, 6, 6, '#f2f2f2');
+  if (t.working) { const k = Math.sin(phase(t) * 4) * 4; line('#c8c8c8', 2, x + 46, y - 30, x + 60 + k, y - 12); line('#c8c8c8', 2, x + 62, y - 30, x + 48 - k, y - 12); ellipse(x + 54, y - 10, 7, 4, '#d8232a'); }
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.popcornmaschine = (x, y, t) => { // der Kamin poppt Popcorn statt Rauch
+  house(x - 16, y, 104, 62, '#fbe8a0', '#d8232a', 22); win(x - 58, y - 48, 18, 14, t.working); win(x - 30, y - 48, 18, 14, t.working); door(x + 12, y, 20, 32, '#c8102e');
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#d8232a' : '#fff'; ctx.fillRect(x - 66 + i * 17, y - 62, 17, 6); } // Streifen-Markise
+  chimney(x + 22, y - 72, 26, false);
+  if (t.working) for (let i = 0; i < 7; i++) { const k = (time * 0.8 + i / 7) % 1, px = x + 22 + Math.sin(i * 2.3) * k * 30, py = y - 100 - Math.sin(k * Math.PI) * 30 + k * 20; ellipse(px, py, 4, 3.5, '#fffbe8'); ellipse(px + 2, py - 2, 2.5, 2, '#f8e8a8'); }
+  sign(x - 16, y - 70, bname(t));
+};
+DRAW.polentagrotto = (x, y, t) => { // Steinhütte, davor rührt einer im Kupferkessi – stundenlang
+  ellipse(x - 8, y, 62, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#9a958c'; ctx.fillRect(x - 64, y - 56, 92, 56); bricks(x - 64, y - 56, 92, 56);
+  ctx.fillStyle = '#6a655c'; ctx.beginPath(); ctx.moveTo(x - 72, y - 54); ctx.lineTo(x - 18, y - 82); ctx.lineTo(x + 36, y - 54); ctx.fill();
+  win(x - 52, y - 44, 16, 14, t.working); door(x - 6, y, 18, 32, '#5a3a20');
+  line('#3a3a3a', 2, x + 42, y, x + 52, y - 34, x + 62, y); line('#3a3a3a', 2, x + 52, y - 34, x + 52, y - 24);
+  ctx.fillStyle = '#c8743a'; ctx.beginPath(); ctx.arc(x + 52, y - 20, 10, 0, Math.PI); ctx.fill(); ellipse(x + 52, y - 20, 10, 3, '#f2cf3b');
+  if (t.working) { flames(x + 52, y + 4, 3, 6); const k = phase(t); line('#6b4423', 2, x + 52 + Math.cos(k * 2) * 5, y - 21, x + 66, y - 40); person(x + 74, y + 2, '#2f6a3a', '#3a2a1a', -1.1 + Math.sin(k * 2) * 0.2); }
+  sign(x - 18, y - 66, bname(t));
+};
+DRAW.zaeltlifabrik = (x, y, t) => { // Riesenbonbon im Papierli dreht sich auf dem Dach
+  stdHouse(x, y, t, '#f8f4e0', '#e8b02e'); const cx = x - 16, cy = y - 96, a = t.working ? Math.sin(phase(t)) * 0.4 : 0;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+  ctx.fillStyle = '#f2e070'; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-28, -9); ctx.lineTo(-28, 9); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(28, -9); ctx.lineTo(28, 9); ctx.fill();
+  ellipse(0, 0, 15, 11, '#e8c02a'); ctx.fillStyle = '#4f8a36'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🌿', 0, 3); ctx.restore();
+  if (t.working) puffs(x + 40, y - 70, true, '220,255,220', 0.5);
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.teestube = (x, y, t) => { // Riesen-Teekanne auf dem Dach dampft, Grossmutter im Schaukelstuhl
+  stdHouse(x, y, t, '#f2ece0', '#4f8a5a'); const cx = x - 16, cy = y - 96;
+  ellipse(cx, cy, 18, 14, '#e8e4dc'); ctx.fillStyle = '#4f8a5a'; ctx.fillRect(cx - 18, cy - 2, 36, 4); ellipse(cx, cy - 14, 6, 3, '#e8e4dc'); ellipse(cx, cy - 17, 2.5, 2.5, '#4f8a5a');
+  line('#e8e4dc', 4, cx + 16, cy + 2, cx + 28, cy - 8); line('#e8e4dc', 3, cx - 17, cy - 6, cx - 24, cy, cx - 17, cy + 6); puffs(cx + 28, cy - 10, t.working, '255,255,255', 0.5);
+  const r = Math.sin(time * 1.5 + t.id) * 0.15; ctx.save(); ctx.translate(x + 54, y); ctx.rotate(r); ctx.strokeStyle = '#8a5a30'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -4, 12, 0.3, Math.PI - 0.3); ctx.stroke(); line('#8a5a30', 2, 8, -6, 10, -26); ctx.restore();
+  person(x + 52, y - 4, '#8a4a8a', '#d8d8d8', -0.2);
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.saegerei = (x, y, t) => { // Wasserrad treibt die Säge, die geht auf und ab
+  house(x - 24, y, 92, 54, '#b08a5a', '#6b4a2b', 22); win(x - 60, y - 42, 16, 12, t.working); door(x - 18, y, 22, 30, '#5a3a20');
+  const a = phase(t) * 2; ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + 34, y - 24, 20, 0, 7); ctx.stroke(); ctx.lineWidth = 4; ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const c = Math.cos(a + i * 0.785), s = Math.sin(a + i * 0.785); ctx.moveTo(x + 34 + c * 8, y - 24 + s * 8); ctx.lineTo(x + 34 + c * 24, y - 24 + s * 24); } ctx.stroke();
+  ctx.fillStyle = 'rgba(110,180,230,.8)'; ctx.fillRect(x + 14, y - 4, 44, 5);
+  ctx.fillStyle = '#a8743a'; ctx.fillRect(x - 64, y - 86, 76, 10); ellipse(x + 12, y - 81, 3, 5, '#d8b07a');
+  const k = t.working ? Math.sin(a * 2) * 6 : 0; ctx.fillStyle = '#c8ccd0'; ctx.fillRect(x - 26, y - 104 + k, 3, 24); // Sägeblatt
+  if (t.working) for (let i = 0; i < 4; i++) { const s = (time * 2 + i / 4) % 1; ellipse(x - 24 + s * 10, y - 74 + s * 16, 1.5, 1.5, '#e8c890'); }
+  sign(x - 24, y - 64, bname(t));
+};
+DRAW.schreinerei = (x, y, t) => { // Riesen-Holzchüeli auf dem Dach schaukelt, die Glocke bimmelt
+  stdHouse(x, y, t, '#e8d4b0', '#8a5a30'); const cx = x - 16, cy = y - 88, r = Math.sin(time * 2 + t.id) * 0.12;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(r);
+  ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -40, 42, Math.PI * 0.35, Math.PI * 0.65); ctx.stroke(); // Schaukelkufe
+  ctx.fillStyle = '#b07a42'; ctx.fillRect(-18, -24, 34, 14); ctx.fillRect(14, -32, 12, 12); for (const lx of [-16, -8, 6, 12]) ctx.fillRect(lx, -10, 4, 10);
+  ellipse(-6, -18, 5, 4, '#f4ead6'); ellipse(8, -19, 4, 3, '#f4ead6'); ellipse(22, -34, 2, 2, '#f4ead6'); line('#e8c35a', 2, 22, -32, 25, -36);
+  ellipse(18, -18, 3, 3, '#e8b02e'); ctx.restore();
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.suppenchuchi = (x, y, t) => { // Riesenkessel auf dem Dach, eine Kelle rührt die orange Suppe
+  stdHouse(x, y, t, '#fbf0e0', '#d8701e'); const cx = x - 16, cy = y - 88;
+  ctx.fillStyle = '#5a5a5a'; ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI); ctx.fill(); ellipse(cx, cy, 20, 5, '#f28a1e'); ellipse(cx + 4, cy, 6, 1.6, '#fff8e8');
+  const k = t.working ? phase(t) * 2 : 0; line('#8a5a30', 3, cx + Math.cos(k) * 10, cy, cx + 6 + Math.cos(k) * 4, cy - 24); puffs(cx, cy - 6, t.working, '255,240,220', 0.6);
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.schnitzerei = (x, y, t) => { // leuchtende Kürbis-Gesichter auf dem Fensterbrett – eines streckt die Zunge raus
+  stdHouse(x, y, t, '#3f3a4a', '#2a2532', '#5a3a20');
+  for (let i = 0; i < 3; i++) { const px = x - 50 + i * 22, py = y - 92, f = 0.7 + Math.sin(time * 9 + i * 2) * 0.2;
+    ellipse(px, py, 10, 8, '#f28a1e'); ctx.fillStyle = `rgba(255,220,80,${f})`; ctx.fillRect(px - 5, py - 3, 3, 3); ctx.fillRect(px + 2, py - 3, 3, 3); ctx.fillRect(px - 4, py + 2, 8, 2);
+    if (i === 1) ellipse(px, py + 5, 2, 2.5, '#e8505a'); line('#4a6a2a', 2, px, py - 8, px + 2, py - 12); }
+  if (t.working) { const k = phase(t); person(x + 50, y + 4, '#4f6f5a', 0, -0.3 + Math.sin(k * 4) * 0.3); ellipse(x + 66, y - 12, 8, 7, '#f28a1e'); }
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.sprudelei = (x, y, t) => { // Riesenflasche auf dem Dach, die Blöterli steigen und der Deckel hüpft
+  stdHouse(x, y, t, '#e8f2f8', '#3a7ab8'); const cx = x - 16, cy = y - 82, j = t.working ? Math.abs(Math.sin(phase(t) * 3)) * 6 : 0;
+  ctx.fillStyle = 'rgba(160,210,240,.85)'; rrect(cx - 10, cy - 34, 20, 34, 5); ctx.fill(); ctx.fillRect(cx - 4, cy - 44, 8, 12); ctx.fillStyle = '#d8232a'; ctx.fillRect(cx - 5, cy - 48 - j, 10, 5);
+  ctx.fillStyle = '#fff'; ctx.fillRect(cx - 10, cy - 22, 20, 8);
+  for (let i = 0; i < 5; i++) { const k = (time * 0.8 + i / 5) % 1; ellipse(cx - 6 + (i * 5 % 12), cy - 4 - k * 28, 1.5, 1.5, 'rgba(255,255,255,.9)'); }
+  if (t.working) for (let i = 0; i < 3; i++) { const k = (time + i / 3) % 1; ellipse(cx + Math.sin(i * 2) * 6, cy - 52 - k * 20, 2, 2, `rgba(200,235,255,${1 - k})`); }
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.sirupkueche = (x, y, t) => { // Sirupflasche und Glas auf dem Dach, Röhrli blubbert
+  stdHouse(x, y, t, '#fdf0ec', '#c8102e'); const cx = x - 26, cy = y - 84;
+  ctx.fillStyle = '#c8102e'; rrect(cx - 8, cy - 30, 16, 30, 4); ctx.fill(); ctx.fillRect(cx - 3, cy - 38, 6, 9); ctx.fillStyle = '#fff'; ctx.fillRect(cx - 8, cy - 18, 16, 7); ellipse(cx, cy - 14, 2.5, 2.5, '#e8283a');
+  ctx.fillStyle = 'rgba(220,235,245,.85)'; ctx.fillRect(cx + 16, cy - 20, 14, 20); ctx.fillStyle = '#f2708a'; ctx.fillRect(cx + 17, cy - 15, 12, 14); line('#3a9a5a', 2, cx + 24, cy - 10, cx + 30, cy - 30);
+  if (t.working) for (let i = 0; i < 3; i++) { const k = (time * 1.4 + i / 3) % 1; ellipse(cx + 20 + i * 3, cy - 4 - k * 10, 1.4, 1.4, 'rgba(255,255,255,.9)'); }
+  sign(x - 16, y - 64, bname(t));
+};
+DRAW.jubilaeumsbeck = (x, y, t) => { // drei Stockwerke Torte, 100 Kerzen (na ja, fast) und Feuerwerk
+  stdHouse(x, y, t, '#fff4f8', '#b84a9a', '#8a2a6a'); const cx = x - 16, cy = y - 82;
+  for (const [w, h, c, dy] of [[46, 12, '#7a4a2a', 0], [34, 11, '#f2a0b8', 12], [22, 10, '#fbf4e8', 23]]) { ctx.fillStyle = c; ctx.fillRect(cx - w / 2, cy - dy - h, w, h); ellipse(cx, cy - dy - h, w / 2, 2.5, '#fff'); }
+  for (let i = 0; i < 5; i++) { const px = cx - 8 + i * 4; ctx.fillStyle = ['#e8483b', '#3a6fd8', '#f2cf3b', '#2f8f4e', '#e870b0'][i]; ctx.fillRect(px - 1, cy - 44, 2, 8); ellipse(px, cy - 46 - Math.abs(Math.sin(time * 10 + i)) * 1.5, 1.6, 2.6, '#ffb02e'); }
+  const f = (time * 0.5 + t.id * 0.3) % 1; if (f < 0.4) { const r = f * 60, fx = x + 40, fy = y - 110; for (let i = 0; i < 10; i++) ellipse(fx + Math.cos(i * 0.63) * r, fy + Math.sin(i * 0.63) * r, 1.8, 1.8, `hsla(${i * 36},90%,60%,${1 - f * 2.5})`); }
+  sign(x - 16, y - 64, bname(t));
+};
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
-const HGT = { geiss: 60, ruebenfeld: 40, kirschbaum: 106, geisskaeserei: 110, chaeschueechli_beck: 112, zuckerfabrik: 104, taefeli_kueche: 110, nougat_kueche: 124, konfiserie: 104, kirschtorte_beck: 118, bienenhaus: 66, kartoffelfeld: 40, kastanienbaum: 106, laeckerli_huus: 118, biberbeck: 124, roestibeiz: 118, raclettestube: 122, chipsfabrik: 120, marronistand: 92, vermicelles_kueche: 128, gelateria: 130, sennhuette: 96, gruyerestube: 136, maelzerei: 128, malzfabrik: 120, schoggistube: 122, meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+const HGT = { erdbeerfeld: 40, kraeuterbeet: 40, kuerbisfeld: 40, maisfeld: 80, schaf: 56, wald: 110, quelle: 56, shakebar: 136, toertlibeck: 114, spinnerei: 124, strickstube: 128, popcornmaschine: 130, polentagrotto: 92, zaeltlifabrik: 112, teestube: 118, saegerei: 106, schreinerei: 132, suppenchuchi: 116, schnitzerei: 108, sprudelei: 136, sirupkueche: 126, jubilaeumsbeck: 132, geiss: 60, ruebenfeld: 40, kirschbaum: 106, geisskaeserei: 110, chaeschueechli_beck: 112, zuckerfabrik: 104, taefeli_kueche: 110, nougat_kueche: 124, konfiserie: 104, kirschtorte_beck: 118, bienenhaus: 66, kartoffelfeld: 40, kastanienbaum: 106, laeckerli_huus: 118, biberbeck: 124, roestibeiz: 118, raclettestube: 122, chipsfabrik: 120, marronistand: 92, vermicelles_kueche: 128, gelateria: 130, sennhuette: 96, gruyerestube: 136, maelzerei: 128, malzfabrik: 120, schoggistube: 122, meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
