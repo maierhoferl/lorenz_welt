@@ -295,12 +295,19 @@ function newGame() {
 }
 function loadGame(server) {
   newGame();
-  const local = store.get(saveKey());
-  const s = (server?.savedAt || 0) > (local?.savedAt || 0) ? server : local;
+  const local = store.get(saveKey()), rv = s => +s?.rev || 0;
+  // Zähler nur vergleichen, wenn beide einen haben – alte Spielstände (ohne rev) wie früher nach Zeit
+  const s = rv(server) && rv(local) && rv(server) !== rv(local) ? (rv(server) > rv(local) ? server : local) : (server?.savedAt || 0) > (local?.savedAt || 0) ? server : local;
   if (s) {
     const tools = G.tools;
     Object.assign(G, s);
     G.tools = Object.assign(tools, s.tools);
+    // Spielstand kommt von aussen (Server/localStorage) und landet teils in innerHTML: Zahlen erzwingen
+    for (const k of ['money', 'land', 'lkw', 'unlocks', 'stage', 'nid', 'rev']) G[k] = Math.max(0, Math.floor(+G[k] || 0));
+    G.rev = Math.max(rv(server), rv(local)); // gewählter Stand darf hochladen, auch wenn er (alt, ohne rev) vom Gerät kommt
+    G.nid ||= 1; G.stage = Math.min(G.stage, STAGES.length - 1); G.unlocks = Math.min(G.unlocks, UNLOCKS.length);
+    for (const k in G.tools) G.tools[k] = TOOLS[k] ? clamp(G.tools[k] | 0, 0, TOOLS[k].levels.length - 1) : 0;
+    G.inv = Object.fromEntries(Object.entries(G.inv || {}).filter(([k, n]) => ITEMS[k] && n > 0).map(([k, n]) => [k, n | 0]));
     G.things = G.things.filter(t => THINGS[t.type]); // falls ein Typ entfernt wurde
     G.deco = (G.deco || []).filter(d => DECOS[d.type]);
     if (G.carry && !DECOS[G.carry]) G.carry = null;
@@ -311,11 +318,25 @@ function loadGame(server) {
     if (G.unlocks > u0) setTimeout(() => toast($t`🎉 ${G.unlocks - u0} neue Rezepte freigeschaltet – schau im Laden bei 🏭 Gebäude!`), 1500);
   }
 }
-function save(cloud) {
+// Laufzeit-Felder nicht speichern, Kommazahlen kürzen: hält den Spielstand klein
+const SKIP = new Set(['warn', 'wl', 'working', 'ang']);
+const slim = (k, v) => SKIP.has(k) ? undefined : typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v;
+// leaving: Seite wird verlassen → keepalive (Browser erlauben dafür höchstens 64 KB)
+function save(cloud, leaving) {
   if (!G) return;
   G.savedAt = Date.now();
-  store.set(saveKey(), G);
-  if (cloud && online && KEY) fetch(API + '/save', { method: 'POST', keepalive: true, headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ id: P.id, pin: KEY, save: G }) }).catch(() => {});
+  const up = cloud && online && KEY;
+  if (up) G.rev = (G.rev || 0) + 1; // Server lehnt ältere Stände ab (anderes Gerät/alter Tab hat weitergespielt)
+  const s = JSON.stringify(G, slim);
+  try { localStorage.setItem(saveKey(), s); } catch (e) {}
+  if (!up) return;
+  const g = G, body = `{"id":${JSON.stringify(P.id)},"pin":${JSON.stringify(KEY)},"save":${s}}`;
+  fetch(API + '/save', { method: 'POST', keepalive: !!leaving && body.length < 60e3, headers: { 'content-type': 'text/plain' }, body })
+    .then(r => { if (r.status === 409 && G === g) stale(); }).catch(() => {});
+}
+function stale() { // anderswo weitergespielt: diesen (alten) Stand verwerfen, neu anmelden lädt den neueren
+  G = null; KEY = null; closeModals(); renderSelect();
+  alert($t`Du hast auf einem anderen Gerät weitergespielt. Melde dich nochmal an, dann geht es dort weiter.`);
 }
 
 function startGame(p, key, server) {
@@ -351,8 +372,8 @@ $('#bplan').onclick = () => openPlan();
 $('#bzin').onclick = () => setZoom(1.25);
 $('#bzout').onclick = () => setZoom(0.8);
 cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(Math.exp(-e.deltaY * 0.002)); }, { passive: false });
-addEventListener('visibilitychange', () => document.hidden && save(true));
-addEventListener('pagehide', () => save(true));
+addEventListener('visibilitychange', () => document.hidden && save(true, true));
+addEventListener('pagehide', () => save(true, true));
 
 // =================== Eingabe ===================
 const keys = {};
@@ -507,12 +528,13 @@ function spedition(dt) {
   for (const [i, k] of trucks.entries()) {
     if (!k.route.length) { // im Depot
       k.wait += dt;
-      if ((k.chk = (k.chk || 0) + dt) < 0.5) continue; // ponytail: Depot nur 2× pro Sekunde prüfen, surplus() ist O(Gebäude²)
+      if ((k.chk = (k.chk || 0) + dt) < 0.5) continue; // Depot nur 2× pro Sekunde prüfen
       k.chk = 0;
       const busy = new Set(trucks.flatMap(o => o.route.map(r => r.t))), val = t => t[fld(t)] * ITEMS[THINGS[t.type].item].price;
       // zuerst Gebäude, deren Ware im Plan Überschuss ist (kein Abnehmer oder 🟠 zu viel: > 1.1× Bedarf), dann wertvollste
       const { sup, dem } = rates(), over = t => { const it = THINGS[t.type].item; return !dem[it] || sup[it] > dem[it] * 1.1; };
-      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && surplus(THINGS[t.type].item)).sort((a, b) => over(b) - over(a) || val(b) - val(a));
+      const sp = {}, sur = it => sp[it] ??= surplus(it); // surplus() ist O(Gebäude) – je Ware nur einmal
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => over(b) - over(a) || val(b) - val(a));
       // Gebäude ohne Abnehmer: nicht auf den Takt warten, schon ab 3 Stück losfahren
       if (k.wait < lv.every && !todo.some(t => t[fld(t)] > 2 && !hasConsumer(THINGS[t.type].item))) continue;
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
@@ -539,8 +561,9 @@ function spedition(dt) {
     if (r.t) { // beim Gebäude einladen
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? Math.min(r.t[f], lv.cap - k.load) : 0;
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
+      G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
       if (k.load >= lv.cap) k.route = k.route.filter(q => !q.t); // voll: restliche Halte auslassen, direkt zum Händler
-    } else if (k.sum) { G.money += k.sum; floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
+    } else if (k.sum) { floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
   }
 }
 function warnings() {
@@ -2156,21 +2179,13 @@ function tanne(x, y, s = 1) {
 }
 
 // Obstgarten = Voralpen: sanfte Hügelwellen (je Baumreihe eine) und Bäche, die aus der Alp herunterkommen
-function drawVoralp() {
-  const a = AREAS.obst, x0 = (ROAD_X + 0.9) * T, x1 = WORLD.w * T, lane = a.lane[0] * T;
-  for (let r = -1; r < a.rows; r++) {
-    const yb = (a.y + r * a.dy) * T + 14, top = yb - 1.6 * T;
-    const crest = x => yb - (yb - (top + 14 * Math.sin(x / 190 + r * 2) + 8 * Math.sin(x / 67 + r))) * Math.sqrt(1 - (1 - Math.min(1, (x - x0) / (2.5 * T))) ** 2); // rundes Westende
-    ctx.beginPath(); ctx.moveTo(x0, yb);
-    for (let x = x0; x <= x1 + 11; x += 12) ctx.lineTo(Math.min(x, x1), crest(Math.min(x, x1)));
-    ctx.lineTo(x1, yb + 0.7 * T); ctx.lineTo(x0, yb + 0.7 * T); ctx.closePath();
-    const g = ctx.createLinearGradient(0, top - 20, 0, yb + 0.7 * T); // Licht oben, Schatten am Fuss, weich auslaufend
-    g.addColorStop(0, 'rgba(220,245,130,.32)'); g.addColorStop(0.4, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(30,60,20,.2)'); g.addColorStop(1, 'rgba(30,60,20,0)');
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = 'rgba(240,255,200,.25)'; ctx.lineWidth = 2; ctx.beginPath();
-    for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, crest(x)); ctx.stroke(); // Kuppenlinie
-  }
-  // Bäche in den Lücken zwischen den Baumspalten: oben fliessen 1–2 Seitenbäche zusammen, dann münden sie in den Fluss
+// Bäche in den Lücken zwischen den Baumspalten: oben fliessen 1–2 Seitenbäche zusammen, dann münden sie in den Fluss.
+// Geometrie hängt nur an Obstgarten-Ende und Weltbreite → gemerkt statt jedes Frame neu
+let brookMemo = null;
+function brooks() {
+  const key = areaEnd('obst') + ':' + WORLD.w;
+  if (brookMemo?.key === key) return brookMemo;
+  const a = AREAS.obst;
   const L = [[riverPath(), 9]]; // [Punkte, Breite] – erst alle Ufer, dann alles Wasser, so verschmelzen die Mündungen
   const srcs = [L[0][0][0]], rocks = [];
   for (let c = 2, s = 0, xs; (xs = (a.x + (c + 0.5) * a.dx) * T) < (areaEnd('obst') + 1.2) * T; c += 7, s++) {
@@ -2191,6 +2206,23 @@ function drawVoralp() {
     srcs.push(P[0]);
     for (let i = 0; i < 6; i++) { const [x, y] = P[Math.floor(r() * P.length)]; rocks.push([x + (r() < 0.5 ? -8 : 8), y]); }
   }
+  return (brookMemo = { key, L, srcs, rocks });
+}
+function drawVoralp() {
+  const a = AREAS.obst, x0 = (ROAD_X + 0.9) * T, x1 = WORLD.w * T, lane = a.lane[0] * T;
+  for (let r = -1; r < a.rows; r++) {
+    const yb = (a.y + r * a.dy) * T + 14, top = yb - 1.6 * T;
+    const crest = x => yb - (yb - (top + 14 * Math.sin(x / 190 + r * 2) + 8 * Math.sin(x / 67 + r))) * Math.sqrt(1 - (1 - Math.min(1, (x - x0) / (2.5 * T))) ** 2); // rundes Westende
+    ctx.beginPath(); ctx.moveTo(x0, yb);
+    for (let x = x0; x <= x1 + 11; x += 12) ctx.lineTo(Math.min(x, x1), crest(Math.min(x, x1)));
+    ctx.lineTo(x1, yb + 0.7 * T); ctx.lineTo(x0, yb + 0.7 * T); ctx.closePath();
+    const g = ctx.createLinearGradient(0, top - 20, 0, yb + 0.7 * T); // Licht oben, Schatten am Fuss, weich auslaufend
+    g.addColorStop(0, 'rgba(220,245,130,.32)'); g.addColorStop(0.4, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(30,60,20,.2)'); g.addColorStop(1, 'rgba(30,60,20,0)');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(240,255,200,.25)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, crest(x)); ctx.stroke(); // Kuppenlinie
+  }
+  const { L, srcs, rocks } = brooks();
   const stroke = (P, col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
   for (const [P, w] of L) stroke(P, '#3f7f8f', w + 5);
   for (const [P, w] of L) stroke(P, '#6cc0e0', w);
@@ -2202,8 +2234,14 @@ function drawVoralp() {
 // → zwischen Laden und Händler unter der Steinbrücke durch → in den See. Kacheln für den West-Teil:
 const riverY = x => 2.45 * T + 9 * Math.sin(x / 83) + 5 * Math.sin(x / 31 + 1);
 const RIVER_W = [[12, 2.6], [5.6, 2.9], [3.3, 5], [3.1, 9], [4.4, 11.6], [7.4, 13], [8.8, 15.2], [8.9, 19.2], [9, 26]];
-function riverPath() { // Punkte (px) alle ~6 px, von der Quelle bis in den See
-  const xe = (areaEnd('obst') + 1.6) * T, y0 = hillY(xe + T) + 6, ye = riverY(xe), P = [];
+let riverMemo = null;
+function riverPath() { // Punkte (px) alle ~6 px, von der Quelle bis in den See; hängt nur am Ende des Obstgartens → gemerkt
+  const xe = (areaEnd('obst') + 1.6) * T;
+  if (riverMemo?.xe !== xe) riverMemo = { xe, P: riverCalc(xe) };
+  return riverMemo.P;
+}
+function riverCalc(xe) {
+  const y0 = hillY(xe + T) + 6, ye = riverY(xe), P = [];
   for (let t = 0; t < 1; t += 6 / (ye - y0)) P.push([xe + T * (1 - t) ** 2, y0 + (ye - y0) * t]); // vom Hang herunter
   for (let x = xe; x > 19 * T; x -= 6) P.push([x, riverY(x)]);
   const W = [[19 * T, riverY(19 * T)], ...RIVER_W.map(([x, y]) => [x * T, y * T])], W1 = [W[0], ...W, W.at(-1)];
@@ -2231,29 +2269,44 @@ function bridge(x, y) { // Steinbrücke: Pflaster, zwei Brüstungen, Bogen auf d
   }
 }
 // Fischteiche liegen im Sumpf: Moorboden, Tümpel, Schilf und Rohrkolben zwischen den Teichen
-function drawSumpf() {
-  const a = AREAS.fischerei; if (!areaOn(a)) return;
-  const rows = Math.ceil(slotsAvail('fischerei') / a.cols), x0 = (a.x - 2) * T, x1 = (a.x + (a.cols - 1) * a.dx + 2) * T, y0 = (a.y - 1.4) * T, y1 = (a.y + (rows - 1) * a.dy + 1) * T;
+let sumpfMemo = null;
+function sumpfGeo(rows) { // Zufalls-Geometrie einmal pro Teich-Reihenzahl berechnen (seeded → immer gleich)
+  const a = AREAS.fischerei, x0 = (a.x - 2) * T, x1 = (a.x + (a.cols - 1) * a.dx + 2) * T, y0 = (a.y - 1.4) * T, y1 = (a.y + (rows - 1) * a.dy + 1) * T;
   const ponds = Array.from({ length: a.cols * rows }, (_, i) => slotPos('fischerei', i)), free = (x, y, m) => ponds.every(p => ((x - p.x) / (78 + m)) ** 2 + ((y - p.y + 14) / (36 + m)) ** 2 > 1);
   const r = seeded(77), n = Math.round((x1 - x0) * (y1 - y0) / 900);
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, edge = (x, y) => clamp(1.4 - Math.hypot((x - cx) / (x1 - cx), (y - cy) / (y1 - cy)), 0, 1); // zum Rand hin ausblenden
-  for (let i = 0; i < n; i++) { const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0), e = edge(x, y); ctx.globalAlpha = e; ellipse(x, y, 30 + r() * 40, 12 + r() * 14, r() < 0.5 ? 'rgba(70,85,40,.16)' : 'rgba(110,120,55,.14)'); } // Moorboden
-  ctx.globalAlpha = 1;
-  for (let i = 0; i < n; i++) { // Tümpel
+  const moor = [], pools = [], reeds = [[], []], cobs = [];
+  for (let i = 0; i < n; i++) { const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0), e = edge(x, y); moor.push([x, y, 30 + r() * 40, 12 + r() * 14, r() < 0.5 ? 'rgba(70,85,40,.16)' : 'rgba(110,120,55,.14)', e]); }
+  for (let i = 0; i < n; i++) {
     const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0), w = 10 + r() * 18;
     if (!free(x, y, w) || r() > edge(x, y)) continue;
-    ellipse(x, y, w + 3, w * 0.4 + 2, '#6b5a35'); ellipse(x, y, w, w * 0.4, '#4d7f86'); ellipse(x - w * 0.3, y - 1.5, w * 0.4, w * 0.1, 'rgba(255,255,255,.25)');
-    if (r() < 0.5) ellipse(x + w * 0.3, y + 1, 4, 2, '#5f9a3a'); // Seerosenblatt
+    pools.push([x, y, w, r() < 0.5]);
   }
-  for (let i = 0; i < n / 2; i++) { // Schilf & Rohrkolben in Büscheln
+  for (let i = 0; i < n / 2; i++) {
     const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0);
     if (!free(x, y, 6) || r() > edge(x, y) + 0.2) continue;
     for (let k = 0; k < 4 + r() * 5; k++) {
-      const bx = x + (r() - 0.5) * 18, h = 18 + r() * 20, lean = (r() - 0.5) * 8 + Math.sin(time * 1.2 + bx * 0.05) * 1.5;
-      line(r() < 0.5 ? '#5c8a34' : '#7a9a3e', 1.6, bx, y, bx + lean, y - h);
-      if (r() < 0.3) ellipse(bx + lean * 0.9, y - h * 0.9, 1.8, 4.5, '#6b4423'); // Rohrkolben
+      const bx = x + (r() - 0.5) * 18, h = 18 + r() * 20, lean = (r() - 0.5) * 8, c = r() < 0.5 ? 0 : 1;
+      reeds[c].push([bx, y, h, lean]);
+      if (r() < 0.3) cobs.push([bx, y, h, lean]);
     }
   }
+  return { rows, moor, pools, reeds, cobs };
+}
+function drawSumpf() {
+  const a = AREAS.fischerei; if (!areaOn(a)) return;
+  const rows = Math.ceil(slotsAvail('fischerei') / a.cols);
+  if (sumpfMemo?.rows !== rows) sumpfMemo = sumpfGeo(rows);
+  const { moor, pools, reeds, cobs } = sumpfMemo, sway = (bx, lean) => lean + Math.sin(time * 1.2 + bx * 0.05) * 1.5;
+  for (const [x, y, rx, ry, c, e] of moor) { ctx.globalAlpha = e; ellipse(x, y, rx, ry, c); } // Moorboden
+  ctx.globalAlpha = 1;
+  for (const [x, y, w, leaf] of pools) { // Tümpel
+    ellipse(x, y, w + 3, w * 0.4 + 2, '#6b5a35'); ellipse(x, y, w, w * 0.4, '#4d7f86'); ellipse(x - w * 0.3, y - 1.5, w * 0.4, w * 0.1, 'rgba(255,255,255,.25)');
+    if (leaf) ellipse(x + w * 0.3, y + 1, 4, 2, '#5f9a3a'); // Seerosenblatt
+  }
+  ctx.lineWidth = 1.6; // Schilf: je Farbe ein Pfad statt ein Strich pro Halm
+  reeds.forEach((L, c) => { ctx.strokeStyle = c ? '#7a9a3e' : '#5c8a34'; ctx.beginPath(); for (const [bx, y, h, lean] of L) { ctx.moveTo(bx, y); ctx.lineTo(bx + sway(bx, lean), y - h); } ctx.stroke(); });
+  for (const [bx, y, h, lean] of cobs) ellipse(bx + sway(bx, lean) * 0.9, y - h * 0.9, 1.8, 4.5, '#6b4423'); // Rohrkolben
 }
 // ---- See ----
 // Weinberg: sanfte Hügelkuppen, Rebreihen auf Terrassen mit Trockenmäuerchen
@@ -2532,6 +2585,8 @@ function render() {
   const vw = W / ZOOM, vh = H / ZOOM, cam = (p, v, w) => v >= w ? (w - v) / 2 : clamp(p - v / 2, 0, w - v); // kleiner als Bildschirm: mittig
   const camX = cam(G.px, vw, WORLD.w * T), camY = cam(G.py - 30 + ALPS * T, vh, (WORLD.h + ALPS) * T) - ALPS * T; // oben: Alpen-Kulisse
   ctx.fillStyle = '#3f6e2a'; ctx.fillRect(0, 0, W, H);
+  // nur zeichnen, was (fast) im Bild ist; y = Fusspunkt, Gebäude ragen bis ~250 px nach oben
+  const vis = (x, y) => x > camX - 200 && x < camX + vw + 200 && y > camY - 60 && y < camY + vh + 260;
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
   drawAlps(); drawVoralp();
@@ -2564,10 +2619,10 @@ function render() {
     }
   }
   ctx.setLineDash([]);
-  for (const t of G.things) if (t.type === 'feld') drawField(t);
+  for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
-  const list = G.things.filter(t => t.type !== 'feld').map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land').map(d => [d.y, d]), trucks.map(k => [k.y, { truck: k }]));
+  const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
@@ -2594,7 +2649,8 @@ function render() {
   // Namen, Status, Warnungen
   for (const t of FIXED_E) label(t.x, t.y + 18, t.name, 14);
   for (const t of G.things) {
-    const d = THINGS[t.type], p = pos(t), top = topOf(t);
+    const p = pos(t); if (!vis(p.x, p.y)) continue;
+    const d = THINGS[t.type], top = topOf(t);
     if (d.kind === 'factory') {
       label(t.x, t.y + 18, d.name);
       const txt = Object.keys(d.in).map(k => `${ITEMS[k].icon}${t.inS[k] || 0}`).join(' ') + ` ➜ ${ITEMS[d.item].icon}${t.out}`;

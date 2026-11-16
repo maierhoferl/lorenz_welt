@@ -34,7 +34,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const path = new URL(req.url).pathname, db = env.DB, now = Date.now();
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-    const profiles = (await get(db, 'profiles')) || DEFAULT;
+    const profiles = (await get(db, 'profiles')) || DEFAULT; // ponytail: ganzer Blob read-modify-write, parallele Schreiber können sich überschreiben; eigene Zeile pro Profil, falls das je passiert
 
     if (path === '/profiles' && req.method === 'GET')
       return json(profiles.map(({ pinHash, ...p }) => ({ fam: 'M', ...p, hasPin: !!pinHash }))); // ohne fam: Standard-Familie M
@@ -92,6 +92,9 @@ export default {
     if (path === '/login') return json({ save: await get(db, 'save:' + prof.id) });
     if (path === '/save') {
       if (!body.save || typeof body.save !== 'object' || JSON.stringify(body.save).length > MAX_SAVE) return json({ error: 'save' }, 400);
+      // älterer Stand (alter Tab / anderes Gerät hat inzwischen weitergespielt) darf den neueren nicht überschreiben
+      const old = await db.prepare("SELECT json_extract(v,'$.rev') r FROM kv WHERE k=?").bind('save:' + prof.id).first();
+      if (old?.r && old.r >= (+body.save.rev || 0)) return json({ error: 'stale' }, 409);
       await put(db, 'save:' + prof.id, body.save);
       return json({ ok: true });
     }

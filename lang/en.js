@@ -60,6 +60,7 @@ var TR = {
 
     '🔒 {} Jahre': '🔒 {} years', '✨ neu': '✨ new', 'Neuer Spieler': 'New player',
     'Wer spielt?': "Who's playing?", 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)': "Who's playing? (offline – game saved on this device only)",
+    "Du hast auf einem anderen Gerät weitergespielt. Melde dich nochmal an, dann geht es dort weiter.": "You kept playing on another device. Log in again to continue from there.",
     'Es gibt schon zu viele Spieler.': 'There are already too many players.', 'Hat nicht geklappt – ist das Internet an?': "That didn't work – is the internet on?",
     'Hallo {}! Gib deinen Geheimcode ein.': 'Hi {}! Enter your secret code.',
     'Hallo {}! Denk dir einen 4-stelligen Geheimcode aus.': 'Hi {}! Think of a 4-digit secret code.',
