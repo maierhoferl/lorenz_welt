@@ -579,7 +579,9 @@ function spedition(dt) {
       // zuerst Gebäude, deren Ware im Plan Überschuss ist (kein Abnehmer oder 🟠 zu viel: > 1.1× Bedarf), dann wertvollste
       const { sup, dem } = rates(), over = t => { const it = THINGS[t.type].item; return !dem[it] || sup[it] > dem[it] * 1.1; };
       const sp = {}, sur = it => sp[it] ??= surplus(it); // surplus() ist O(Gebäude) – je Ware nur einmal
-      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => over(b) - over(a) || val(b) - val(a));
+      // ganz zuerst: Endprodukt (nur der Händler nimmt es) mit vollem Lager – dort steht die Arbeit
+      const stuck = t => { const d = THINGS[t.type]; return !hasConsumer(d.item) && (d.kind === 'grow' ? t.store >= storeCap(d) : t.out + d.n > OUT_CAP); };
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => stuck(b) - stuck(a) || over(b) - over(a) || val(b) - val(a));
       // Gebäude ohne Abnehmer: nicht auf den Takt warten, schon ab 3 Stück losfahren
       if (k.wait < lv.every && !todo.some(t => t[fld(t)] > 2 && !hasConsumer(THINGS[t.type].item))) continue;
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
