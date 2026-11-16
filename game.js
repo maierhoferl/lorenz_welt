@@ -548,9 +548,28 @@ function road(a, b) { // Wegpunkte von a nach b: Zufahrt → Querweg → Hauptst
 }
 const fld = t => THINGS[t.type].kind === 'grow' ? 'store' : 'out'; // Lagerfeld: Ernte vs. fertige Ware
 const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
+// LKW-Parkplatz südlich vom Grosshandel (zwischen Händler und See): ab Lastwagen, 2 Reihen, wächst mit den Fahrzeugen
+const LOT = { x: 10.3, y: 19.75, bay: 1.15, rows: [21.15, 23], cols: 6 }; // Kacheln
+const lotOn = () => G.tools.spedition >= 3;
+const lotCols = () => Math.min(LOT.cols, Math.ceil(truckCount() / 2));
+function parkAt(i) { // Parkfeld i (Pixel); ponytail: 12 Felder, weitere stehen wie früher neben dem Händler
+  if (lotOn() && i < LOT.cols * 2) return { x: (LOT.x + 0.65 + Math.floor(i / 2) * LOT.bay) * T, y: LOT.rows[i % 2] * T };
+  const h = FIXED_E.find(f => f.type === 'haendler'); return { x: h.x + 140, y: h.y + 20 + i * 45 };
+}
+function drawLot() {
+  if (!lotOn()) return;
+  const x = LOT.x * T, y = LOT.y * T, w = (lotCols() * LOT.bay + 0.75) * T, hh = (LOT.rows[1] + 0.9 - LOT.y) * T;
+  ctx.fillStyle = '#b9b2a2'; rrect(x - 5, y - 5, w + 10, hh + 10, 10); ctx.fill(); // Randstein
+  ctx.fillStyle = '#5d6166'; rrect(x, y, w, hh, 7); ctx.fill();
+  ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 6, y + hh / 2 - 1.5, w - 0.5 * T, 3); // Mittellinie
+  for (let c = 0; c <= lotCols(); c++) // Parkfeld-Striche
+    { const bx = x + (0.075 + c * LOT.bay) * T; ctx.fillRect(bx - 1.5, y + 6, 3, hh / 2 - 14); ctx.fillRect(bx - 1.5, y + hh / 2 + 8, 3, hh / 2 - 14); }
+  ctx.fillStyle = '#2f6fc4'; rrect(x + w - 26, y + hh / 2 - 10, 20, 20, 4); ctx.fill(); // P-Schild
+  ctx.font = '800 15px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('P', x + w - 16, y + hh / 2 + 6);
+}
 function spedition(dt) {
-  const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition'), hx = h.x + 140, hy = h.y + 20;
-  while (trucks.length < truckCount()) trucks.push({ x: hx, y: hy + trucks.length * 45, h: Math.PI, wait: trucks.length * 4, route: [], load: 0, sum: 0 });
+  const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition');
+  while (trucks.length < truckCount()) { const i = trucks.length, p = parkAt(i); trucks.push({ x: p.x, y: p.y, h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0 }); }
   for (const [i, k] of trucks.entries()) {
     if (!k.route.length) { // im Depot
       k.wait += dt;
@@ -573,7 +592,7 @@ function spedition(dt) {
         if (left[n] <= 0) return; // alle voll
         idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; at[n] = p;
       });
-      idle.forEach(o => { if (o.route.length) { o.wait = 0; o.route.push({ x: hx, y: hy + trucks.indexOf(o) * 45 }); } }); // zurück auf den eigenen Parkplatz
+      idle.forEach(o => { if (o.route.length) { o.wait = 0; o.route.push(parkAt(trucks.indexOf(o))); } }); // zurück auf den eigenen Parkplatz
       continue;
     }
     k.wait += dt;
@@ -677,6 +696,7 @@ function decoSpotOk(x, y) {
     }
   }
   for (const p of paths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; if (x > (Math.min(ax, bx) - 0.8) * T && x < (Math.max(ax, bx) + 0.8) * T && y > (Math.min(ay, by) - 0.6) * T && y < (Math.max(ay, by) + 1) * T) return false; } // nicht auf den Weg
+  if (lotOn() && x > (LOT.x - 0.4) * T && x < (LOT.x + LOT.cols * LOT.bay + 1) * T && y > (LOT.y - 0.2) * T && y < (LOT.rows[1] + 1.4) * T) return false; // Parkplatz
   if (x > PASTURE.x * T - 20 && x < (PASTURE.x + PASTURE.w) * T + 20 && y > PASTURE.y * T - 20 && y < (PASTURE.y + PASTURE.h) * T + 30) return false;
   return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
 }
@@ -3025,6 +3045,7 @@ function render() {
     }
   }
   ctx.setLineDash([]);
+  drawLot();
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
