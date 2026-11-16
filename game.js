@@ -653,7 +653,7 @@ let toastKeys = {};
 function toast(msg, key) {
   if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 5; }
   const d = document.createElement('div'); d.textContent = msg; $('#toast').append(d);
-  setTimeout(() => d.remove(), 3800);
+  setTimeout(() => d.remove(), 5000);
 }
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }
 function take(t, field) { // Ware vom Lager in die Tasche
