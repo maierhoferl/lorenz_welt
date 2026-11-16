@@ -56,7 +56,7 @@ var TR = {
     'Code vergessen?': 'Codice dimenticato?', 'Code vergessen? Löse alle Rechnungen!': 'Codice dimenticato? Risolvi tutti i calcoli!', 'Prüfen': 'Controlla',
     "Genug gespielt für heute! Morgen geht's weiter.": 'Basta giocare per oggi! Si continua domani.',
     'Eltern-Code': 'Codice dei genitori', 'Code': 'Codice', 'Weiterspielen': 'Continua a giocare', 'Spieler wechseln': 'Cambia giocatore',
-    'Rauszoomen (−)': 'Rimpicciolisci (−)', 'Reinzoomen (+)': 'Ingrandisci (+)', 'Produktions-Plan': 'Piano di produzione', 'Ton an/aus': 'Suono sì/no',
+    'Rauszoomen (−)': 'Rimpicciolisci (−)', 'Reinzoomen (+)': 'Ingrandisci (+)', 'Produktions-Plan': 'Piano di produzione', 'Ton an/aus': 'Suono sì/no', 'Stromsparen an/aus': 'Risparmio batteria sì/no', '🔋 Stromsparen an': '🔋 Risparmio batteria attivo', '🔋 Stromsparen aus': '🔋 Risparmio batteria spento',
 
     '🔒 {} Jahre': '🔒 {} anni', '✨ neu': '✨ nuovo', 'Neuer Spieler': 'Nuovo giocatore',
     'Wer spielt?': 'Chi gioca?', 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)': 'Chi gioca? (offline – partita solo su questo apparecchio)',

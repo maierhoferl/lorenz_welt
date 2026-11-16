@@ -1,9 +1,10 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const cv = $('#cv'); let ctx = cv.getContext('2d'); // let: Avatar-Vorschau zeichnet kurz auf eigene Canvas
-let W = 0, H = 0, DPR = 1, ZOOM = 1;
+let W = 0, H = 0, DPR = 1, ZOOM = 1, eco = false; // eco: Stromsparen (30 fps, DPR 1, kein Rauch)
+try { eco = localStorage.getItem('lw_eco') === 'true'; } catch (e) {}
 function resize() {
-  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  DPR = Math.min(eco ? 1 : 1.5, devicePixelRatio || 1); W = innerWidth; H = innerHeight; // DPR 1.5 statt 2: halb so viele Pixel, kaum sichtbar
   cv.width = W * DPR | 0; cv.height = H * DPR | 0;
 }
 // Zoom: Grundzoom passt sich dem Bildschirm an, der Spieler kann rein-/rauszoomen (bis die ganze Welt sichtbar ist)
@@ -26,7 +27,11 @@ function shade(hex, f) {
   const c = [n >> 16, n >> 8 & 255, n & 255].map(v => clamp(Math.round(v * f), 0, 255));
   return `rgb(${c})`;
 }
-function show(id) { for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id; }
+let loopOn = false;
+function show(id) {
+  for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
+  if (id === 'game' && !loopOn) { loopOn = true; AU.init(); requestAnimationFrame(loop); } // Loop läuft nur im Spiel
+}
 
 // =================== Spieler, Code, Wiederherstellung ===================
 const PKEY = 'lw_profiles';
@@ -381,10 +386,18 @@ $('#tuexit').onclick = () => $('#bexit').click();
 $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
+function ecoUi() { $('#beco').style.opacity = eco ? 1 : 0.5; resize(); }
+$('#beco').onclick = () => { eco = !eco; store.set('lw_eco', eco); ecoUi(); toast(eco ? $t`🔋 Stromsparen an` : $t`🔋 Stromsparen aus`); };
+ecoUi();
+// Akku unter 20 % und nicht am Laden: einmal pro Sitzung automatisch sparen (nicht gespeichert). Nur Chrome/Android, Safari kennt getBattery nicht.
+navigator.getBattery?.().then(b => {
+  const chk = () => { if (eco || b.charging || b.level >= 0.2) return; b.onlevelchange = b.onchargingchange = null; eco = true; ecoUi(); if (G) toast($t`🔋 Stromsparen an`); };
+  b.onlevelchange = b.onchargingchange = chk; chk();
+}).catch(() => {});
 $('#bzin').onclick = () => setZoom(1.25);
 $('#bzout').onclick = () => setZoom(0.8);
 cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(Math.exp(-e.deltaY * 0.002)); }, { passive: false });
-addEventListener('visibilitychange', () => document.hidden && save(true, true));
+addEventListener('visibilitychange', () => { if (document.hidden) { save(true, true); AU.pause(); } else if (G && !$('#game').hidden) AU.init(); });
 addEventListener('pagehide', () => save(true, true));
 
 // =================== Eingabe ===================
@@ -459,7 +472,7 @@ function update(dt) {
         t.wait = 0; t.prog += dt / d.time;
         if (t.prog >= 1) { t.prog = 0; for (const k in d.in) t.inS[k] -= d.in[k]; t.out += d.n; }
       } else t.wait += dt;
-      if (t.working && t.type === 'baeckerei' && Math.random() < dt * 3) particles.push({ x: t.x + 34, y: t.y - 100, vx: rndf(-5, 5), vy: -18, life: 2.5, r: 6 });
+      if (!eco && t.working && t.type === 'baeckerei' && Math.random() < dt * 3) particles.push({ x: t.x + 34, y: t.y - 100, vx: rndf(-5, 5), vy: -18, life: 2.5, r: 6 });
       t.ang = (t.ang || 0) + dt * (t.working ? 2.2 : t.type === 'muehle' ? 0.25 : 0); // Animation: steht still, wenn nichts zu tun
     }
   }
@@ -1122,15 +1135,16 @@ function sack(x, y) {
 
 function drawTree(t) {
   const { x, y } = t, d = THINGS.baum, g = t.ripe ? 1 : t.timer / d.time, r = seeded(t.id * 17 + 3);
-  ellipse(x + 6, y, 30, 10, 'rgba(0,0,0,.25)');
-  let gr = ctx.createLinearGradient(x - 6, 0, x + 6, 0); gr.addColorStop(0, '#7a5534'); gr.addColorStop(1, '#4a3220');
-  ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x - 4, y - 38); ctx.lineTo(x + 4, y - 38); ctx.lineTo(x + 7, y); ctx.fill();
-  const blobs = [[-16, -50, 19], [16, -52, 19], [0, -68, 21], [-6, -46, 18], [8, -44, 18]];
-  for (const [bx, by, br] of blobs) {
-    gr = ctx.createRadialGradient(x + bx - 6, y + by - 8, 2, x + bx, y + by, br);
-    gr.addColorStop(0, '#7dbb4f'); gr.addColorStop(1, '#2f6a26');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x + bx, y + by, br, 0, 7); ctx.fill();
-  }
+  sprite('baum', x, y, 36, 90, 82, 102, () => { // Schatten, Stamm und Krone sind bei allen Bäumen gleich
+    ellipse(6, 0, 30, 10, 'rgba(0,0,0,.25)');
+    let gr = ctx.createLinearGradient(-6, 0, 6, 0); gr.addColorStop(0, '#7a5534'); gr.addColorStop(1, '#4a3220');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-4, -38); ctx.lineTo(4, -38); ctx.lineTo(7, 0); ctx.fill();
+    for (const [bx, by, br] of [[-16, -50, 19], [16, -52, 19], [0, -68, 21], [-6, -46, 18], [8, -44, 18]]) {
+      gr = ctx.createRadialGradient(bx - 6, by - 8, 2, bx, by, br);
+      gr.addColorStop(0, '#7dbb4f'); gr.addColorStop(1, '#2f6a26');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill();
+    }
+  });
   const n = 12;
   for (let i = 0; i < n; i++) {
     const ax = x + (r() - 0.5) * 50, ay = y - 40 - r() * 38;
@@ -2232,28 +2246,67 @@ function mountainRange(R, pk, base, c1, c2, snowY) {
   for (const p of pk) { ctx.beginPath(); ctx.moveTo(p.x, base - p.h); ctx.lineTo(p.x + p.wr, base); ctx.lineTo(p.x + p.wr * 0.15, base); ctx.closePath(); ctx.fill(); }
   ctx.restore();
 }
-function drawAlps() {
+// Himmel und Wolken (bewegt) liegen hinter dem Hintergrund-Cache, die Berge darin decken sie unten ab
+function drawSky() {
   if (alps.Wp !== WORLD.w * T) alps = makeAlps(); // Welt breiter geworden
   const top = -ALPS * T, Wp = alps.Wp;
-  let g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
+  const g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
   ctx.fillStyle = g; ctx.fillRect(0, top, Wp, -top + 2);
   for (let i = 0; i < 7; i++) { // Wolken
     const cx = ((time * (6 + i) + i * 523) % (Wp + 300)) - 150, cy = top + 40 + (i * 37) % 90;
     ctx.fillStyle = 'rgba(255,255,255,.85)';
     for (const [dx, dy, rr] of [[0, 0, 22], [22, 4, 17], [-22, 5, 16], [10, -10, 16]]) { ctx.beginPath(); ctx.arc(cx + dx, cy + dy, rr, 0, 7); ctx.fill(); }
   }
+}
+// Hintergrund-Cache: unbewegte Landschaft einmal in eine Canvas rund um den Bildausschnitt, pro Frame nur ein drawImage.
+// Neu gezeichnet bei Zoom, Landkauf (G.land bestimmt Bänder, Wege, Sumpf) oder wenn die Kamera aus dem Rand läuft.
+const bg = { c: document.createElement('canvas'), key: '' };
+function drawBg(camX, camY, vw, vh) {
+  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land].join();
+  if (key !== bg.key || camX < bg.x || camY < bg.y || camX + vw > bg.x + bg.w || camY + vh > bg.y + bg.h) {
+    const m = Math.max(vw, vh) * 0.35, main = ctx;
+    Object.assign(bg, { key, x: camX - m, y: camY - m, w: vw + 2 * m, h: vh + 2 * m });
+    bg.c.width = Math.ceil(bg.w * s); bg.c.height = Math.ceil(bg.h * s);
+    ctx = bg.c.getContext('2d'); ctx.setTransform(s, 0, 0, s, -bg.x * s, -bg.y * s);
+    try {
+      ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
+      drawAlps(); drawVoralp();
+      for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
+      drawSumpf();
+      ctx.lineCap = ctx.lineJoin = 'round'; // Wege
+      for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
+        ctx.strokeStyle = c; ctx.lineWidth = w;
+        for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+      }
+      drawLake();
+    } finally { ctx = main; }
+  }
+  if (bg.c.width && bg.c.height) ctx.drawImage(bg.c, bg.x, bg.y, bg.w, bg.h); // Fenster 0×0 (minimiert) → nichts
+}
+// Sprite-Cache für Teile, die überall gleich aussehen (Baumkrone): einmal je Zoomstufe zeichnen, dann nur drawImage. ox/oy = Fusspunkt im Sprite
+const sprites = {};
+function sprite(key, x, y, ox, oy, w, h, draw) {
+  const s = ZOOM * DPR; let c = sprites[key];
+  if (c?.s !== s) {
+    c = sprites[key] = document.createElement('canvas'); c.s = s; c.width = Math.ceil(w * s); c.height = Math.ceil(h * s);
+    const main = ctx; ctx = c.getContext('2d'); ctx.setTransform(s, 0, 0, s, ox * s, oy * s);
+    try { draw(); } finally { ctx = main; }
+  }
+  ctx.drawImage(c, x - ox, y - oy, w, h);
+}
+function drawAlps() {
+  const Wp = alps.Wp;
   mountainRange(alps.farR, alps.far, -40, '#9db3cf', '#7f97b5', -180);
   mountainRange(alps.nearR, alps.near, -6, '#8a8f99', '#6c7a6c', -175);
   const h = alps.horn; flagPole(h.x, -6 - h.h + 4, 26, 14, 1); // Gipfelfahne
   // Alpwiesen-Hügel, nahtlos ins Gras
   ctx.beginPath(); ctx.moveTo(0, 14); for (let x = 0; x <= Wp; x += 16) ctx.lineTo(x, hillY(x)); ctx.lineTo(Wp, 14); ctx.closePath();
   ctx.fillStyle = grassPat; ctx.fill();
-  g = ctx.createLinearGradient(0, -50, 0, 0); g.addColorStop(0, 'rgba(40,80,30,.25)'); g.addColorStop(1, 'rgba(40,80,30,0)'); ctx.fillStyle = g; ctx.fill();
+  const g = ctx.createLinearGradient(0, -50, 0, 0); g.addColorStop(0, 'rgba(40,80,30,.25)'); g.addColorStop(1, 'rgba(40,80,30,0)'); ctx.fillStyle = g; ctx.fill();
   // Bergsee in der Alp
   const bx = Wp * 0.3, by = hillY(Wp * 0.3) + 16;
   ellipse(bx, by, 74, 11, '#d9c89a'); ellipse(bx, by, 68, 8.5, '#3fb6c7'); ellipse(bx - 14, by - 2, 30, 2.5, 'rgba(255,255,255,.35)');
   for (const [fx, fy, fs] of alps.firs) { const y = hillY(fx) + 6 + fy * 18; if (Math.abs(fx - bx) > 90 || y < by - 14) tanne(fx, y, fs); }
-  if (G.deco.some(d => d.type === 'gondelbahn')) gondola();
 }
 function gondola() {
   const bx = 34 * T, by = 1.6 * T, tx = 40.5 * T, ty = ridgeAt(alps.nearR, 40.5 * T) + 34;
@@ -2326,9 +2379,13 @@ function drawVoralp() {
   const stroke = (P, col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (const [x, y] of P) ctx.lineTo(x, y); ctx.stroke(); };
   for (const [P, w] of L) stroke(P, '#3f7f8f', w + 5);
   for (const [P, w] of L) stroke(P, '#6cc0e0', w);
-  ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30; for (const [P] of L) stroke(P, 'rgba(255,255,255,.7)', 1.5); ctx.setLineDash([]); // fliessendes Glitzern
   for (const [x, y] of srcs) { ellipse(x - 7, y, 7, 4, '#9a9a92'); ellipse(x + 6, y + 1, 5, 3, '#b5b4ab'); } // Quellen
   for (const [x, y] of rocks) ellipse(x, y, 3, 2, '#a9a79c');
+}
+function brookGlitter() { // fliessendes Glitzern auf Bächen und Fluss – live, der Rest liegt im Hintergrund-Cache
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 14]); ctx.lineDashOffset = -time * 30;
+  ctx.beginPath(); for (const [P] of brooks().L) { ctx.moveTo(...P[0]); for (const [x, y] of P) ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.setLineDash([]);
 }
 // Fluss: Quelle am Hang östlich vom Obstgarten → Sammelbach über den Obstbäumen nach Westen → hinter dem Hof vorbei
 // → zwischen Laden und Händler unter der Steinbrücke durch → in den See. Kacheln für den West-Teil:
@@ -2397,7 +2454,7 @@ function drawSumpf() {
   const a = AREAS.fischerei; if (!areaOn(a)) return;
   const rows = Math.ceil(slotsAvail('fischerei') / a.cols);
   if (sumpfMemo?.rows !== rows) sumpfMemo = sumpfGeo(rows);
-  const { moor, pools, reeds, cobs } = sumpfMemo, sway = (bx, lean) => lean + Math.sin(time * 1.2 + bx * 0.05) * 1.5;
+  const { moor, pools, reeds, cobs } = sumpfMemo; // ponytail: Schilf ohne Wiegen, damit der Sumpf in den Hintergrund-Cache passt
   for (const [x, y, rx, ry, c, e] of moor) { ctx.globalAlpha = e; ellipse(x, y, rx, ry, c); } // Moorboden
   ctx.globalAlpha = 1;
   for (const [x, y, w, leaf] of pools) { // Tümpel
@@ -2405,8 +2462,8 @@ function drawSumpf() {
     if (leaf) ellipse(x + w * 0.3, y + 1, 4, 2, '#5f9a3a'); // Seerosenblatt
   }
   ctx.lineWidth = 1.6; // Schilf: je Farbe ein Pfad statt ein Strich pro Halm
-  reeds.forEach((L, c) => { ctx.strokeStyle = c ? '#7a9a3e' : '#5c8a34'; ctx.beginPath(); for (const [bx, y, h, lean] of L) { ctx.moveTo(bx, y); ctx.lineTo(bx + sway(bx, lean), y - h); } ctx.stroke(); });
-  for (const [bx, y, h, lean] of cobs) ellipse(bx + sway(bx, lean) * 0.9, y - h * 0.9, 1.8, 4.5, '#6b4423'); // Rohrkolben
+  reeds.forEach((L, c) => { ctx.strokeStyle = c ? '#7a9a3e' : '#5c8a34'; ctx.beginPath(); for (const [bx, y, h, lean] of L) { ctx.moveTo(bx, y); ctx.lineTo(bx + lean, y - h); } ctx.stroke(); });
+  for (const [bx, y, h, lean] of cobs) ellipse(bx + lean * 0.9, y - h * 0.9, 1.8, 4.5, '#6b4423'); // Rohrkolben
 }
 // ---- See ----
 // Weinberg: sanfte Hügelkuppen, Rebreihen auf Terrassen mit Trockenmäuerchen
@@ -2438,6 +2495,11 @@ function drawLake() {
   ctx.save(); lakePath(0); ctx.clip();
   // Spiegelung der Berge und kleine Wellen
   ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(cx - 60, cy - 50, 120, 22, -0.1, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function lakeLive() { // Wellen, Schilf, Steg, Name – über dem See aus dem Hintergrund-Cache
+  const cx = LAKE.x * T, cy = LAKE.y * T;
+  ctx.save(); lakePath(0); ctx.clip();
   ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5; const r = seeded(11);
   for (let i = 0; i < 26; i++) {
     const wx = cx + (r() - 0.5) * LAKE.rx * 2 * T, wy = cy + (r() - 0.5) * LAKE.ry * 2 * T, k = (time * 0.4 + r()) % 1;
@@ -2688,18 +2750,11 @@ function render() {
   // nur zeichnen, was (fast) im Bild ist; y = Fusspunkt, Gebäude ragen bis ~250 px nach oben
   const vis = (x, y) => x > camX - 200 && x < camX + vw + 200 && y > camY - 60 && y < camY + vh + 260;
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
-  ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
-  drawAlps(); drawVoralp();
-  for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
-  drawSumpf();
-  // Wege
+  drawSky(); drawBg(camX, camY, vw, vh);
   ctx.lineCap = ctx.lineJoin = 'round';
-  for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
-    ctx.strokeStyle = c; ctx.lineWidth = w;
-    for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
-  }
-  bridge(RIVER_W[7][0] * T, RIVER_W[7][1] * T);
-  drawLake(); lakeDecos();
+  if (G.deco.some(d => d.type === 'gondelbahn')) gondola();
+  brookGlitter(); bridge(RIVER_W[7][0] * T, RIVER_W[7][1] * T);
+  lakeLive(); lakeDecos();
   // Weide-Zaun
   const pa = { x: PASTURE.x * T, y: PASTURE.y * T, w: PASTURE.w * T, h: PASTURE.h * T };
   ctx.fillStyle = 'rgba(140,200,90,.18)'; ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
@@ -2712,7 +2767,7 @@ function render() {
     const used = new Set(G.things.filter(t => THINGS[t.type].area === a).map(t => t.slot));
     for (let i = 0; i < slotsAvail(a); i++) {
       if (used.has(i)) continue;
-      const p = slotPos(a, i);
+      const p = slotPos(a, i); if (!vis(p.x, p.y)) continue;
       if (a === 'acker') ctx.strokeRect(p.x - 2.5 * T, p.y - 1.5 * T, 5 * T, 3 * T);
       else if (a === 'dorf') ctx.strokeRect(p.x - 1.3 * T, p.y - 2 * T, 2.6 * T, 2.2 * T);
       else { ctx.beginPath(); ctx.ellipse(p.x, p.y, 20, 9, 0, 0, 7); ctx.stroke(); }
@@ -2789,9 +2844,11 @@ function render() {
 
 let last = 0;
 function loop(t) {
-  const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
-  if (G && !$('#game').hidden) { update(dt); render(); tickTime(dt); }
+  if (!G || $('#game').hidden) { loopOn = false; AU.pause(); return; } // ausserhalb des Spiels steht alles still, show('game') startet neu
   requestAnimationFrame(loop);
+  // ponytail: 60 fps nur beim Laufen, sonst 30 (Tiere, Mühlen, Wolken sehen gleich aus); 120-Hz-Displays nie voll. -4 ms Toleranz fürs Frame-Raster
+  if (t - last < (!eco && (moving || joy) ? 1000 / 60 : 1000 / 30) - 4) return;
+  const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
+  update(dt); render(); tickTime(dt);
 }
 renderSelect();
-requestAnimationFrame(loop);

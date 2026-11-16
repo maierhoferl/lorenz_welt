@@ -14,7 +14,7 @@ const AU = (() => {
         const d = nb.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       }
-      ac.resume();
+      if (on) ac.resume();
     } catch (e) { ac = null; }
   }
   const filt = (type, f, q = 1) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
@@ -105,7 +105,8 @@ const AU = (() => {
   return {
     init, update,
     sfx: k => { if (ac && on) try { SFX[k](); } catch (e) {} },
-    toggle: () => { on = !on; if (master) master.gain.value = on ? 0.5 : 0; if (!on) window.speechSynthesis?.cancel(); return on; },
+    toggle: () => { on = !on; if (master) master.gain.value = on ? 0.5 : 0; if (ac) on ? ac.resume() : ac.suspend(); if (!on) window.speechSynthesis?.cancel(); return on; },
+    pause: () => ac?.suspend(), // Audio-Thread anhalten (Tab weg, Spiel verlassen): spart Akku, init() weckt ihn wieder
     get on() { return on; },
   };
 })();
