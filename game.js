@@ -250,6 +250,7 @@ const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
 const avail = k => G.land >= (THINGS[k].land || 0) && !UNLOCKS.slice(G.unlocks).flat().includes(k); // schon im Laden?
 const hofLv = () => HOF_LV.filter(l => G.land >= l).length;
+const shopLv = () => hofLv() + SHOP_LV.filter(l => G.land >= l).length; // Laden/Händler: 0–9
 // Endstation (Ware wird nirgends weiterverarbeitet) zum ersten Mal gebaut → nächste Kette freischalten
 function checkUnlock(k) {
   const d = THINGS[k];
@@ -873,6 +874,7 @@ function shopList() {
     buy: () => {
       G.land++; fitWorld(); relayout(); fixDeco(); toast($t`🗺️ Deine Welt ist grösser geworden! Neue Plätze sind gestrichelt markiert.`);
       const i = HOF_LV.indexOf(G.land); if (i >= 0) toast($t`🏡 Dein Bauernhof wird ausgebaut: ${HOF_ADD[i]}!`);
+      if (SHOP_LV.includes(G.land)) toast($t`🏪 Laden und Händler sind gewachsen!`);
       if (i === 1 || i === 3) setTimeout(() => toast($t`🏪 Laden und Händler ziehen in grössere Häuser!`), 2500);
       for (const a of Object.values(AREAS)) if (a.from === G.land) { toast($t`🎉 Neu im Süden ⬇️: ${a.name}! Schau im Laden.`); AU.sfx('grow'); }
     },
@@ -1243,8 +1245,8 @@ const DRAW = {
     }
     flagPole(x + 158, y, 96, 26, 0);
   },
-  haendler(x, y) { // wächst mit der Land-Stufe (HOF_LV): Marktstand → Markthalle → Grosshandel
-    const lv = hofLv();
+  haendler(x, y) { // wächst mit der Land-Stufe (HOF_LV, dann SHOP_LV): Marktstand → Markthalle → Grosshandel
+    const lv = shopLv();
     if (lv >= 4) { grosshandel(x + 6, y, lv); return; }
     if (lv >= 2) { markthalle(x - 10, y, lv); return; }
     if (lv >= 1) { // Waage und mehr Kisten neben dem Stand
@@ -1260,8 +1262,8 @@ const DRAW = {
     sign(x, y - 94, $t`HÄNDLER 💰`);
     flagPole(x + 57, y - 72, 26, 16, 2);
   },
-  laden(x, y) { // wächst mit der Land-Stufe (HOF_LV): Lädeli → Dorfladen → moderner Markt
-    const lv = hofLv();
+  laden(x, y) { // wächst mit der Land-Stufe (HOF_LV, dann SHOP_LV): Lädeli → Dorfladen → moderner Markt
+    const lv = shopLv();
     if (lv >= 4) { supermarkt(x, y, lv); return; }
     if (lv >= 2) { dorfladen(x, y, lv); return; }
     if (lv >= 1) { // Gemüse-Gestell vor dem Laden
@@ -1541,11 +1543,26 @@ function dorfladen(x, y, lv) { // Stufe 2–3: zweistöckiger Dorfladen mit Scha
   if (lv >= 3) { ctx.fillStyle = '#8a5a30'; ctx.fillRect(x + 96, y - 14, 30, 4); ctx.fillRect(x + 99, y - 10, 3, 10); ctx.fillRect(x + 120, y - 10, 3, 10); } // Bänkli
 }
 function supermarkt(x, y, lv) { // Stufe 4–5: moderner Markt mit Glasfront, Flachdach (5: Solardach, Parkplatz, Ladesäule)
-  const w = 250, h = 96, x0 = x - w / 2 - 10;
+  const w = 250, h = 96, x0 = x - w / 2 - 10, up = lv >= 6 ? 64 : 0; // up = Obergeschoss
+  // ab Stufe 6 wächst er in die Höhe (links der Rand, rechts der Händler, vorne der Weg)
+  if (lv >= 7) { // Glasturm am linken Rand
+    const tx = x0 + 8, th = lv >= 9 ? 190 : 140; ctx.fillStyle = '#5a7a94'; ctx.fillRect(tx, y - h - th, 62, th);
+    for (let r = 0; r < th / 16 - 1; r++) for (let c = 0; c < 3; c++) { ctx.fillStyle = (r * 5 + c * 3 + Math.floor(time * 0.3)) % 7 ? '#a8d0ec' : '#ffe08a'; ctx.fillRect(tx + 5 + c * 19, y - h - th + 6 + r * 16, 15, 11); } // Fenster, manche mit Licht
+    if (lv >= 9) { const cx = tx + 31, cy = y - h - th - 16; ellipse(cx, cy, 15, 15, '#fff'); ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke(); const d = new Date(), hh = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * 6.283, mm = d.getMinutes() / 60 * 6.283; line('#222', 2.5, cx, cy, cx + Math.sin(hh) * 8, cy - Math.cos(hh) * 8); line('#222', 1.5, cx, cy, cx + Math.sin(mm) * 12, cy - Math.cos(mm) * 12); } // Uhr mit echter Zeit
+  }
+  if (up) { // Obergeschoss mit Restaurant
+    const ux0 = x0 + 24, uw = w - 40; ctx.fillStyle = '#e4e6e8'; ctx.fillRect(ux0, y - h - 14 - up, uw, up);
+    for (let i = 0; i < 5; i++) { shopWin(ux0 + 8 + i * (uw - 16) / 5, y - h - up - 4, (uw - 16) / 5 - 6, 34, '#4a4f56'); ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillText(['🍝', '☕', '🍰', '🥗', '🍕'][i], ux0 + 8 + (i + 0.5) * (uw - 16) / 5 - 3, y - h - up + 22); }
+    ctx.fillStyle = '#d52b1e'; ctx.fillRect(ux0 - 4, y - h - 14 - up - 8, uw + 8, 9);
+  }
+  if (lv >= 8) { // grosse Leuchtreklame auf dem Dach
+    const sy = y - h - 22 - up - 34, on = Math.sin(time * 2.5) > -0.7; line('#555', 3, x - 50, sy + 30, x - 50, y - h - 22 - up); line('#555', 3, x + 50, sy + 30, x + 50, y - h - 22 - up);
+    ctx.fillStyle = on ? '#ffd23a' : '#c8a020'; rrect(x - 74, sy, 148, 30, 7); ctx.fill(); ctx.font = '800 17px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#d52b1e'; ctx.fillText($t`LADEN 🛒`, x, sy + 22);
+  }
   ellipse(x - 2, y, w / 2 + 20, 11, 'rgba(0,0,0,.22)');
   const g = ctx.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, '#f4f4f0'); g.addColorStop(1, '#c9ccd0'); ctx.fillStyle = g; ctx.fillRect(x0, y - h, w, h);
   ctx.fillStyle = '#d52b1e'; ctx.fillRect(x0 - 6, y - h - 14, w + 12, 16); // Dachrand
-  if (lv >= 5) for (let i = 0; i < 8; i++) { ctx.fillStyle = '#1f3a64'; ctx.beginPath(); const px = x0 + 6 + i * 30; ctx.moveTo(px, y - h - 14); ctx.lineTo(px + 26, y - h - 14); ctx.lineTo(px + 22, y - h - 28); ctx.lineTo(px + 4, y - h - 28); ctx.fill(); line('rgba(150,190,240,.6)', 1, px + 13, y - h - 14, px + 13, y - h - 28); } // Solarpanels
+  if (lv >= 5) for (let i = 0; i < 8; i++) { ctx.fillStyle = '#1f3a64'; ctx.beginPath(); const px = x0 + 6 + i * 30, py = y - h - 14 - (up ? up + 8 : 0); if (lv >= 8 && px > x - 80 && px < x + 60) continue; ctx.moveTo(px, py); ctx.lineTo(px + 26, py); ctx.lineTo(px + 22, py - 14); ctx.lineTo(px + 4, py - 14); ctx.fill(); line('rgba(150,190,240,.6)', 1, px + 13, py, px + 13, py - 14); } // Solarpanels
   // Glasfront mit Sprossen
   const gx = x0 + 16, gw = w - 32, gh = 58, gy = y - gh;
   shopWin(gx, gy, gw, gh, '#4a4f56');
@@ -1559,7 +1576,7 @@ function supermarkt(x, y, lv) { // Stufe 4–5: moderner Markt mit Glasfront, Fl
   if (lv >= 5) { // Ladesäule fürs E-Auto
     const ex = x - 186; ctx.fillStyle = '#e8eef2'; rrect(ex - 7, y - 40, 14, 40, 3); ctx.fill(); ctx.fillStyle = '#3fb55a'; ctx.fillRect(ex - 4, y - 34, 8, 6); line('#2a2a2a', 2, ex + 7, y - 20, ex + 14, y - 10, ex + 12, y - 2);
   }
-  flagPole(x0 + w - 14, y - h - 14, 44, 20, 4); // auf dem Dach
+  flagPole(x0 + w - 14, y - h - 14 - (up ? up + 8 : 0), 44, 20, 4); // auf dem Dach
 }
 function markthalle(x, y, lv) { // Stufe 2–3: offene Holz-Markthalle (3: Leiterwagen mit Säcken)
   ellipse(x + 6, y, 104, 12, 'rgba(0,0,0,.22)');
@@ -1580,6 +1597,24 @@ function markthalle(x, y, lv) { // Stufe 2–3: offene Holz-Markthalle (3: Leite
 }
 function grosshandel(x, y, lv) { // Stufe 4–5: Lagerhalle mit Rolltor, Büro mit Glasfront und Rampe (5: Gabelstapler fährt Paletten)
   const w = 240, h = 92, x0 = x - w / 2;
+  // ab Stufe 6 wächst er hinter der Halle in die Höhe (Seiten: Laden, Strasse und Spediteur-Hof)
+  if (lv >= 8) { // Windrad
+    const wx = x0 + w - 46, wy = y - h - 150; line('#e8eef2', 5, wx, y - h, wx, wy); ellipse(wx, wy, 5, 5, '#d8dee2');
+    for (let i = 0; i < 3; i++) { const a = time * 1.4 + i * 2.094; line('#f4f6f8', 4, wx, wy, wx + Math.cos(a) * 52, wy + Math.sin(a) * 52); }
+  }
+  if (lv >= 6) { // Hochregal-Lager: Turm mit bunten Paletten
+    const th = lv >= 9 ? 150 : 96, tx = x0 + 14, tw = 84;
+    ctx.fillStyle = '#c8d0d6'; ctx.fillRect(tx, y - h - th, tw, th);
+    for (let r = 0; r < th / 14 - 1; r++) { line('#8a959e', 2, tx, y - h - th + 12 + r * 14, tx + tw, y - h - th + 12 + r * 14); for (let c = 0; c < 6; c++) if ((r * 7 + c * 3) % 5) { ctx.fillStyle = ['#d8332a', '#e0b54a', '#7fbf4a', '#3a6fd8'][(r + c) % 4]; ctx.fillRect(tx + 4 + c * 13, y - h - th + 3 + r * 14, 10, 8); } }
+    if (lv >= 9) { // Leuchtschrift oben drauf
+      const on = Math.sin(time * 3) > -0.6; ctx.fillStyle = on ? '#ff3a2a' : '#a8251c'; rrect(tx - 6, y - h - th - 26, tw + 12, 22, 5); ctx.fill();
+      ctx.font = '800 15px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = on ? '#fff' : '#f2d0c8'; ctx.fillText('💰 💰 💰', tx + tw / 2, y - h - th - 10);
+    }
+  }
+  if (lv >= 7) { // Büro-Etage aus Glas hinter dem Dach
+    const ox = x0 + 112, ow = w - 140; ctx.fillStyle = '#e8ecef'; ctx.fillRect(ox, y - h - 60, ow, 60);
+    for (let i = 0; i < 3; i++) shopWin(ox + 6 + i * (ow - 12) / 3, y - h - 54, (ow - 12) / 3 - 4, 26, '#4a4f56');
+  }
   ellipse(x + 6, y, w / 2 + 14, 12, 'rgba(0,0,0,.22)');
   const g = ctx.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, '#9fb3c0'); g.addColorStop(1, '#6f8594'); ctx.fillStyle = g; ctx.fillRect(x0, y - h, w, h);
   for (let px = x0 + 4; px < x0 + w; px += 7) line('rgba(255,255,255,.18)', 1.5, px, y - h, px, y); // Wellblech
@@ -2238,7 +2273,8 @@ function gearFront(D) {
 // Vorderachse hält Abstand zur Kupplung, Hinterachse zur Vorderachse.
 const hasCart = () => G.tools.tragen === 3 || onTractor();
 const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1; return [tx - (tx - x) / l * d, ty - (ty - y) / l * d]; };
-function cartDims(s) { const t = onTractor(), k = (t ? 18 : 6) * s; if (t) s *= 1 + (G.tools.tragen - 4) * 0.25; return { k, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
+const trK = () => 1 + (G.tools.tragen - 4) * 0.25; // Traktor wächst mit der Stufe: 1 / 1.25 / 1.5
+function cartDims(s) { const t = onTractor(), k = (t ? 18 * trK() : 6) * s; if (t) s *= trK(); return { k, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
 function trailCart() {
   if (!hasCart()) { cart.on = false; return; }
   const c = cartDims(0.85 + G.stage * 0.09), ux = Math.cos(trH), uy = Math.sin(trH);
@@ -2252,8 +2288,8 @@ function poly(pts, fill) {
   ctx.fillStyle = fill; ctx.beginPath(); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
 }
-function wheelE(cx, cy, r, ux, uy) { // Rad steht parallel zur Fahrtrichtung
-  ctx.fillStyle = ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 2; ctx.beginPath();
+function wheelE(cx, cy, r, ux, uy, c = '#2b2b2b') { // Rad steht parallel zur Fahrtrichtung
+  ctx.fillStyle = ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath();
   for (let i = 0; i < 16; i++) { const t = i / 16 * 6.283; ctx.lineTo(cx + Math.cos(t) * r * ux, cy + Math.cos(t) * r * uy * 0.5 - Math.sin(t) * r); }
   ctx.closePath(); ctx.fill(); ctx.stroke();
 }
@@ -2303,17 +2339,36 @@ function drawTruck(k) {
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
 const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782']]; // Stufe 4/5/6: grün, rot, blau
 function tractorParts(x, y, s) {
-  const [c1, c2, c3] = TR_COL[G.tools.tragen - 4] || TR_COL[0];
-  const P = proj(x, y, s), { ux, uy } = P, box = (...a) => box3(P, ...a);
+  const lv = clamp(G.tools.tragen - 4, 0, 2), [c1, c2, c3] = TR_COL[lv];
+  const P = proj(x, y, s * trK()), { ux, uy } = P, box = (...a) => box3(P, ...a), S = s * trK();
   const part = (a, b, d) => ({ y: P(a, b)[1], d });
-  const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * s, ux, uy); });
-  const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * s, ...P(a, b, 15), ...P(a, b, 58)));
-  const shadow = { y: -Infinity, d: () => { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-14, 15], [38, 12], [38, -12], [-14, -15]]) ctx.lineTo(...P(a, b)); ctx.fill(); } };
-  return [shadow, whl(0, 13, 12), whl(0, -13, 12), whl(30, 9, 7), whl(30, -9, 7),
+  const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * S, ux, uy); if (lv) wheelE(cx, cy, r * 0.45 * S, ux, uy, '#e8c33a'); }); // ab Kipper: gelbe Felgen
+  const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * S, ...P(a, b, 15), ...P(a, b, 58)));
+  const shadow = { y: -Infinity, d: () => { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-14, 19], [42, 15], [42, -15], [-14, -19]]) ctx.lineTo(...P(a, b)); ctx.fill(); } };
+  const rear = [12, 14, 13][lv], front = [7, 8, 13][lv], hood = [36, 38, 40][lv], hh = [13, 14, 17][lv];
+  const W = [whl(0, 13, rear), whl(0, -13, rear), whl(30, 9 + lv * 2, front), whl(30, -9 - lv * 2, front)];
+  if (lv === 2) W.push(whl(0, 19, rear), whl(0, -19, rear)); // Riesentraktor: Zwillingsräder hinten
+  const roof = () => {
+    if (lv) box(-10, 8, 11, 15, 43, 'rgba(170,215,240,.18)', 'rgba(170,215,240,.28)'); // geschlossene Glaskabine
+    box(-10, 8, 11, 58, 3, c1, c3);
+    if (!lv) return;
+    const on = Math.sin(time * 9) > 0; // orange Rundumleuchte blinkt
+    const [bx, by] = P(-6, 6, 63); ellipse(bx, by, 3 * S, 3 * S, on ? '#ffb02e' : '#b8641a'); if (on) ellipse(bx, by, 6 * S, 6 * S, 'rgba(255,176,46,.3)');
+    if (lv === 2) {
+      const [gx, gy] = P(-3, -2, 62); ellipse(gx, gy, 4 * S, 2.5 * S, '#f2f2f2'); // GPS-Antenne
+      for (const b of [-8, -3, 3, 8]) { const [lx, ly] = P(8, b, 59); ellipse(lx, ly, 2 * S, 1.5 * S, '#fff8c8'); } // Lichtbalken
+    }
+  };
+  return [shadow, ...W,
     part(0, 0, () => box(-9, 7, 9, 8, 7, c1, c2)), // Sitzkasten
-    part(21, 0, () => { box(6, 36, 6, 8, 13, c1, c2); line('#333', 2.5 * s, ...P(30, 0, 21), ...P(30, 0, 31 + Math.abs(Math.sin(time * 12)) * 2)); }), // Motorhaube + Auspuff
+    part(21, 0, () => {
+      box(6, hood, 6 + lv, 8, hh, c1, c2); // Motorhaube
+      if (lv) box(hood, hood + 4, 7, 6, 8, '#3c3c3c', '#2a2a2a'); // Frontgewicht
+      const ex = P(hood - 6, 0, 8 + hh), et = P(hood - 6, 0, 18 + hh + lv * 6 + Math.abs(Math.sin(time * 12)) * 2);
+      line('#333', (2.5 + lv) * S, ...ex, ...et); if (lv) puffs(et[0], et[1], true, lv === 2 ? '90,90,90' : '200,200,200', 0.4 + lv * 0.2); // Auspuff qualmt
+    }),
     post(-8, 9), post(-8, -9), post(6, 9), post(6, -9),
-    { y: Infinity, d: () => box(-10, 8, 11, 58, 3, c1, c3) }]; // Dach
+    { y: Infinity, d: roof }];
 }
 // Bein mit Knie (2-Glied-IK) in der Ebene quer-Versatz b: Fuss schwingt nach vorn und hebt ab, Standbein bleibt am Boden.
 // Rechnet in (vorne, unten) wie in der Seitenansicht und projiziert dann in 3D.
@@ -2327,10 +2382,10 @@ function leg3(P, s, p, L, drop, b, z0, col, am, shoe = '#4a2f1e') {
 function drawPlayer() {
   const x = G.px, y = G.py, st = G.stage, s = 0.85 + st * 0.09, P = proj(x, y, s);
   const tr = onTractor(), am = tr ? 0 : amp, sw = Math.sin(walk) * am, leg = -sw * 4; // Arme gegengleich zu den Beinen
-  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = tr ? 15 - legL : liftH(); // auf dem Traktor sitzt der Rumpf auf dem Sitz
+  const legL = 13 + st * 2.5, torso = 17 + st * 2, sh = 8 + st * 0.8, headR = 9.5 - st * 0.5, lift = tr ? 15 * trK() - legL : liftH(); // auf dem Traktor sitzt der Rumpf auf dem Sitz
   const drop = legL * (1 - Math.cos(sw * 0.5)); // Hüfte sinkt bei gespreizten Beinen
   const D = { legL, torso, sh, headR, lift, hx: sh + 3 + leg * 0.5, hy: -legL - 1, bx: -sh - 3 - leg * 0.5 };
-  const anchor = () => tr ? P(-18, 0, 8) : P(-6, 0, legL + lift - drop);
+  const anchor = () => tr ? P(-18 * trK(), 0, 8 * trK()) : P(-6, 0, legL + lift - drop);
   const cartBack = cart.on && (cart.fy + cart.by) / 2 <= y;
   if (!tr) ellipse(x, y, 12 * s, 4 * s, 'rgba(0,0,0,.3)');
   if (cartBack) drawCart(...anchor(), s);

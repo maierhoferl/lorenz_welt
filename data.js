@@ -494,6 +494,7 @@ const AREAS = {
 };
 // Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
 const HOF_LV = [2, 5, 10, 15, 20];
+const SHOP_LV = [30, 40, 50, 60]; // danach wachsen Laden und Händler weiter in die Höhe
 const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
 const PASTURE = { x: 19.2, y: 27.5, w: 10, h: 6.6 }; // Zaun (Kacheln), w wächst mit der Weide (fitWorld)
 
