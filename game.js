@@ -220,15 +220,26 @@ const isAuto = t => { const d = THINGS[t.type]; return d.kind === 'grow' && !!to
 const storeCap = d => d.n * 3;
 const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
 const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
-// Herstellung/Verbrauch pro Minute je Ware (wie im Produktions-Plan)
+// Herstellung/Bedarf pro Minute je Ware (auch für den Produktions-Plan).
+// Fehlt einem Gebäude eine Zutat, läuft es langsamer (u < 1) – das zieht durch die ganze Kette.
+// sup = was wirklich herauskommt; dem = was die Abnehmer nehmen würden, wenn genau diese Ware reichen würde.
 function rates() {
-  const sup = {}, dem = {};
-  for (const t of G.things) {
-    const d = THINGS[t.type];
-    sup[d.item] = (sup[d.item] || 0) + d.n / d.time * 60;
-    if (d.in) for (const k in d.in) dem[k] = (dem[k] || 0) + d.in[k] / d.time * 60;
+  const cnt = {}, u = {}, bind = {};
+  for (const t of G.things) cnt[t.type] = (cnt[t.type] || 0) + 1;
+  const ks = Object.keys(cnt), pm = (k, v) => cnt[k] * v / THINGS[k].time * 60;
+  let sup, use;
+  for (let n = 0; n < 60; n++) { // ponytail: Fixpunkt mit fester Rundenzahl, reicht für die ≤ 6 Stufen tiefen Ketten
+    sup = {}; use = {};
+    for (const k of ks) { const d = THINGS[k]; sup[d.item] = (sup[d.item] || 0) + pm(k, d.n) * (u[k] ?? 1); for (const i in d.in) use[i] = (use[i] || 0) + pm(k, d.in[i]) * (u[k] ?? 1); }
+    for (const k of ks) {
+      const d = THINGS[k]; if (!d.in) continue;
+      const q = Object.keys(d.in).map(i => [i, use[i] ? (sup[i] || 0) / use[i] : 1]).sort((a, b) => a[1] - b[1]);
+      u[k] = Math.min(1, Math.max(u[k] ?? 1, 1e-3) * q[0][1]); bind[k] = q.filter(e => e[1] < q[0][1] + 0.02).map(e => e[0]); // knappste Zutat(en)
+    }
   }
-  return { sup, dem };
+  const dem = {}; // ponytail: Abnehmer, die an dieser Ware hängen, zählen voll – auch wenn noch eine zweite Zutat knapp wäre
+  for (const k of ks) for (const i in THINGS[k].in) dem[i] = (dem[i] || 0) + pm(k, THINGS[k].in[i]) * (u[k] === 1 || bind[k].includes(i) ? 1 : u[k]);
+  return { sup, dem, u, cnt };
 }
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
@@ -586,7 +597,7 @@ function warnings() {
     const miss = Object.keys(d.in).filter(k => (t.inS[k] || 0) < d.in[k]);
     if (miss.length && t.wait > 5) {
       const k = miss[0], name = ITEMS[k].name;
-      if (!sup[k]) t.warn = $t`Es fehlt ${name} – niemand stellt das her! Kauf etwas, das ${name} macht.`;
+      if (!G.things.some(s => THINGS[s.type].item === k)) t.warn = $t`Es fehlt ${name} – niemand stellt das her! Kauf etwas, das ${name} macht.`;
       else {
         const auto = G.things.some(s => THINGS[s.type].item === k && (THINGS[s.type].kind === 'factory' || isAuto(s)));
         t.warn = auto ? $t`Wartet auf ${name} …` : $t`Bring ${name} her! (oder kauf eine Maschine, die automatisch erntet)`;
@@ -890,9 +901,8 @@ function openPlan() {
   const makers = it => types.filter(k => THINGS[k].item === it);
   const dep = k => depth[k] ?? (depth[k] = THINGS[k].kind === 'grow' ? 0 : 1 + Math.max(0, ...Object.keys(THINGS[k].in).flatMap(it => makers(it).map(dep))));
   types.forEach(dep);
-  const cnt = {}, sup = {}, dem = {};
-  for (const k of types) cnt[k] = G.things.filter(t => t.type === k).length;
-  for (const k of types) { const d = THINGS[k]; sup[d.item] = (sup[d.item] || 0) + cnt[k] * d.n / d.time * 60; if (d.in) for (const i in d.in) dem[i] = (dem[i] || 0) + cnt[k] * d.in[i] / d.time * 60; }
+  const { sup, dem, u, cnt: c0 } = rates(), cnt = {};
+  for (const k of types) cnt[k] = c0[k] || 0;
   // Ein Reiter pro Rohstoff. Kategorie = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel).
   const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = Object.keys(THINGS).find(f => THINGS[f].item === it); return m ? catOf(m) : it; };
   const cats = [...new Set(types.map(catOf))];
@@ -949,9 +959,11 @@ function openPlan() {
     edges += `<g data-e="${e.a}>${e.b}"><path d="${d}" fill="none" stroke="${e.color}" stroke-width="3.5" marker-end="url(#ar)"/></g>`;
   }
   // Σ-Label 1× pro Hersteller: ganze Produktion → ganze Abnahme (alle Abnehmer, auch anderer Reiter), über dem obersten Pfeil
+  const said = new Set(); // Ware mit mehreren Herstellern (Fleisch): Summe nur 1×
   for (const k of vis) {
     const out = E.filter(e => e.a === k);
-    if (!out.length) continue;
+    if (!out.length || said.has(THINGS[k].item)) continue;
+    said.add(THINGS[k].item);
     const it = THINGS[k].item, top = Math.min(...out.map(e => e.y1)), c = out.find(e => e.color !== '#bbb')?.color || '#bbb';
     labels += `<text x="${posn[k].x + NW + 6}" y="${top - 6}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it] || 0)}/min` : ITEMS[it].icon}</text>`;
   }
@@ -961,7 +973,7 @@ function openPlan() {
   const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
   const unitVal = f => eur(THINGS[f].item) * THINGS[f].n / Object.values(THINGS[f].in).reduce((a, b) => a + b); // Wert je Zutat nach Verarbeitung
   const ready = f => Object.keys(THINGS[f].in).every(i => sup[i] > 0); // nur vorschlagen, wenn ALLE Zutaten schon hergestellt werden
-  const bestUser = (it, built) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f]) && ready(f)).sort((a, b) => unitVal(b) - unitVal(a))[0];
+  const bestUser = (it, built, fed) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f]) && ready(f) && (!fed || u[f] >= 0.9)).sort((a, b) => unitVal(b) - unitVal(a))[0]; // fed: hat genug von den anderen Zutaten
   let blocked = 0; // was gerade auf eine freie Tasche wartet
   for (const k of types) {
     const d = THINGS[k], it = d.item, fld = d.kind === 'grow' ? 'store' : 'out', cap = d.kind === 'grow' ? storeCap(d) : OUT_CAP;
@@ -982,12 +994,13 @@ function openPlan() {
   if (bagCount() >= bagCap()) tip(blocked + 1, $t`🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
   for (const it in ITEMS) {
     const s = sup[it] || 0, dm = dem[it] || 0, makes = makers(it).map(k => THINGS[k].name).join(' / ');
-    if (dm && s < dm * 0.9) {
+    // Hersteller hungern selbst (u < 0.9)? Dann bringen mehr davon nichts – der Tipp steht weiter oben in der Kette
+    if (dm && s < dm * 0.9 && !(s && makers(it).filter(k => cnt[k]).every(k => (u[k] ?? 1) < 0.9))) {
       const f = bestUser(it, true);
       tip((dm - s) * (f ? unitVal(f) : eur(it)) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`));
     }
     if (!s) continue;
-    const bu = bestUser(it, true), best = bestUser(it, false);
+    const bu = bestUser(it, true, true), best = bestUser(it, false);
     if (dm && bu && s > dm * 1.1) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
     if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
@@ -996,7 +1009,8 @@ function openPlan() {
   tips.sort((a, b) => b.v - a.v);
   for (const k of vis) {
     const p = posn[k], d = THINGS[k], on = cnt[k] > 0, warn = G.things.some(t => t.type === k && t.warn);
-    const rate = on ? `${r(cnt[k] * d.n / d.time * 60)} ${ITEMS[d.item].icon}/min` : $t`${d.price} Fr. im Laden`;
+    const full = cnt[k] * d.n / d.time * 60, uk = u[k] ?? 1; // läuft langsamer (Zutat fehlt): echt/möglich
+    const rate = on ? `${r(full * uk)}${uk < 0.95 ? '/' + r(full) : ''} ${ITEMS[d.item].icon}/min${k === 'feld' && guelleOn() ? ' 💩×2' : ''}` : $t`${d.price} Fr. im Laden`;
     const extra = Object.keys(d.in || {}).filter(it => !vis.some(m => THINGS[m].item === it)).map(it => ITEMS[it].icon).join(''); // Zutaten aus anderen Reitern
     const awayF = types.filter(f => cnt[f] && !vis.includes(f) && THINGS[f].in?.[d.item]), away = [...new Set(awayF.map(f => THINGS[f].icon))].join(''); // ponytail: nur gebaute Abnehmer, sonst zu viele Symbole (Mehl)
     const sell = !types.some(f => THINGS[f].in?.[d.item] && cnt[f]) ? `→ 💰${on ? ' ' + (d.kind === 'factory' && G.tools.spedition ? '🚚' : '🎒') : ''}` : '';
