@@ -917,6 +917,8 @@ function openPlan() {
   types.forEach(dep);
   const { sup, dem, u, cnt: c0 } = rates(), cnt = {};
   for (const k of types) cnt[k] = c0[k] || 0;
+  const cap = {}; // volle Kapazität je Ware (alle Gebäude laufen ohne Wartezeit)
+  for (const k of types) { const d = THINGS[k]; cap[d.item] = (cap[d.item] || 0) + cnt[k] * d.n / d.time * 60; }
   // Ein Reiter pro Rohstoff. Kategorie = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel).
   const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = Object.keys(THINGS).find(f => THINGS[f].item === it); return m ? catOf(m) : it; };
   const cats = [...new Set(types.map(catOf))];
@@ -927,6 +929,7 @@ function openPlan() {
   const Wd = 110 + used.length * (NW + GX) - GX; // +90: Platz für Stummel mit Rate ganz rechts
   let Hd = 20 + Math.max(...rows) * (NH + GY) - GY, edges = '', labels = '', nodes = '';
   const r = v => Math.round(v * 10) / 10;
+  const rateTxt = it => `${r(sup[it] || 0)}${(sup[it] || 0) < cap[it] * 0.95 ? ' ' + $t`(voll ${r(cap[it])})` : ''}`; // echt (voll), wenn es gerade langsamer läuft
   // Pfeile überlagern sich nie: jeder hat eigene Anschlusspunkte, eigene senkrechte Spur pro Lücke,
   // und Pfeile über mehrere Spalten laufen auf einer eigenen Bahn unter allen Kästchen durch.
   const users = k => vis.filter(f => THINGS[f].in?.[THINGS[k].item]), feeders = k => vis.filter(m => THINGS[k].in?.[THINGS[m].item]);
@@ -979,7 +982,7 @@ function openPlan() {
     if (!out.length || said.has(THINGS[k].item)) continue;
     said.add(THINGS[k].item);
     const it = THINGS[k].item, top = Math.min(...out.map(e => e.y1)), c = out.find(e => e.color !== '#bbb')?.color || '#bbb';
-    labels += `<text x="${posn[k].x + NW + 6}" y="${top - 6}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${r(sup[it])}→${r(dem[it] || 0)}/min` : ITEMS[it].icon}</text>`;
+    labels += `<text x="${posn[k].x + NW + 6}" y="${top - 6}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${rateTxt(it)}→${r(dem[it] || 0)}/min` : ITEMS[it].icon}</text>`;
   }
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
@@ -1020,6 +1023,13 @@ function openPlan() {
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
     if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`);
   }
+  // Transport: alles über dem Bedarf geht zum Händler – bei voller Produktion, damit man vor dem Engpass gewarnt wird.
+  // ponytail: Fahrzeug-Leistung = cap pro Takt; lange Fahrwege machen es langsamer, das schätzen wir nicht.
+  const sellIt = Object.keys(cap).filter(it => cap[it] > (dem[it] || 0) * 1.1), sellN = sellIt.reduce((a, it) => a + cap[it] - (dem[it] || 0), 0);
+  const sellV = sellIt.reduce((a, it) => a + (cap[it] - (dem[it] || 0)) * eur(it), 0), lvS = G.tools.spedition && toolLv('spedition');
+  const truckN = lvS ? truckCount() * lvS.cap / lvS.every * 60 : 0;
+  if (sellN >= 1 && !lvS) tip(sellV * M * 0.3, $t`🚚 <b>Kein Spediteur</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen – die musst du alle selbst zum Händler tragen. Ein Spediteur aus dem Laden macht das für dich.`);
+  if (lvS && sellN > truckN * 1.05) tip(sellV * (1 - truckN / sellN) * M, $t`⚠️ <b>Zu wenig Transport</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen, ${truckCount()}× ${lvS.name} schafft nur ≈ ${r(truckN)}/min. Kauf im Laden noch ein Fahrzeug oder ein grösseres – sonst werden die Lager voll und die Arbeit steht.`);
   tips.sort((a, b) => b.v - a.v);
   for (const k of vis) {
     const p = posn[k], d = THINGS[k], on = cnt[k] > 0, warn = G.things.some(t => t.type === k && t.warn);
@@ -1037,7 +1047,7 @@ function openPlan() {
     const sy = p.y + NH - 12, stub = (x1, x2, ic, tx) => `<g opacity="${on ? 1 : 0.45}"><path d="M${x1},${sy} L${x2},${sy}" stroke="#3e7bc4" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#ab)"/><text x="${tx}" y="${sy - 5}" font-size="12">${ic}</text></g>`; // Pfeil-Stummel: von/zu anderem Reiter
     if (extra) nodes += stub(p.x - 40, p.x, extra, p.x - 40);
     // Rate (Summe aller Abnehmer, auch anderer Reiter) steht nur 1×: am obersten Pfeil, sonst am Stummel
-    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${r(sup[d.item])}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
+    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${rateTxt(d.item)}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
   }
   const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
   const head = `<div class="tabs">${cats.map(c => `<button data-cat="${c}" class="${c === planCat ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}</button>`).join('')}</div>`;
