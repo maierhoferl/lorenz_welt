@@ -556,6 +556,9 @@ const TOOLS = {
     { name: 'Bote mit Lastenrad', cap: 8, every: 30, price: 2500, info: 'Du stellst einen Boten an: Er holt fertige Waren aus deinen Gebäuden und verkauft sie für dich beim Händler. Ein Lastenrad hat vorne eine grosse Kiste – ohne Benzin, nur mit Muskelkraft. Angestellte bekommen Lohn, darum ist das teuer!' },
     { name: 'Lieferwagen', cap: 25, every: 25, price: 6000, info: 'Ein Lieferwagen hat hinten einen grossen Laderaum ohne Fenster. Mit Kühl-Lieferwagen bleiben Joghurt, Käse und Torten auch im Sommer frisch – innen sind es nur 4 °C.' },
     { name: 'Lastwagen', cap: 60, every: 20, price: 15000, info: 'Ein Lastwagen (LKW) darf bis zu 40 Tonnen wiegen – so viel wie 30 Autos! Der Fahrer braucht einen eigenen Führerschein und muss nach 4½ Stunden Fahrt eine Pause machen.' },
+    { name: 'Sattelschlepper', cap: 120, every: 16, v: 8, price: 40000, info: 'Ein Sattelschlepper ist zweiteilig: vorne die Zugmaschine mit dem Motor, hinten der Auflieger mit der Ladung. Der Auflieger liegt auf einer drehbaren Platte, der Sattelkupplung – so kommt der lange Lastwagen trotzdem um die Kurve.' },
+    { name: 'Lastzug mit Anhänger', cap: 250, every: 12, v: 8, price: 100000, info: 'Ein Lastwagen mit Anhänger heisst Lastzug. Er ist bis zu 18,75 Meter lang! In der Schweiz zahlt jeder Lastwagen eine Gebühr pro Kilometer, die LSVA. Damit wird auch die Bahn bezahlt – viele Waren fahren huckepack auf dem Zug durch die Alpen.' },
+    { name: 'Elektro-Lastwagen', cap: 500, every: 10, v: 10, price: 250000, info: 'Dieser Lastwagen fährt mit Strom aus einer riesigen Batterie – so schwer wie ein Auto! Er ist leise und stinkt nicht. Beim Bremsen wird der Motor zum Generator und lädt die Batterie wieder auf.' },
   ]},
 };
 

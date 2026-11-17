@@ -403,6 +403,9 @@ var TR = {
       ['Coursier à vélo-cargo', 'Tu engages un coursier : il va chercher les produits finis dans tes bâtiments et les vend pour toi au marchand. Un vélo-cargo a une grande caisse devant – sans essence, juste avec la force des jambes. Les employés reçoivent un salaire, c’est pour ça que c’est cher !'],
       ['Camionnette', 'Une camionnette a derrière un grand espace de chargement sans fenêtres. Avec une camionnette frigorifique, le yogourt, le fromage et les gâteaux restent frais même en été – à l’intérieur il ne fait que 4 °C.'],
       ['Camion', 'Un camion peut peser jusqu’à 40 tonnes – autant que 30 voitures ! Le chauffeur a besoin d’un permis spécial et doit faire une pause après 4 heures et demie de route.'],
+      ['Semi-remorque', 'Un semi-remorque est en deux parties : devant le tracteur avec le moteur, derrière la remorque avec le chargement. La remorque repose sur une plaque qui tourne, la sellette – ainsi le long camion passe quand même les virages.'],
+      ['Camion avec remorque', 'Un camion avec remorque peut mesurer jusqu’à 18,75 mètres ! En Suisse, chaque camion paie une taxe par kilomètre, la RPLP. Elle aide aussi à payer le train – beaucoup de marchandises traversent les Alpes sur le train.'],
+      ['Camion électrique', 'Ce camion roule à l’électricité d’une énorme batterie – aussi lourde qu’une voiture ! Il est silencieux et ne sent pas mauvais. Quand il freine, le moteur devient une dynamo et recharge la batterie.'],
     ]],
   },
   decos: {

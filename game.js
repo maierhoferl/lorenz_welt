@@ -601,7 +601,7 @@ function spedition(dt) {
     k.wait += dt;
     const r = k.route[0];
     if (!k.path?.length) k.path = road(k, r);
-    const w = k.path[0], dx = w.x - k.x, dy = w.y - k.y, l = Math.hypot(dx, dy), v = T * 7 * dt;
+    const w = k.path[0], dx = w.x - k.x, dy = w.y - k.y, l = Math.hypot(dx, dy), v = T * (lv.v || 7) * dt;
     if (l > v) { k.x += dx / l * v; k.y += dy / l * v; const d = Math.atan2(dy, dx) - k.h; k.h += clamp(Math.atan2(Math.sin(d), Math.cos(d)), -6 * dt, 6 * dt); continue; }
     k.x = w.x; k.y = w.y; k.path.shift();
     if (k.path.length) continue;
@@ -2590,14 +2590,14 @@ function box3(P, a0, a1, b, z0, h, top, side) {
   [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
   poly(hi, top);
 }
-// Spediteur-Fahrzeug: Lastenrad, Lieferwagen oder Lastwagen (je nach Stufe), in Fahrtrichtung k.h
+// Spediteur-Fahrzeug: Lastenrad, Lieferwagen, Lastwagen, Sattelschlepper, Lastzug (2 Ladeflächen) oder E-Lastwagen (je nach Stufe), in Fahrtrichtung k.h
 function drawTruck(k) {
-  const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
-  const L = lv === 3 ? 30 : 18, col = ['', '#e39b1c', '#f2f2f2', '#d23b2b'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e'][lv];
+  const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1, 1, 1, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
+  const L = [0, 18, 18, 30, 40, 48, 40][lv], col = ['', '#e39b1c', '#f2f2f2', '#d23b2b', '#2f6fc4', '#38a35b', '#1fa39a'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e', '#2559a0', '#26794a', '#167a73'][lv];
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-L - 6, 15], [34, 15], [34, -15], [-L - 6, -15]]) ctx.lineTo(...P(a, b)); ctx.fill();
   const whl = (a, b) => { const [cx, cy] = P(a, b, 7); wheelE(cx, cy, 7 * s, ux, uy); };
-  const parts = [[-L + 6, 12], [-L + 6, -12], [24, 12], [24, -12]].map(([a, b]) => ({ d: P.d(a, b), f: () => whl(a, b) }));
-  parts.push({ d: 0, f: () => { box(-L - 4, 14, 13, 6, 30, '#c9a24a', '#a8842f'); box(14, 34, 12, 6, 22, col, dark); box(28, 33, 10, 18, 8, '#9fd3f0', '#7ab6d8'); } }); // Ladefläche, Kabine, Scheibe
+  const parts = [[-L + 6, 12], [-L + 6, -12], [24, 12], [24, -12], ...(lv > 3 ? [[-L + 18, 12], [-L + 18, -12]] : [])].map(([a, b]) => ({ d: P.d(a, b), f: () => whl(a, b) }));
+  parts.push({ d: 0, f: () => { if (lv === 5) { box(-L - 4, -L / 2 + 2, 13, 6, 30, '#c9a24a', '#a8842f'); box(-L / 2 + 6, 14, 13, 6, 30, '#c9a24a', '#a8842f'); } else box(-L - 4, 14, 13, 6, 30, '#c9a24a', '#a8842f'); box(14, 34, 12, 6, 22, col, dark); box(28, 33, 10, 18, 8, '#9fd3f0', '#7ab6d8'); } }); // Ladefläche, Kabine, Scheibe
   parts.sort((a, b) => a.d - b.d).forEach(p => p.f());
   if (k.icons) { ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.fillText(k.icons, ...P(-L / 2 + 5, 0, 44)); }
 }

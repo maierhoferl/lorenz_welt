@@ -403,6 +403,9 @@ var TR = {
       ['Fattorino con bici cargo', 'Assumi un fattorino: prende i prodotti finiti dai tuoi edifici e li vende per te al commerciante. Una bici cargo ha davanti una grande cassa – niente benzina, solo forza dei muscoli. I dipendenti ricevono uno stipendio, per questo è caro!'],
       ['Furgone', 'Un furgone ha dietro un grande vano di carico senza finestre. Con un furgone frigorifero yogurt, formaggio e torte restano freschi anche d’estate – dentro ci sono solo 4 °C.'],
       ['Camion', 'Un camion può pesare fino a 40 tonnellate – quanto 30 automobili! L’autista ha bisogno di una patente speciale e deve fare una pausa dopo 4 ore e mezza di guida.'],
+      ['Autoarticolato', 'Un autoarticolato è fatto di due parti: davanti il trattore con il motore, dietro il semirimorchio con il carico. Il semirimorchio poggia su un piatto che gira, la ralla – così il lungo camion riesce comunque a curvare.'],
+      ['Autotreno con rimorchio', 'Un camion con rimorchio può essere lungo fino a 18,75 metri! In Svizzera ogni camion paga una tassa per ogni chilometro, la TTPCP. Serve anche a pagare la ferrovia – tante merci attraversano le Alpi sul treno.'],
+      ['Camion elettrico', 'Questo camion va a corrente con una batteria enorme – pesante come un’auto! È silenzioso e non puzza. Quando frena, il motore diventa una dinamo e ricarica la batteria.'],
     ]],
   },
   decos: {

@@ -403,6 +403,9 @@ var TR = {
       ['Cargo bike courier', "You hire a courier: he picks up finished goods from your buildings and sells them for you to the trader. A cargo bike has a big box at the front – no petrol, just muscle power. Employees get paid wages, that's why it's expensive!"],
       ['Delivery van', 'A delivery van has a big cargo space at the back with no windows. In a refrigerated van, yoghurt, cheese and cakes stay fresh even in summer – it is only 4 °C inside.'],
       ['Truck', 'A truck can weigh up to 40 tonnes – as much as 30 cars! The driver needs a special licence and has to take a break after 4½ hours of driving.'],
+      ['Semi-trailer truck', 'A semi-trailer truck comes in two parts: at the front the tractor unit with the engine, at the back the trailer with the load. The trailer rests on a turning plate, the fifth wheel – so the long truck can still get round corners.'],
+      ['Truck and trailer', 'A truck pulling a trailer can be up to 18.75 metres long! In Switzerland every truck pays a fee for each kilometre, the LSVA. It also helps pay for the railway – lots of goods ride piggyback on the train through the Alps.'],
+      ['Electric truck', 'This truck runs on electricity from a huge battery – as heavy as a car! It is quiet and does not smell. When it brakes, the motor becomes a generator and charges the battery again.'],
     ]],
   },
   decos: {
