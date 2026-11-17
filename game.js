@@ -358,7 +358,7 @@ function stale() { // anderswo weitergespielt: diesen (alten) Stand verwerfen, n
 }
 
 function startGame(p, key, server) {
-  P = p; KEY = key; pin = null; loadGame(server);
+  P = p; KEY = key; pin = null; loadGame(server); folk.length = 0;
   const lk = getLook(p.id); // Aussehen: neuere Fassung gewinnt (Gerät oder Spielstand in der Cloud)
   if ((G.look?.t || 0) > (lk.t || 0)) store.set('lw_look_' + p.id, G.look); else G.look = lk; AU.init(); show('game'); resize();
   shopDismiss = false; near = null; lastNear = null;
@@ -483,6 +483,7 @@ function update(dt) {
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); seasonTick(); }
+  folkTick(dt);
   for (const k of packages) k.t += dt / k.dur;
   for (const f of floaters) { f.t += dt; f.y -= dt * 30; }
   for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; }
@@ -3228,6 +3229,86 @@ function seasonFx(camX, camY, vw, vh) { // Schnee, Blüten, Schmetterlinge, Laub
   }
 }
 
+// =================== Bewohner ===================
+// Kleine Leute aus Hof und Dorf: bringen Kisten zum Händler, kaufen im Laden ein – und machen typisch Schweizerisches:
+// vor dem Haus wischen, am See fischen, auf die Alp wandern und jodeln, mit dem Berner Sennenhund spazieren.
+// Mehr Land → mehr Leute (4 bis 24). Nur Kulisse: keine Kollision, kein Einfluss aufs Spiel.
+const folk = [], FOLK_LOOK = [['#d52b1e', '#6b4423'], ['#2f6fc4', null], ['#3d8b2f', '#f2b01e'], ['#8a3bb8', null], ['#e8a019', '#2f6fc4'], ['#f5a3c7', '#fff'], ['#5a5f66', '#d52b1e'], ['#1f8a8a', null], ['#b5652b', '#3d8b2f']];
+const fixedE = k => FIXED_E.find(f => f.type === k);
+const YODEL = ['Holleri-du-dödl-di! 🎶', 'Jo-ho-dl-di-hu! 🎶', 'Hoi zäme! 👋', '♪ Lueget vo Bärg und Tal ♪'];
+function folkTask(f) { // was macht diese Person als Nächstes? Ziel (Pixel) oder null = bleibt daheim
+  const L = G.land, r = Math.random(), opts = [['haendler', 3], ['laden', 3], ['fegen', 1], ['see', L >= 5 ? 1.5 : 0], ['wandern', L >= 10 ? 1.5 : 0], ['gassi', L >= 15 ? 1.2 : 0]];
+  let k = r * opts.reduce((a, o) => a + o[1], 0), task = 'haendler';
+  for (const [t, w] of opts) if ((k -= w) < 0) { task = t; break; }
+  f.task = task;
+  if (task === 'fegen') return null;
+  if (task === 'haendler' || task === 'laden') { const s = fixedE(task); return { x: s.x + rndf(-22, 22), y: s.y + 12 }; }
+  if (task === 'see') { const a = rndf(-0.7, 0.5), rr = LAKE.rx * lakeR(a) + 0.7; return { x: (LAKE.x + Math.cos(a) * rr) * T, y: (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T, face: -1 }; }
+  if (task === 'wandern') return { x: rndf(2, WORLD.w - 2) * T, y: 0.7 * T };
+  return { x: ROAD_X * T + rndf(-8, 8), y: rndf(4, WORLD.h - 4) * T }; // gassi: ein Stück die Hauptstrasse entlang
+}
+function folkTick(dt) {
+  const n = 4 + Math.min(20, Math.floor(G.land / 5));
+  while (folk.length < n) folk.push({ id: folk.length, x: 0, y: 0, dir: 1, way: [], wait: Math.random() * 8, home: null, out: false, bag: null, task: null });
+  folk.length = n;
+  for (const f of folk) {
+    if (f.way.length) {
+      const p = f.way[0], dx = p.x - f.x, dy = p.y - f.y, l = Math.hypot(dx, dy), s = 40 * dt;
+      if (Math.abs(dx) > 0.5) f.dir = Math.sign(dx);
+      if (l <= s) {
+        f.x = p.x; f.y = p.y; f.way.shift();
+        if (!f.way.length) { // angekommen
+          if (p.face) f.dir = p.face;
+          f.wait = !f.out ? rndf(4, 10) : { see: rndf(8, 14), wandern: rndf(5, 8), gassi: 1 }[f.task] || rndf(2, 4);
+          if (f.out && f.task === 'wandern') floater(f.x, f.y - 40, YODEL[f.id % YODEL.length]);
+          if (!f.out) f.task = null;
+        }
+      } else { f.x += dx / l * s; f.y += dy / l * s; }
+      continue;
+    }
+    if ((f.wait -= dt) > 0) continue;
+    if (!f.home) { // erstes Mal: zu Hause auftauchen (Hof, Dorfhäuser, Dorfgebäude)
+      const homes = [fixedE('hof'), ...townOn().map(b => ({ x: b.x * T, y: b.y * T })), ...G.things.filter(t => THINGS[t.type].area === 'dorf')], h = homes[f.id % homes.length];
+      f.home = { x: h.x + rndf(-14, 14), y: h.y + 8 }; Object.assign(f, f.home);
+    }
+    if (f.out) { // heim, mit dem, was man geholt hat
+      f.bag = { laden: 'korb', see: Math.random() < 0.7 ? 'fisch' : null }[f.task] || null;
+      f.out = false; f.way = road(f, f.home); continue;
+    }
+    const to = folkTask(f);
+    f.bag = f.task === 'haendler' ? 'kiste' : null;
+    if (!to) { f.wait = rndf(5, 9); continue; } // fegen vor dem Haus
+    f.out = true; f.way = road(f, to); f.way.at(-1).face = to.face;
+  }
+}
+function folkDog(x, y, d) { // Berner Sennenhund trottet nebenher
+  const ph = Math.sin(time * 12 + x) * 2;
+  ctx.save(); ctx.translate(x, y); ctx.scale(d, 1);
+  ellipse(0, 0, 9, 2.5, 'rgba(0,0,0,.18)');
+  ctx.fillStyle = '#222'; for (const [lx, o] of [[-6, ph], [-3, -ph], [4, -ph], [7, ph]]) ctx.fillRect(lx - 1 + o * 0.3, -6, 2, 6);
+  ellipse(0, -9, 10, 5, '#222'); ellipse(2, -7, 6, 2.5, '#f6f1e4'); ellipse(-6, -9, 3, 3.5, '#a0522d');
+  ellipse(10, -13, 4.5, 4, '#222'); ellipse(12, -11, 2.5, 1.8, '#f6f1e4'); ellipse(9, -15, 1.5, 1.2, '#a0522d');
+  line('#222', 2, -9, -10, -13, -14 + ph); ctx.restore();
+}
+function drawFolk(f) {
+  const [shirt, hat] = FOLK_LOOK[f.id % FOLK_LOOK.length], go = f.way.length > 0, b = go ? Math.abs(Math.sin(time * 9 + f.id)) * 1.5 : 0;
+  const here = !go && f.out, sweep = !go && !f.out && f.task === 'fegen', fishing = here && f.task === 'see';
+  const arm = sweep ? -1.2 + Math.sin(time * 6 + f.id) * 0.5 : fishing ? 0.5 : here && f.task === 'wandern' ? 1.2 + Math.sin(time * 5) * 0.2 : f.bag ? -0.3 : go ? -0.9 + 0.4 * Math.sin(time * 9 + f.id) : -0.6;
+  ellipse(f.x, f.y, 7, 2.5, 'rgba(0,0,0,.2)');
+  if (f.task === 'gassi') folkDog(f.x - 16 * f.dir, f.y + 3, f.dir);
+  ctx.save(); ctx.translate(f.x, f.y - b); ctx.scale(f.dir * 0.85, 0.85);
+  if (f.task === 'wandern') { ctx.fillStyle = '#c8352b'; rrect(-10, -22, 7, 12, 2); ctx.fill(); } // Rucksack
+  person(0, 0, shirt, SW[0] > 0.5 ? '#e8303a' : hat, arm); // im Winter alle mit Zipfelmütze
+  const [hx, hy] = hand(0, 0, arm);
+  if (f.task === 'wandern') line('#6b4423', 1.5, hx, hy - 4, hx + 3, hy + 16); // Wanderstock
+  if (sweep) { line('#8a5a2b', 2, hx, hy, hx + 6, 2); ctx.fillStyle = '#d9b45a'; ctx.fillRect(hx + 2, -1, 9, 3); }
+  if (fishing) { const t = time * 2 + f.id; line('#5b3a1e', 1.5, hx, hy, hx + 22, hy - 16); line('rgba(255,255,255,.7)', 0.8, hx + 22, hy - 16, hx + 30, 6); ellipse(hx + 30, 7 + Math.sin(t) * 1.2, 2, 2, '#e8303a'); }
+  if (f.bag === 'kiste') { ctx.fillStyle = '#b07a42'; ctx.fillRect(hx - 5, hy - 4, 12, 8); for (let i = 0; i < 3; i++) ellipse(hx - 2 + i * 3.5, hy - 5, 2, 2, '#d23b2b'); }
+  if (f.bag === 'korb') { ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hx + 1, hy + 2, 5, Math.PI, 0); ctx.stroke(); ctx.fillStyle = '#c8935a'; ctx.fillRect(hx - 5, hy + 2, 12, 7); ellipse(hx + 3, hy + 1, 5, 1.8, '#d9953a'); ellipse(hx - 2, hy, 1.5, 3, '#3d8b2f'); }
+  if (f.bag === 'fisch') { line('#666', 1, hx, hy, hx, hy + 5); ctx.save(); ctx.translate(hx, hy + 9); ctx.rotate(Math.PI / 2); fish(0, 0, 0.5, '#8fa8b8'); ctx.restore(); }
+  ctx.restore();
+}
+
 function balloons() {
   const Wp = alps.Wp;
   for (const d of G.deco) {
@@ -3482,13 +3563,14 @@ function render() {
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, t] of list) {
     if (!t) drawPlayer();
     else if (t.truck) drawTruck(t.truck);
+    else if (t.folk) drawFolk(t.folk);
     else if (t.town) drawTown(t.town);
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
