@@ -482,7 +482,7 @@ function update(dt) {
   spedition(dt);
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
   interact(dt);
-  if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); }
+  if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); seasonTick(); }
   for (const k of packages) k.t += dt / k.dur;
   for (const f of floaters) { f.t += dt; f.y -= dt * 30; }
   for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; }
@@ -2767,6 +2767,8 @@ function drawSky() {
   const top = -ALPS * T, Wp = alps.Wp;
   const g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
   ctx.fillStyle = g; ctx.fillRect(0, top, Wp, -top + 2);
+  if (SW[0]) { ctx.fillStyle = `rgba(222,230,238,${0.55 * SW[0]})`; ctx.fillRect(0, top, Wp, -top + 2); } // Winter: Hochnebel-Himmel
+  if (SW[3]) { ctx.fillStyle = `rgba(255,196,130,${0.28 * SW[3]})`; ctx.fillRect(0, top, Wp, -top + 2); } // Herbst: goldenes Licht
   for (let i = 0; i < 7; i++) { // Wolken
     const cx = ((time * (6 + i) + i * 523) % (Wp + 300)) - 150, cy = top + 40 + (i * 37) % 90;
     ctx.fillStyle = 'rgba(255,255,255,.85)';
@@ -2777,7 +2779,7 @@ function drawSky() {
 // Neu gezeichnet bei Zoom, Landkauf (G.land bestimmt Bänder, Wege, Sumpf) oder wenn die Kamera aus dem Rand läuft.
 const bg = { c: document.createElement('canvas'), key: '' };
 function drawBg(camX, camY, vw, vh) {
-  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land].join();
+  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
   if (key !== bg.key || camX < bg.x || camY < bg.y || camX + vw > bg.x + bg.w || camY + vh > bg.y + bg.h) {
     const m = Math.max(vw, vh) * 0.35, main = ctx;
     Object.assign(bg, { key, x: camX - m, y: camY - m, w: vw + 2 * m, h: vh + 2 * m });
@@ -2788,12 +2790,14 @@ function drawBg(camX, camY, vw, vh) {
       drawAlps(); drawVoralp();
       for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
       drawSumpf();
-      ctx.lineCap = ctx.lineJoin = 'round'; // Wege
-      for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
-        ctx.strokeStyle = c; ctx.lineWidth = w;
-        for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
-      }
-      drawLake();
+      const roads = () => { ctx.lineCap = ctx.lineJoin = 'round'; // Wege
+        for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
+          ctx.strokeStyle = c; ctx.lineWidth = w;
+          for (const p of paths()) { ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+        } };
+      roads(); drawLake();
+      seasonTint(s);
+      if (SW[0]) { ctx.globalAlpha = 0.45 * SW[0]; roads(); ctx.globalAlpha = 1; } // Winter: Wege sind gepfadet
     } finally { ctx = main; }
   }
   if (bg.c.width && bg.c.height) ctx.drawImage(bg.c, bg.x, bg.y, bg.w, bg.h); // Fenster 0×0 (minimiert) → nichts
@@ -3069,17 +3073,18 @@ function lakeLive() { // Wellen, Schilf, Steg, Name – über dem See aus dem Hi
   for (let i = 0; i < 26; i++) {
     const wx = cx + (r() - 0.5) * LAKE.rx * 2 * T, wy = cy + (r() - 0.5) * LAKE.ry * 2 * T, k = (time * 0.4 + r()) % 1;
     if (Math.abs(wx - 7 * T) < 56 && Math.abs(wy - 25.3 * T) < 34) continue; // nicht übers Schloss
-    ctx.globalAlpha = Math.sin(k * Math.PI); ctx.beginPath(); ctx.arc(wx, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.arc(wx + 12, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.globalAlpha = Math.sin(k * Math.PI) * (1 - SW[0]); ctx.beginPath(); ctx.arc(wx, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.arc(wx + 12, wy, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.globalAlpha = 1; ctx.restore();
   // Jet d'eau: Fontäne im See, Wind weht die Gischt nach rechts
-  const jx = 14 * T, jy = 27.6 * T, H = 125 + Math.sin(time * 3) * 4, q = seeded(29);
+  const jx = 14 * T, jy = 27.6 * T, H = (125 + Math.sin(time * 3) * 4) * (1 - SW[0]), q = seeded(29); // im Winter abgestellt (wie in Genf)
+  if (H > 8) {
   ellipse(jx + 2, jy, 26, 6, 'rgba(255,255,255,.6)'); ellipse(jx + 2, jy - 2, 14, 4, 'rgba(255,255,255,.8)'); // Schaum am Fuss
   const jg = ctx.createLinearGradient(0, jy - H, 0, jy); jg.addColorStop(0, 'rgba(255,255,255,.25)'); jg.addColorStop(1, 'rgba(255,255,255,.95)');
   ctx.fillStyle = jg; ctx.beginPath(); ctx.moveTo(jx - 7, jy); ctx.quadraticCurveTo(jx - 4, jy - H * 0.6, jx + 3, jy - H); ctx.lineTo(jx + 17, jy - H + 8); ctx.quadraticCurveTo(jx + 8, jy - H * 0.5, jx + 9, jy); ctx.fill();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(jx + 1, jy); ctx.quadraticCurveTo(jx + 1, jy - H * 0.6, jx + 8, jy - H + 3); ctx.stroke(); // heller Kern
   for (let i = 0; i < 40; i++) { const k = (time * 0.7 + q()) % 1, o = q() * 14; ctx.globalAlpha = 0.75 * (1 - k); ellipse(jx + 6 + k * 36 + o, jy - H + 2 + k * k * (H - 6), 4 + k * 7, 4 + k * 7, '#fff'); } // Gischt fällt
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 1; }
   // Schilf am Ufer
   for (const a of [2.4, 2.6, 0.5, 0.65, 5.3]) {
     const rr = LAKE.rx * lakeR(a) - 0.1, x = (LAKE.x + Math.cos(a) * rr) * T, y = (LAKE.y + Math.sin(a) * rr * LAKE.ry / LAKE.rx) * T;
@@ -3099,6 +3104,130 @@ function lakeDecos() {
   }).sort((a, b) => a.y - b.y);
   for (const o of L) { ctx.save(); ctx.translate(o.x, o.y + Math.sin(time * 2 + o.d.id) * 1.2); ctx.scale(o.f, 1); DECO_DRAW[o.d.type](0, 0, o.d); ctx.restore(); }
 }
+// =================== Jahreszeiten ===================
+// ponytail: an der Uhr (Date.now) statt im Spielstand – nichts zu speichern, alle sehen dieselbe Saison. 15 Min je Saison, die letzten 2 Min überblenden.
+// Reine Kulisse: nichts hier berührt Felder, Tiere, Wege oder Klicks. Zum Ausprobieren: ?saison=0…3 (Winter, Frühling, Sommer, Herbst; 0.9 = mitten im Überblenden)
+const SEASON_MS = 15 * 60e3, SEASON_FIX = new URLSearchParams(location.search).get('saison');
+let SW = [1, 0, 0, 0], seasonNow = -1; // Gewicht je Saison (Winter, Frühling, Sommer, Herbst), Summe 1
+const SEASON_MSG = [() => $t`❄️ Winter! Alles tief verschneit – ab auf die Piste! ⛷️`, () => $t`🌸 Frühling! Die Bäume blühen und der Böögg brennt! 🔥`, () => $t`☀️ Sommer! Gleitschirme über den Alpen und Feuerwerk zum 1. August 🎆`, () => $t`🍂 Herbst! Alpabzug – die Kühe kommen geschmückt von der Alp 🐄🌻`];
+function seasonTick() {
+  const p = SEASON_FIX != null ? +SEASON_FIX % 4 : (Date.now() / SEASON_MS) % 4, i = Math.floor(p), k = clamp((p - i - 13 / 15) / (2 / 15), 0, 1), s = k * k * (3 - 2 * k);
+  SW = [0, 0, 0, 0]; SW[i] = 1 - s; SW[(i + 1) % 4] += s;
+  const cur = s < 0.5 ? i : (i + 1) % 4;
+  if (cur !== seasonNow) { seasonNow = cur; toast(SEASON_MSG[cur]()); }
+}
+function seasonTint(s) { // Boden im Hintergrund-Cache einfärben; source-atop lässt den Himmel (durchsichtig) frei
+  const [wi, fr, , he] = SW;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-atop';
+  for (const [w, c] of [[wi * 0.74, '246,250,255'], [he * 0.26, '214,128,36'], [fr * 0.1, '190,240,140']]) if (w) { ctx.fillStyle = `rgba(${c},${w})`; ctx.fillRect(0, 0, bg.c.width, bg.c.height); }
+  if (wi > 0.2) { const r = seeded(5); ctx.fillStyle = `rgba(160,185,215,${0.35 * wi})`; for (let i = 0; i < 260; i++) { ctx.beginPath(); ctx.ellipse(r() * bg.c.width, r() * bg.c.height, (10 + r() * 30) * s, (2 + r() * 4) * s, 0, 0, 7); ctx.fill(); } } // Schneewehen
+  ctx.restore();
+}
+function skier(x, y, c, d) { // klein, weit weg auf dem Berg; d = Richtung im Schwung
+  ellipse(x - 6 * d, y + 1, 4, 1.6, 'rgba(255,255,255,.9)'); // Pulverschnee
+  line('#222', 1.4, x - 7 * d, y + 1.5, x + 7 * d, y - 0.5);
+  ctx.fillStyle = c; ctx.fillRect(x - 2, y - 9, 4, 8);
+  ellipse(x, y - 11, 2.2, 2.2, '#f1c9a5'); ellipse(x, y - 12.6, 2.4, 1.3, '#fff');
+  line('#555', 0.8, x + 2 * d, y - 6, x + 5 * d, y + 1);
+}
+function sled(x, y, c) { // Kind auf dem Schlitten, saust den Alphügel hinunter
+  ctx.save(); ctx.translate(x, y); ctx.rotate(0.36);
+  for (let i = 1; i < 4; i++) ellipse(-12 - i * 7, 1, 4 - i * 0.6, 2, `rgba(255,255,255,${0.9 - i * 0.2})`);
+  line('#6b4423', 2, -12, 0, 12, 0, 15, -4); ctx.fillStyle = '#b5652b'; ctx.fillRect(-11, -5, 22, 3);
+  ctx.fillStyle = c; rrect(-6, -15, 9, 11, 3); ctx.fill(); line(c, 3, 1, -6, 8, -3);
+  ellipse(-1, -18, 4, 4, '#f1c9a5'); ctx.fillStyle = '#2f6fc4'; ctx.beginPath(); ctx.arc(-1, -19, 4.3, Math.PI, 0); ctx.fill(); ellipse(-1, -24, 1.8, 1.8, '#fff');
+  line('#f1c9a5', 2, 2, -11, 10, -6); ctx.restore();
+}
+function glider(x, y, c) { // Gleitschirm
+  ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, 24, 9, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; for (const dx of [-12, 4]) ctx.fillRect(x + dx, y - 8, 5, 8);
+  for (const dx of [-22, -9, 9, 22]) line('rgba(60,60,60,.6)', 0.6, x + dx, y, x, y + 26);
+  ellipse(x, y + 29, 2.6, 4, '#333'); ellipse(x, y + 24, 2.2, 2.2, '#f1c9a5');
+}
+function boeoegg(x, y) { // Sechseläuten: der Böögg auf dem Holzstoss – brennt, bis der Kopf knallt
+  const c = time % 24, boom = c > 18;
+  ctx.fillStyle = '#7a4e2a'; for (let i = 0; i < 4; i++) ctx.fillRect(x - 22 + i * 3, y - 8 - i * 7, 44 - i * 6, 6);
+  line('#5b3a1e', 3, x, y - 30, x, y - 70);
+  if (c < 20) flames(x, y - 14 - Math.min(c, 14), 5, 7);
+  puffs(x, y - 40, true, '120,120,120', 0.8);
+  ellipse(x, y - 64, 10, 9, '#fafafa'); ellipse(x, y - 79, 8, 7, '#fafafa');
+  if (!boom) { ellipse(x, y - 92, 7, 7, '#fafafa'); ctx.fillStyle = '#222'; ctx.fillRect(x - 6, y - 98, 12, 3); ctx.fillRect(x - 4, y - 108, 8, 10); ellipse(x + 2, y - 93, 1.2, 1.2, '#222'); ellipse(x + 5, y - 92, 2.5, 1.2, '#ff8a2a'); }
+  else for (let i = 0; i < 10; i++) { const a = i * 0.63, k = (c - 18) * 3; line(i % 2 ? '#ffd34d' : '#ff6a2a', 2, x + Math.cos(a) * k * 4, y - 92 + Math.sin(a) * k * 4, x + Math.cos(a) * k * 7, y - 92 + Math.sin(a) * k * 7); }
+}
+function crown(x, y) { // Blumenkranz mit Tännli für den Alpabzug
+  ctx.fillStyle = '#2f6a2a'; ctx.beginPath(); ctx.moveTo(x - 5, y - 2); ctx.lineTo(x, y - 18); ctx.lineTo(x + 5, y - 2); ctx.fill();
+  for (let i = 0; i < 6; i++) { const a = Math.PI * (1.05 + i * 0.18); ellipse(x + Math.cos(a) * 10, y + 3 + Math.sin(a) * 7, 3.4, 3.4, ['#e8303a', '#ffe066', '#fff', '#f5a3c7', '#e8303a', '#ffe066'][i]); }
+}
+function seasonBack(camX, vw) { // Szenen in den Bergen und am Alphügel (hinter allem anderen)
+  const [wi, fr, so, he] = SW, Wp = alps.Wp, inView = x => x > camX - 200 && x < camX + vw + 200;
+  if (wi > 0.3) {
+    ctx.globalAlpha = clamp((wi - 0.3) * 3, 0, 1);
+    alps.near.forEach((p, j) => { if (p.h < 140 || !inView(p.x)) return;
+      for (let k = 0; k < 3; k++) { const u = (time * 0.03 + k / 3 + j * 0.21) % 1, w = Math.sin(u * 24); skier(p.x + u * p.wr * 0.6 + w * 16 * (0.3 + u), -6 - p.h * (1 - u * 0.8) + 14, ['#d52b1e', '#2f6fc4', '#f2b01e'][k], Math.cos(u * 24) > 0 ? 1 : -1); } });
+    [0.14, 0.52, 0.83].forEach((f, j) => { const x0 = Wp * f; if (!inView(x0)) return; const u = (time * 0.2 + f * 3) % 1; sled(x0 + u * 120, hillY(x0) + 8 + u * 44, ['#d52b1e', '#3d8b2f', '#8a3bb8'][j]); });
+  }
+  if (fr > 0.3) { ctx.globalAlpha = clamp((fr - 0.3) * 3, 0, 1); const x = Wp * 0.22; if (inView(x)) boeoegg(x, hillY(x) + 24); }
+  if (so > 0.3) {
+    ctx.globalAlpha = clamp((so - 0.3) * 3, 0, 1);
+    for (let j = 0; j < 3; j++) { const x = ((time * (14 + j * 3) + j * 900) % (Wp + 400)) - 200; if (inView(x)) glider(x, -ALPS * T * 0.6 + j * 30 + Math.sin(time * 0.5 + j) * 14, ['#e8303a', '#f2b01e', '#2f9fd6'][j]); }
+    for (let j = 0; j < 3; j++) { // 1.-August-Feuerwerk über den Bergen
+      const z = time / 2.6 + j / 3, n = Math.floor(z), k = z - n, r = seeded(n * 7 + j + 1), x = r() * Wp, y = -ALPS * T * 0.75 + r() * 90, col = `hsl(${r() * 360},90%,60%)`;
+      if (!inView(x)) continue;
+      ctx.globalAlpha = clamp((so - 0.3) * 3, 0, 1) * (1 - k);
+      for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, R = 8 + k * 38; line(col, 2, x + Math.cos(a) * R * 0.6, y + Math.sin(a) * R * 0.6 + k * k * 12, x + Math.cos(a) * R, y + Math.sin(a) * R + k * k * 16); }
+    }
+  }
+  if (he > 0.3) { // Alpabzug: geschmückte Kühe ziehen mit dem Senn über den Alphügel
+    ctx.globalAlpha = clamp((he - 0.3) * 3, 0, 1);
+    const lead = ((time * 20) % (Wp + 900)) - 300;
+    for (let j = 5; j >= 0; j--) {
+      const x = lead - j * 80, y = hillY(x) + 34; if (!inView(x)) continue;
+      if (!j) { person(x + 20, y, '#d52b1e', '#222', 0.9); line('#6b4423', 2, x + 26, y - 30, x + 30, y + 1); continue; } // Senn mit Stock
+      ctx.save(); ctx.translate(x, y); ctx.scale(0.75, 0.75); drawCow({ cx: 0, cy: 0, tx: 99, ty: 0, face: 1, id: j, ripe: true, store: 0 }); crown(27, -42); ctx.restore();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function seasonGround() { // Szenen auf dem See und der Weide (flach am Boden)
+  const [wi, fr, so] = SW, cx = LAKE.x * T, cy = LAKE.y * T;
+  if (wi > 0.3) { // Seegfrörni: Schlittschuhläufer
+    ctx.globalAlpha = clamp((wi - 0.3) * 3, 0, 1);
+    for (let j = 0; j < 5; j++) { const a = time * (0.25 + j * 0.04) + j * 1.3, x = cx + Math.cos(a) * LAKE.rx * T * (0.35 + j * 0.06), y = cy + Math.sin(a) * LAKE.ry * T * 0.45 + 10;
+      line('rgba(255,255,255,.8)', 1.5, x - 14, y + 2, x - 4, y + 1); ctx.save(); ctx.translate(x, y); ctx.scale(-Math.sin(a) >= 0 ? 1 : -1, 1); person(0, 0, ['#d52b1e', '#2f6fc4', '#f2b01e', '#8a3bb8', '#3d8b2f'][j], '#fff', Math.sin(time * 3 + j) * 0.4); line('#bbb', 1.5, -5, 1, 5, 1); ctx.restore(); }
+    // Schneemann am Ufer
+    const sx = (LAKE.x - 5.6) * T, sy = (LAKE.y - 2.6) * T;
+    ellipse(sx + 4, sy, 18, 5, 'rgba(0,0,0,.15)'); ellipse(sx, sy - 12, 15, 13, '#fbfdff'); ellipse(sx, sy - 33, 11, 10, '#fbfdff'); ellipse(sx, sy - 50, 8, 8, '#fbfdff');
+    ellipse(sx + 6, sy - 50, 4, 1.6, '#ff8a2a'); ellipse(sx - 3, sy - 53, 1.3, 1.3, '#222'); ellipse(sx + 2, sy - 53, 1.3, 1.3, '#222');
+    ctx.fillStyle = '#d52b1e'; ctx.fillRect(sx - 9, sy - 44, 18, 4); ctx.fillRect(sx + 4, sy - 44, 4, 12); // Schal
+    line('#6b4423', 2, sx - 10, sy - 34, sx - 22, sy - 44); line('#6b4423', 2, sx + 10, sy - 34, sx + 22, sy - 42);
+  }
+  if (fr > 0.3) { // Ostereier im Gras der Weide
+    ctx.globalAlpha = clamp((fr - 0.3) * 3, 0, 1); const r = seeded(3);
+    for (let i = 0; i < 12; i++) { const x = (PASTURE.x + 0.4 + r() * (PASTURE.w - 0.8)) * T, y = (PASTURE.y + 0.8 + r() * (PASTURE.h - 1.2)) * T, c = ['#e8303a', '#2f9fd6', '#ffd34d', '#8a3bb8', '#3d8b2f'][i % 5];
+      ellipse(x, y - 6, 5, 6.5, c); ctx.fillStyle = '#fff'; ctx.fillRect(x - 5, y - 7, 10, 2); line('#4f8a2a', 1.5, x - 7, y, x - 9, y - 7, x - 4, y, x - 3, y - 6); }
+  }
+  if (so > 0.3) { // Schwimmer im See
+    ctx.globalAlpha = clamp((so - 0.3) * 3, 0, 1);
+    for (let j = 0; j < 4; j++) { const a = time * 0.08 * (j % 2 ? 1 : -1) + j * 1.6, x = cx + Math.cos(a) * LAKE.rx * T * 0.45, y = cy + Math.sin(a) * LAKE.ry * T * 0.5 + 8, b = Math.sin(time * 3 + j) * 1.5;
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(x, y + 3, 10 + b, 3, 0, 0, 7); ctx.stroke();
+      ellipse(x, y + b, 4.5, 4.5, '#f1c9a5'); ctx.fillStyle = ['#e8303a', '#ffd34d', '#2f9fd6', '#f5a3c7'][j]; ctx.beginPath(); ctx.arc(x, y + b - 1, 4.8, Math.PI, 0); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+function seasonFx(camX, camY, vw, vh) { // Schnee, Blüten, Schmetterlinge, Laub – weltfest, laufen am Bildrand rundum
+  const [wi, fr, so, he] = SW, n = eco ? 40 : 110, mod = (a, b) => ((a % b) + b) % b;
+  for (let i = 0; i < n; i++) {
+    const q = i / n, r1 = (i * 0.6180339) % 1, r2 = (i * 0.7548776) % 1, sp = 0.6 + r2;
+    const kind = q < wi ? 0 : q < wi + he * 0.6 ? 3 : q < wi + he * 0.6 + fr * 0.4 ? 1 : q < wi + he * 0.6 + fr * 0.4 + so * 0.08 ? 2 : -1;
+    if (kind < 0) continue;
+    const x = camX + mod(r1 * (vw + 40) + Math.sin(time * (0.5 + r2) + i) * 24 + time * 10 - camX, vw + 40) - 20;
+    const y = camY + mod(r2 * (vh + 40) + (kind === 2 ? Math.sin(time * 1.3 + i) * 30 : time * [42, 20, 0, 30][kind] * sp) - camY, vh + 40) - 20;
+    if (kind === 0) ellipse(x, y, 1.4 + r1 * 2.2, 1.4 + r1 * 2.2, 'rgba(255,255,255,.9)');
+    else if (kind === 2) { const f = Math.abs(Math.sin(time * 12 + i)) * 5 + 1, c = ['#ffd34d', '#f5a3c7', '#7ac6f0'][i % 3]; ellipse(x - f / 2, y, f / 2, 4, c); ellipse(x + f / 2, y, f / 2, 4, c); }
+    else { ctx.fillStyle = kind === 1 ? ['#ffd1e3', '#fff'][i % 2] : ['#d9531e', '#e8a019', '#a8331c'][i % 3]; ctx.beginPath(); ctx.ellipse(x, y, kind === 1 ? 2.6 : 4.5, kind === 1 ? 1.6 : 2.2, time * (1 + r1) + i, 0, 7); ctx.fill(); }
+  }
+}
+
 function balloons() {
   const Wp = alps.Wp;
   for (const d of G.deco) {
@@ -3326,9 +3455,10 @@ function render() {
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
   drawSky(); drawBg(camX, camY, vw, vh);
   ctx.lineCap = ctx.lineJoin = 'round';
+  seasonBack(camX, vw);
   if (G.deco.some(d => d.type === 'gondelbahn')) gondola();
   brookGlitter(); bridge(RIVER_W[7][0] * T, RIVER_W[7][1] * T);
-  lakeLive(); lakeDecos();
+  lakeLive(); lakeDecos(); seasonGround();
   // Weide-Zaun
   const pa = { x: PASTURE.x * T, y: PASTURE.y * T, w: PASTURE.w * T, h: PASTURE.h * T };
   ctx.fillStyle = 'rgba(140,200,90,.18)'; ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
@@ -3405,7 +3535,7 @@ function render() {
     ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(G.px, hy, 12, 0, 7); ctx.stroke();
     ctx.strokeStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(G.px, hy, 12, -Math.PI / 2, -Math.PI / 2 + harvest.p * Math.PI * 2); ctx.stroke();
   }
-  balloons();
+  balloons(); seasonFx(camX, camY, vw, vh);
   for (const f of floaters) { ctx.globalAlpha = clamp(1.6 - f.t, 0, 1); label(f.x, f.y, f.text, 18); }
   ctx.globalAlpha = 1;
   // Bildschirm-Joystick

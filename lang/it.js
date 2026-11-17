@@ -2,6 +2,11 @@
 // Italiano (Ticino). Le chiavi in ui = testo tedesco originale di game.js / index.html.
 var TR = {
   ui: {
+    // Jahreszeiten
+    "❄️ Winter! Alles tief verschneit – ab auf die Piste! ⛷️": "❄️ Inverno! Tutto è sotto la neve – via sulle piste! ⛷️",
+    "🌸 Frühling! Die Bäume blühen und der Böögg brennt! 🔥": "🌸 Primavera! Gli alberi fioriscono e il Böögg brucia! 🔥",
+    "☀️ Sommer! Gleitschirme über den Alpen und Feuerwerk zum 1. August 🎆": "☀️ Estate! Parapendii sopra le Alpi e fuochi d'artificio per il 1° agosto 🎆",
+    "🍂 Herbst! Alpabzug – die Kühe kommen geschmückt von der Alp 🐄🌻": "🍂 Autunno! La discesa dall'alpe – le mucche tornano a valle tutte decorate 🐄🌻",
     // Land-Fest
     "Neues Gebiet im Süden: {}!": "Nuova zona a sud: {}!", "Dein Bauernhof bekommt {}!": "La tua fattoria riceve {}!", "Lauf hin und schau ihn dir an!": "Vai a vederla!", "Laden und Händler ziehen in grössere Häuser!": "Il negozio e il mercante si trasferiscono in edifici più grandi!", "Mehr Regale, mehr Kundschaft, mehr Geld 💰": "Più scaffali, più clienti, più soldi 💰", "Neu im Laden: Kirche und Gülle-Verteiler": "Novità nel negozio: chiesa e spandiliquame", "Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩": "Il liquame puzza – ma il tuo grano cresce il doppio! 💩", "Dein Hof wächst zum Städtchen: {}!": "La tua fattoria diventa una cittadina: {}!", "Neue Nachbarn ziehen ein – sie finden dein Dorf toll!": "Arrivano nuovi vicini – adorano il tuo villaggio!", "Im Städtchen wird ein Haus höher!": "Una casa della cittadina diventa più alta!", "Ein Stock mehr – bis zu den Wolken? ☁️": "Un piano in più – fino alle nuvole? ☁️", "Die Kühe rufen: Muuuh-ega! 🐄": "Le mucche gridano: Muuuh-ga! 🐄", "Sogar die Geissen machen einen Freudensprung! 🐐": "Anche le capre saltano di gioia! 🐐", "Die Hühner gackern vor Stolz! 🐔": "Le galline chiocciano di orgoglio! 🐔", "Das Murmeli pfeift dir ein Ständchen! 🎶": "La marmotta ti fischia una canzoncina! 🎶", "Der Nachbar staunt mit offenem Mund! 😮": "Il vicino resta a bocca aperta! 😮", "Die Säuli wälzen sich vor Freude im Dreck! 🐖": "I maialini si rotolano felici nel fango! 🐖", "Land-Stufe {}!": "Livello terreno {}!", "Super gemacht! Nächste Überraschung bei Land-Stufe {} 🎁": "Bravissimo! Prossima sorpresa al livello {} 🎁", "Juhui, weiter!": "Evviva, avanti!",
     // Familien (Startbildschirm)
