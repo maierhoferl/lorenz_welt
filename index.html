@@ -77,6 +77,9 @@
   #hud { position:fixed; top:0; left:0; right:0; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; pointer-events:none;
     padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
   .chip { pointer-events:auto; background:rgba(251,244,228,.94); border-radius:16px; padding:6px 12px; box-shadow:0 3px 0 rgba(120,80,40,.5); font-weight:700; font-size:16px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #bag { flex-wrap:nowrap; white-space:nowrap; overflow-x:auto; max-width:100%; scrollbar-width:none; } /* viele Waren: wischen statt umbrechen, sonst deckt der HUD das Spielfeld zu */
+  #bag::-webkit-scrollbar { display:none; }
+  @media (max-width:600px) { #hud { gap:6px; } .chip { font-size:14px; padding:4px 10px; } #btns button { width:40px; height:40px; font-size:19px; } }
   #btns { margin-left:auto; display:flex; gap:6px; pointer-events:auto; }
   #btns button { border:0; width:46px; height:46px; border-radius:14px; background:rgba(251,244,228,.94); box-shadow:0 3px 0 rgba(120,80,40,.5); font-size:22px; }
   #prox { position:fixed; left:50%; transform:translateX(-50%); bottom:max(14px, env(safe-area-inset-bottom)); max-width:min(560px, 94vw);

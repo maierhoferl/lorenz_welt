@@ -785,7 +785,7 @@ function hud() {
   $('#who').textContent = $t`👦🏼 ${P.name} · ${age()} Jahre`;
   $('#money').textContent = `💰 ${G.money} ${$t`Fr.`}`;
   const inv = Object.entries(G.inv).map(([k, n]) => `${ITEMS[k].icon}${n}`).join(' ');
-  $('#bag').innerHTML = `${TOOLS.tragen.icon} ${inv || `<small>${$t`leer`}</small>`} <small>(${bagCount()}/${bagCap()})</small>`;
+  $('#bag').innerHTML = `${TOOLS.tragen.icon} <small>(${bagCount()}/${bagCap()})</small> ${inv || `<small>${$t`leer`}</small>`}`;
   // Info-Leiste zum nächsten Ort
   const t = near, px = $('#prox');
   const set = (html, ...fns) => {
