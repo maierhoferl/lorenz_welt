@@ -914,13 +914,15 @@ function shopList() {
   for (const [k, line] of Object.entries(TOOLS)) {
     if (G.land < (line.land || 0)) continue;
     const lv = G.tools[k], next = line.levels[lv + 1];
-    if (!next && k === 'spedition') { tabs[2].push({ icon: '🚛', name: $t`Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
+    // Spediteur: zusätzliches Fahrzeug kaufen ist ein eigener Eintrag, getrennt vom Upgrade auf die nächste Stufe
+    if (lv && k === 'spedition') tabs[2].push({ icon: '🚛', name: $t`Noch ein ${line.levels[lv].name}`, price: line.levels[lv].price, info: line.levels[lv].info, can: true,
       desc: $t`${line.name} · du hast ${truckCount()} Fahrzeuge`, note: $t`fährt zusätzlich und holt noch mehr Waren ab`,
-      buy: () => { G.lkw = (G.lkw || 0) + 1; toast($t`🚛 Du hast jetzt ${truckCount()} Lastwagen!`); } }); continue; }
+      buy: () => { G.lkw = (G.lkw || 0) + 1; toast($t`🚛 Du hast jetzt ${truckCount()} Fahrzeuge!`); } });
     if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: $t`Beste Stufe erreicht! 🏆`, info: line.levels[lv].info, can: false, price: 0 }); continue; }
     tabs[2].push({
-      icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
-      desc: $t`${line.name} · jetzt: ${line.levels[lv].name}`,
+      // Upgrade ersetzt alle Fahrzeuge, darum kostet es pro Fahrzeug
+      icon: line.icon, name: next.name, price: next.price * (k === 'spedition' ? Math.max(1, truckCount()) : 1), info: next.info, can: true,
+      desc: $t`${line.name} · jetzt: ${line.levels[lv].name}` + (k === 'spedition' && truckCount() > 1 ? ` (${truckCount()}×)` : ''),
       note: next.every ? $t`holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? $t`trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? $t`🤖 arbeitet automatisch!` : $t`${next.speed / line.levels[lv].speed}× schneller`,
       buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); speak(`${next.name}. ${next.info}`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });

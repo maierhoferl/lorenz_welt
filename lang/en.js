@@ -116,7 +116,7 @@ var TR = {
     '🎉 Neues Rezept freigeschaltet: {} – schau im Laden bei 🏭 Gebäude!': '🎉 New recipe unlocked: {} – look in the shop under 🏭 Buildings!',
     'Noch ein {}': 'Another {}', '{} · du hast {} Fahrzeuge': '{} · you have {} vehicles',
     'fährt zusätzlich und holt noch mehr Waren ab': 'drives as well and picks up even more goods',
-    '🚛 Du hast jetzt {} Lastwagen!': '🚛 You now have {} trucks!', 'Beste Stufe erreicht! 🏆': 'Best level reached! 🏆',
+    '🚛 Du hast jetzt {} Fahrzeuge!': '🚛 You now have {} vehicles!', 'Beste Stufe erreicht! 🏆': 'Best level reached! 🏆',
     '{} · jetzt: {}': '{} · now: {}', 'holt {} fertige Waren alle {} s und verkauft sie': 'picks up {} finished goods every {} s and sells them',
     'trägt {} statt {} Waren': 'carries {} instead of {} goods', '🤖 arbeitet automatisch!': '🤖 works automatically!', '{}× schneller': '{}× faster',
     "{} {} – so funktioniert's": "{} {} – here's how it works", 'Super!': 'Great!', 'Land Stufe {}': 'Land level {}',

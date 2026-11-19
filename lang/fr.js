@@ -116,7 +116,7 @@ var TR = {
     '🎉 Neues Rezept freigeschaltet: {} – schau im Laden bei 🏭 Gebäude!': '🎉 Nouvelle recette débloquée : {} – regarde au magasin sous 🏭 Bâtiments !',
     'Noch ein {}': 'Encore un {}', '{} · du hast {} Fahrzeuge': '{} · tu as {} véhicules',
     'fährt zusätzlich und holt noch mehr Waren ab': 'roule en plus et va chercher encore plus de marchandises',
-    '🚛 Du hast jetzt {} Lastwagen!': '🚛 Tu as maintenant {} camions !', 'Beste Stufe erreicht! 🏆': 'Meilleur niveau atteint ! 🏆',
+    '🚛 Du hast jetzt {} Fahrzeuge!': '🚛 Tu as maintenant {} véhicules !', 'Beste Stufe erreicht! 🏆': 'Meilleur niveau atteint ! 🏆',
     '{} · jetzt: {}': '{} · maintenant : {}', 'holt {} fertige Waren alle {} s und verkauft sie': 'prend {} produits finis toutes les {} s et les vend',
     'trägt {} statt {} Waren': 'porte {} au lieu de {} marchandises', '🤖 arbeitet automatisch!': '🤖 travaille tout seul !', '{}× schneller': '{}× plus rapide',
     "{} {} – so funktioniert's": '{} {} – voilà comment ça marche', 'Super!': 'Super !', 'Land Stufe {}': 'Terrain niveau {}',
