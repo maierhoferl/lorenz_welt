@@ -653,9 +653,9 @@ function checkStage() {
 
 function addInv(item, n) { G.inv[item] = (G.inv[item] || 0) + n; }
 let toastKeys = {};
-function toast(msg, key) {
+function toast(msg, key, soft) {
   if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 5; }
-  const d = document.createElement('div'); d.textContent = msg; $('#toast').append(d);
+  const d = document.createElement('div'); d.textContent = msg; if (soft) d.className = 'soft'; $('#toast').append(d);
   setTimeout(() => d.remove(), 5000);
 }
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }
@@ -3117,7 +3117,7 @@ function seasonTick() {
   const p = SEASON_FIX != null ? +SEASON_FIX % 4 : (Date.now() / SEASON_MS) % 4, i = Math.floor(p), k = clamp((p - i - 13 / 15) / (2 / 15), 0, 1), s = k * k * (3 - 2 * k);
   SW = [0, 0, 0, 0]; SW[i] = 1 - s; SW[(i + 1) % 4] += s;
   const cur = s < 0.5 ? i : (i + 1) % 4;
-  if (cur !== seasonNow) { seasonNow = cur; toast(SEASON_MSG[cur]()); }
+  if (cur !== seasonNow) { seasonNow = cur; toast(SEASON_MSG[cur](), null, true); }
 }
 function seasonTint(s) { // Boden im Hintergrund-Cache einfärben; source-atop lässt den Himmel (durchsichtig) frei
   const [wi, fr, , he] = SW;
