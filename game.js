@@ -655,7 +655,7 @@ function addInv(item, n) { G.inv[item] = (G.inv[item] || 0) + n; }
 let toastKeys = {};
 function toast(msg, key, soft) {
   if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 5; }
-  const d = document.createElement('div'); d.textContent = msg; if (soft) d.className = 'soft'; $('#toast').append(d);
+  const d = document.createElement('div'); d.textContent = msg; if (soft) { d.className = 'soft'; document.body.append(d); } else $('#toast').append(d);
   setTimeout(() => d.remove(), 5000);
 }
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }

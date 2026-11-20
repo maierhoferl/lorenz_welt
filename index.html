@@ -89,7 +89,8 @@
   #prox button { border:0; border-radius:12px; background:#3e7bc4; color:#fff; padding:8px 10px; font-weight:700; white-space:nowrap; }
   #toast { position:fixed; top:90px; left:50%; transform:translateX(-50%); pointer-events:none; display:flex; flex-direction:column; gap:8px; align-items:center; width:92vw; z-index:10; }
   #toast div { background:#fff8e1; color:#4a2f12; border:4px solid #f0a020; padding:14px 20px; border-radius:18px; font-size:19px; font-weight:800; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.45); animation: tin .4s cubic-bezier(.3,1.6,.6,1), tout .4s 4.6s forwards; max-width:540px; }
-  #toast div.soft { background:rgba(255,248,225,.75); border:0; padding:6px 14px; font-size:14px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.2); animation: fin .8s ease, tout .8s 4.2s forwards; }
+  .soft { position:fixed; left:14px; bottom:max(14px, env(safe-area-inset-bottom)); max-width:min(320px, 70vw); pointer-events:none; z-index:10; background:rgba(255,248,225,.75); color:#4a2f12; padding:6px 14px; border-radius:14px; font-size:14px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.2); animation: fin .8s ease, tout .8s 4.2s forwards; }
+  @media (max-width:700px) { .soft { bottom:90px; } } /* über #prox */
   @keyframes fin { from { opacity:0; } }
   @keyframes tin { from { opacity:0; transform:translateY(-14px) scale(.85); } }
   @keyframes tout { to { opacity:0; transform:translateY(-10px); } }
