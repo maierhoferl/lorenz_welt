@@ -608,11 +608,11 @@ function spedition(dt) {
     if (k.path.length) continue;
     k.route.shift();
     if (r.t) { // beim Gebäude einladen
-      const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? Math.min(r.t[f], lv.cap - k.load) : 0;
-      r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.icons = (k.icons || '') + (n ? ITEMS[it].icon : '');
+      const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? r.t[f] : 0; // immer den ganzen Vorrat mitnehmen, auch wenn es über die Ladung geht
+      r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
       G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
       if (k.load >= lv.cap) k.route = k.route.filter(q => !q.t); // voll: restliche Halte auslassen, direkt zum Händler
-    } else if (k.sum) { floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.icons = ''; }
+    } else if (k.sum) { floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.cargo = {}; }
   }
 }
 function warnings() {
@@ -2618,6 +2618,18 @@ function wheelE(cx, cy, r, ux, uy, c = '#2b2b2b') { // Rad steht parallel zur Fa
   for (let i = 0; i < 16; i++) { const t = i / 16 * 6.283; ctx.lineTo(cx + Math.cos(t) * r * ux, cy + Math.cos(t) * r * uy * 0.5 - Math.sin(t) * r); }
   ctx.closePath(); ctx.fill(); ctx.stroke();
 }
+// Ladung als Haufen: Q(u, v, z) → Bildschirm (u 0..1 längs, v -1..1 quer, z Höhe in px), na Plätze längs.
+// Unterste Lage 2 Reihen, darüber je eine Reihe mit einem Platz weniger; Grösse wächst mit Füllstand.
+function pile(Q, inv, cap, na, sz) {
+  const all = Object.entries(inv).flatMap(([k, n]) => Array(Math.min(n, 999)).fill(ITEMS[k].icon)); // ponytail: max 999 je Ware, reicht für die Stichprobe
+  if (!all.length) return;
+  const ps = [];
+  for (let l = 0; l < na; l++) for (let a = 0; a < na - l; a++) for (const v of l ? [0] : [-0.5, 0.5]) ps.push({ l, p: Q((a + 0.5 + l / 2) / na, v, l * sz * 0.55) });
+  const tot = Object.values(inv).reduce((a, b) => a + b, 0), n = clamp(Math.ceil(ps.length * tot / cap), 1, ps.length);
+  ps.length = n; ps.forEach((q, i) => q.ic = all[Math.floor((i * 0.618 % 1) * all.length)]); // goldener Schnitt: gemischt, im Verhältnis der Waren
+  ctx.font = `${sz}px system-ui`; ctx.textAlign = 'center';
+  ps.sort((a, b) => a.l - b.l || a.p[1] - b.p[1]).forEach(q => ctx.fillText(q.ic, q.p[0], q.p[1]));
+}
 function drawCart(ax, ay, s) {
   const c = cartDims(s), dx = cart.fx - cart.bx, dy = cart.fy - cart.by, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
   const px = -uy * c.w, py = ux * c.w * 0.5; // Querachse, Boden in der Tiefe gestaucht
@@ -2632,8 +2644,7 @@ function drawCart(ax, ay, s) {
   const walls = [0, 1, 2, 3].map(i => [C[i], C[(i + 1) % 4]]).sort((a, b) => a[0][1] + a[1][1] - b[0][1] - b[1][1])
     .map(([p, q]) => [[p[0], p[1] - c.h], [q[0], q[1] - c.h], [q[0], q[1] - c.h - c.wall], [p[0], p[1] - c.h - c.wall]]);
   walls.slice(0, 2).forEach(w => poly(w, back));
-  const items = Object.keys(G.inv); // Ladung liegt im Wagen
-  if (items.length) { ctx.font = `${11 * s}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(items.map(k => ITEMS[k].icon).join(''), mx, my - c.h - c.wall * 0.2); }
+  pile((u, v, z) => [cart.bx + dx * u + px * v, cart.by + dy * u + py * v - c.h - c.wall * 0.3 - z], G.inv, toolLv('tragen').cap, Math.max(2, Math.round(c.L / (9 * s))), 10 * s); // Ladung als Haufen im Wagen
   walls.slice(2).forEach(w => poly(w, col));
   wheels.slice(2).forEach(([x, y]) => wheelE(x, y, c.r, ux, uy));
   line(c.t ? '#555' : '#6b4a2b', 2, cart.fx, cart.fy - c.h, ax, ay); // Deichsel
@@ -2659,7 +2670,7 @@ function drawTruck(k) {
   const parts = [[-L + 6, 12], [-L + 6, -12], [24, 12], [24, -12], ...(lv > 3 ? [[-L + 18, 12], [-L + 18, -12]] : [])].map(([a, b]) => ({ d: P.d(a, b), f: () => whl(a, b) }));
   parts.push({ d: 0, f: () => { if (lv === 5) { box(-L - 4, -L / 2 + 2, 13, 6, 30, '#c9a24a', '#a8842f'); box(-L / 2 + 6, 14, 13, 6, 30, '#c9a24a', '#a8842f'); } else box(-L - 4, 14, 13, 6, 30, '#c9a24a', '#a8842f'); box(14, 34, 12, 6, 22, col, dark); box(28, 33, 10, 18, 8, '#9fd3f0', '#7ab6d8'); } }); // Ladefläche, Kabine, Scheibe
   parts.sort((a, b) => a.d - b.d).forEach(p => p.f());
-  if (k.icons) { ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.fillText(k.icons, ...P(-L / 2 + 5, 0, 44)); }
+  if (k.load) pile((u, v, z) => P(-L - 4 + (L + 18) * u, v * 10, 36 + z / s), k.cargo, toolLv('spedition').cap, Math.max(2, Math.round((L + 18) * s / 9)), 11);
 }
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
 const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782']]; // Stufe 4/5/6: grün, rot, blau
