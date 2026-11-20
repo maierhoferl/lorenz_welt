@@ -2549,12 +2549,39 @@ function gearBack(D) {
     line('#9b7040', 2.5, 8, 0, 14, -78); line('#9b7040', 2.5, 20, 0, 18, -78); line('#7d5a33', 2, 34, 0, 16, -78);
     for (let y = -10; y > -76; y -= 11) line('#9b7040', 2, 8 - y * 0.077, y, 20 + y * 0.026, y);
   }
-  if (ht === 'obst' && G.tools.obst === 3) { // Hebebühne: Scheren-Hub
+}
+// Fahrbare Geräte als echte 3D-Körper (drehen mit der Figur): P wie proj, zu = Höhe der Füsse, add() sortiert nach Tiefe
+function gear3(P, s, D, zu, add) {
+  const ht = harvTool(), lv = ht && G.tools[ht], { hx } = D, hz = zu - D.hy, { ux, uy } = P;
+  const whl = (a, b, z, r, w, rim) => add(a, b, () => { const [cx, cy] = P(a, b, z + r); wheelE(cx, cy, r * s, ux, uy, { w: w * s, rim }); });
+  const bar = (c, w, ...q) => line(c, w * s, ...q.flatMap(([a, b, z]) => P(a, b, z)));
+  if (ht === 'obst' && lv === 3) { // Hebebühne: Fahrgestell, Scherenhub, Korb mit Geländer
     const L = D.lift;
-    ctx.fillStyle = '#555'; ctx.fillRect(-18, -5, 36, 5); wheel(-13, 0, 3); wheel(13, 0, 3);
-    line('#e0b020', 2.5, -14, -5, 14, -L, -14, -L, 14, -5, -14, -5);
-    ctx.fillStyle = '#e0b020'; ctx.fillRect(-18, -L - 3, 36, 4);
-    line('#e0b020', 2, -18, -L - 3, -18, -L - 20, 18, -L - 20, 18, -L - 3);
+    const W = [[-13, -9], [13, -9], [-13, 9], [13, 9]].sort((p, q) => P.d(...p) - P.d(...q)), rad = ([a, b]) => { const [cx, cy] = P(a, b, 3); wheelE(cx, cy, 3 * s, ux, uy, { w: 1.2 * s }); };
+    add(0, -1, () => {
+      W.slice(0, 2).forEach(rad); box3(P, -18, 18, 8, 2, 4, '#666', '#4a4a4a'); W.slice(2).forEach(rad);
+      for (const b of [-7, 7]) bar('#e0b020', 2.5, [-14, b, 6], [14, b, L], [-14, b, L], [14, b, 6], [-14, b, 6]);
+      box3(P, -18, 18, 9, L, 3, '#e0b020', '#c09018');
+    }, -20);
+    add(0, 0, () => { // Geländer (vorne über der Figur, ist ja durchsichtig)
+      const C = [[-18, -9], [18, -9], [18, 9], [-18, 9]];
+      for (const [a, b] of C) bar('#e0b020', 1.8, [a, b, L + 3], [a, b, L + 20]);
+      bar('#e0b020', 1.8, ...[...C, C[0]].map(([a, b]) => [a, b, L + 20]));
+    }, 20);
+  }
+  if (G.tools.tragen === 2) { // Schubkarre: Mulde, zwei Holme mit Stützen, Rad vorne
+    whl(hx + 28, 0, zu, 5, 2, '#c8c8c8');
+    add(hx + 14, 0, () => { for (const b of [-4.5, 4.5]) { bar('#6b4a2b', 2, [hx, b, hz], [hx + 28, b * 0.4, zu + 5]); bar('#555', 2, [hx + 12, b, zu + 10], [hx + 12, b, zu]); } }, -0.5);
+    add(hx + 20, 0, () => box3(P, hx + 8, hx + 33, 8, zu + 9, 12, '#2a5a94', '#3d7fc4'));
+  }
+  if (ht === 'getreide' && lv === 3) { // Motormäher: Lenkholm, Motor, zwei Räder, quer liegender Mähbalken
+    for (const b of [-6, 6]) whl(hx + 14, b, zu, 4, 1.8, '#c8c8c8');
+    add(hx + 14, 0, () => { for (const b of [-3, 3]) bar('#333', 2, [hx, b, hz], [hx + 10, b, zu + 11]); box3(P, hx + 8, hx + 22, 5, zu + 4, 9, '#e04a40', '#c33'); });
+    const j = Math.sin(time * 60) * 1.5;
+    add(hx + 26, 0, () => {
+      box3(P, hx + 22, hx + 27, 16, zu + 1, 2, '#aaa', '#888');
+      ctx.fillStyle = '#ccd'; for (let b = -15; b <= 15; b += 3) { ctx.beginPath(); ctx.moveTo(...P(hx + 27, b + j - 1.2, zu + 2)); ctx.lineTo(...P(hx + 31, b + j, zu + 2)); ctx.lineTo(...P(hx + 27, b + j + 1.2, zu + 2)); ctx.fill(); }
+    });
   }
 }
 function gearFront(D) {
@@ -2563,11 +2590,6 @@ function gearFront(D) {
     line('#8a5a2b', 1.5, D.bx - 5, D.hy + 3, D.bx, D.hy - 3, D.bx + 5, D.hy + 3);
     ctx.fillStyle = '#c48a45'; rrect(D.bx - 6, D.hy + 2, 12, 9, 2); ctx.fill(); line('#8a5a2b', 1, D.bx - 6, D.hy + 6, D.bx + 6, D.hy + 6);
   }
-  if (tr === 2) { // Schubkarre vorne geschoben
-    line('#6b4a2b', 2, hx, hy, hx + 12, -12);
-    ctx.fillStyle = '#3d7fc4'; ctx.beginPath(); ctx.moveTo(hx + 6, -22); ctx.lineTo(hx + 36, -24); ctx.lineTo(hx + 29, -10); ctx.lineTo(hx + 11, -10); ctx.fill();
-    line('#555', 2, hx + 12, -10, hx + 12, 0); wheel(hx + 28, -5, 5);
-  }
   if (ht === 'getreide' && lv === 1) { // Sichel schwingen
     ctx.save(); ctx.translate(hx, hy); ctx.rotate(a * 0.6);
     line('#6b4a2b', 2.5, 0, 0, 5, 0); ctx.strokeStyle = '#ccd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(10, 0, 6, Math.PI, Math.PI * 1.9); ctx.stroke(); ctx.restore();
@@ -2575,12 +2597,6 @@ function gearFront(D) {
   if (ht === 'getreide' && lv === 2) { // Sense
     ctx.save(); ctx.translate(hx, hy); ctx.rotate(a * 0.4);
     line('#8a5a2b', 2.5, -2, -16, 5, 14); ctx.strokeStyle = '#ccd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(5, 14); ctx.quadraticCurveTo(16, 10, 26, 14); ctx.stroke(); ctx.restore();
-  }
-  if (ht === 'getreide' && lv === 3) { // Motormäher mit zitterndem Mähbalken
-    line('#333', 2, hx, hy, hx + 10, -10);
-    ctx.fillStyle = '#d33'; ctx.fillRect(hx + 8, -13, 14, 9); wheel(hx + 14, -3, 3);
-    const j = Math.sin(time * 60) * 1.5; ctx.fillStyle = '#999'; ctx.fillRect(hx + 20, -4, 24, 3);
-    ctx.fillStyle = '#ccd'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(hx + 21 + i * 4 + j, -4); ctx.lineTo(hx + 23 + i * 4 + j, -8); ctx.lineTo(hx + 25 + i * 4 + j, -4); ctx.fill(); }
   }
   if (ht === 'obst' && lv === 1) { // Pflückstange
     const tx = hx + 14, ty = -D.legL - D.torso - 34 + a * 2;
@@ -2617,10 +2633,25 @@ function poly(pts, fill) {
   ctx.fillStyle = fill; ctx.beginPath(); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
 }
-function wheelE(cx, cy, r, ux, uy, c = '#2b2b2b') { // Rad steht parallel zur Fahrtrichtung
-  ctx.fillStyle = ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath();
-  for (let i = 0; i < 16; i++) { const t = i / 16 * 6.283; ctx.lineTo(cx + Math.cos(t) * r * ux, cy + Math.cos(t) * r * uy * 0.5 - Math.sin(t) * r); }
-  ctx.closePath(); ctx.fill(); ctx.stroke();
+// Rad als Zylinder parallel zur Fahrtrichtung: Lauffläche (Breite 2·w, quer zur Fahrt) + Flanke mit Felge auf der Seite zum Betrachter.
+// rim = Felgenfarbe, lug = Stollenprofil (Traktor)
+function wheelE(cx, cy, r, ux, uy, { w = r * 0.45, rim = '#a8a8a8', lug = false } = {}) {
+  const N = 32, sx = -uy * w, sy = ux * w * 0.5, k = ux < 0 ? -1 : 1; // Querachse; k: welche Flanke näher ist
+  const E = (t, o = 0, f = 1) => [cx + Math.cos(t) * r * f * ux + sx * o, cy + Math.cos(t) * r * f * uy * 0.5 - Math.sin(t) * r * f + sy * o];
+  ctx.fillStyle = '#1b1b1b'; ctx.beginPath(); // Umriss = Ellipse über die Breite geschoben
+  for (let i = 0; i < N; i++) {
+    const t = i / N * 6.283, [ax, ay] = E(t - 0.01), [bx, by] = E(t + 0.01), nx = by - ay, ny = ax - bx; // Normale (Umlaufsinn egal, nur Vorzeichen-Wechsel zählt)
+    ctx.lineTo(...E(t, nx * sx + ny * sy > 0 ? 1 : -1));
+  }
+  ctx.closePath(); ctx.fill();
+  if (lug) { // Stollen auf dem sichtbaren Teil der Lauffläche (nur innerhalb des Reifens)
+    ctx.save(); ctx.clip(); ctx.strokeStyle = '#444'; ctx.lineWidth = Math.max(1, r * 0.12);
+    for (let i = 0; i < 20; i++) { const t = i / 20 * 6.283; if (uy * Math.cos(t) + Math.sin(t) * 0.8 < 0.15) continue; ctx.beginPath(); ctx.moveTo(...E(t, -0.9)); ctx.lineTo(...E(t + 0.12, 0)); ctx.lineTo(...E(t, 0.9)); ctx.stroke(); }
+    ctx.restore();
+  }
+  const face = (f, c) => { ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i < N; i++) ctx.lineTo(...E(i / N * 6.283, k, f)); ctx.closePath(); ctx.fill(); };
+  if (Math.abs(ux) < 0.08) return; // genau von vorn/hinten: nur die Lauffläche
+  face(1, '#2e2e2e'); face(0.62, rim); face(0.5, shade(rim, 0.8)); face(0.18, shade(rim, 1.15)); // Flanke, Felge mit Schüssel, Nabe
 }
 // Ladung als Haufen: Q(u, v, z) → Bildschirm (u 0..1 längs, v -1..1 quer, z Höhe in px), na Plätze längs.
 // Unterste Lage 2 Reihen, darüber je eine Reihe mit einem Platz weniger; Grösse wächst mit Füllstand.
@@ -2669,6 +2700,7 @@ function box3(P, a0, a1, b, z0, h, top, side) {
 function drawTruck(k) {
   const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1, 1, 1, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
   const L = [0, 18, 18, 30, 40, 48, 40][lv], col = ['', '#e39b1c', '#f2f2f2', '#d23b2b', '#2f6fc4', '#38a35b', '#1fa39a'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e', '#2559a0', '#26794a', '#167a73'][lv];
+  if (lv === 1) return drawCargoBike(k, P, s);
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-L - 6, 15], [34, 15], [34, -15], [-L - 6, -15]]) ctx.lineTo(...P(a, b)); ctx.fill();
   const whl = (a, b) => { const [cx, cy] = P(a, b, 7); wheelE(cx, cy, 7 * s, ux, uy); };
   const parts = [[-L + 6, 12], [-L + 6, -12], [24, 12], [24, -12], ...(lv > 3 ? [[-L + 18, 12], [-L + 18, -12]] : [])].map(([a, b]) => ({ d: P.d(a, b), f: () => whl(a, b) }));
@@ -2676,18 +2708,37 @@ function drawTruck(k) {
   parts.sort((a, b) => a.d - b.d).forEach(p => p.f());
   if (k.load) pile((u, v, z) => P(-L - 4 + (L + 18) * u, v * 10, 36 + z / s), k.cargo, toolLv('spedition').cap, Math.max(2, Math.round((L + 18) * s / 9)), 11);
 }
+// Lastenrad (Dreirad): Kiste vorne zwischen zwei Rädern, hinten ein grosses Rad, Fahrer tritt in die Pedale
+function drawCargoBike(k, P, s) {
+  const { ux, uy } = P, pd = time * 8, bar = (c, w, ...q) => line(c, w * s, ...q.flatMap(([a, b, z]) => P(a, b, z)));
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-26, 6], [38, 15], [38, -15], [-26, -6]]) ctx.lineTo(...P(a, b)); ctx.fill();
+  const parts = [[24, 12, 6], [24, -12, 6], [-18, 0, 9]].map(([a, b, r]) => ({ d: P.d(a, b), f: () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * s, ux, uy, { w: 1.6 * s, rim: '#d8d8d8' }); } }));
+  parts.push({ d: P.d(0, 0) - 0.01, f: () => bar('#555', 2.5, [-18, 0, 9], [-6, 0, 22], [8, 0, 12], [-18, 0, 9]) }); // Rahmen
+  parts.push({ d: P.d(-4, 0), f: () => { // Fahrer
+    for (const sd of [-1, 1]) { const c = Math.sin(pd + (sd > 0 ? 0 : Math.PI)) * 4; bar('#2b3a55', 3.5, [-6, sd * 3, 24], [0 + c, sd * 3, 17], [-1 + c, sd * 3, 10 + c * 0.5]); }
+    box3(P, -10, -2, 5, 24, 16, '#f0a83a', '#e39b1c'); // Weste
+    bar('#e39b1c', 3, [-4, 4, 38], [6, 6, 30]); bar('#e39b1c', 3, [-4, -4, 38], [6, -6, 30]); // Arme zum Lenker
+    const [hx, hy] = P(-5, 0, 46); ellipse(hx, hy, 5.5 * s, 5.5 * s, '#f1c9a5'); ctx.fillStyle = '#d23b2b'; ctx.beginPath(); ctx.ellipse(hx, hy - 2 * s, 6 * s, 4.5 * s, 0, Math.PI, 0); ctx.fill(); // Kopf mit Velohelm
+  } });
+  parts.push({ d: P.d(4, 0), f: () => { bar('#333', 2, [6, 0, 12], [6, 0, 30]); bar('#333', 2, [6, -7, 30], [6, 7, 30]); } }); // Lenker
+  parts.push({ d: P.d(23, 0), f: () => box3(P, 10, 36, 12, 7, 14, '#8a5a1a', '#e39b1c') }); // Kiste
+  parts.sort((a, b) => a.d - b.d).forEach(p => p.f());
+  if (k.load) pile((u, v, z) => P(12 + 22 * u, v * 9, 18 + z / s), k.cargo, toolLv('spedition').cap, 2, 11);
+}
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
 const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782']]; // Stufe 4/5/6: grün, rot, blau
 function tractorParts(x, y, s) {
   const lv = clamp(G.tools.tragen - 4, 0, 2), [c1, c2, c3] = TR_COL[lv];
   const P = proj(x, y, s * trK()), { ux, uy } = P, box = (...a) => box3(P, ...a), S = s * trK();
   const part = (a, b, d) => ({ y: P(a, b)[1], d });
-  const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * S, ux, uy); if (lv) wheelE(cx, cy, r * 0.45 * S, ux, uy, '#e8c33a'); }); // ab Kipper: gelbe Felgen
+  const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * S, ux, uy, { w: (r > 10 ? 4 : 3) * S, rim: lv ? '#e8c33a' : '#d8d8d8', lug: true }); }); // ab Kipper: gelbe Felgen
   const post = (a, b) => part(a, b, () => line('#3c3c3c', 2.5 * S, ...P(a, b, 15), ...P(a, b, 58)));
   const shadow = { y: -Infinity, d: () => { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-14, 19], [42, 15], [42, -15], [-14, -19]]) ctx.lineTo(...P(a, b)); ctx.fill(); } };
   const rear = [12, 14, 13][lv], front = [7, 8, 13][lv], hood = [36, 38, 40][lv], hh = [13, 14, 17][lv];
   const W = [whl(0, 13, rear), whl(0, -13, rear), whl(30, 9 + lv * 2, front), whl(30, -9 - lv * 2, front)];
   if (lv === 2) W.push(whl(0, 19, rear), whl(0, -19, rear)); // Riesentraktor: Zwillingsräder hinten
+  const fb = lv === 2 ? 16 : 13; // Kotflügel über den Hinterrädern (Bogen in der Radebene)
+  for (const b of [fb, -fb]) W.push(part(0, b + 0.01, () => { ctx.lineCap = 'round'; line(c2, 6 * S, ...Array.from({ length: 9 }, (_, i) => { const t = 0.15 + i / 8 * 0.7; return P(Math.cos(t * Math.PI) * (rear + 2), b, rear + Math.sin(t * Math.PI) * (rear + 2)); }).flat()); ctx.lineCap = 'butt'; }));
   const roof = () => {
     if (lv) box(-10, 8, 11, 15, 43, 'rgba(170,215,240,.18)', 'rgba(170,215,240,.28)'); // geschlossene Glaskabine
     box(-10, 8, 11, 58, 3, c1, c3);
@@ -2746,6 +2797,7 @@ function drawPlayer() {
     const reach = sd > 0 ? front : basket, ha = reach ? (sd > 0 ? D.hx : D.bx) : -sd * leg * 0.8, hb = reach ? sd * sh * 0.6 : sd * (sh + 2.5);
     add(ha, hb, () => { line(shirt, 4.5 * s, ...P(0, sd * (sh + 1.5), shZ), ...P(ha, hb, handZ)); ball(ha, hb, handZ, 2.6, skin)(); }, 0.01);
   }
+  if (!tr) gear3(P, s, D, zu, add);
   const blob = (a, b, z, rx, ry, c) => () => { const [px, py] = P(a, b, z); ellipse(px, py, rx * s, ry * s, c); };
   const [fw, fh] = { Rund: [1, 1], Oval: [0.88, 1.15], Breit: [1.15, 0.92] }[lk.face];
   add(1.5, 0, blob(1.5, 0, hz, headR * fw, headR * fh, skin), 0.02); // Gesicht
