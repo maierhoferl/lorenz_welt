@@ -28,8 +28,11 @@ function shade(hex, f) {
   return `rgb(${c})`;
 }
 let loopOn = false;
+// Dialog auf → Cursor ins erste sichtbare Eingabefeld
+const focusInput = el => [...el.querySelectorAll('input:not([type=hidden]),textarea')].find(i => i.offsetParent)?.focus();
 function show(id) {
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
+  focusInput($('#' + id));
   if (id === 'game' && !loopOn) { loopOn = true; AU.init(); requestAnimationFrame(loop); } // Loop läuft nur im Spiel
 }
 
@@ -166,8 +169,9 @@ addEventListener('keydown', e => { if (!$('#pin').hidden && /^[0-9]$|^Backspace$
 async function loadProblems(msg = '') {
   try {
     const { problems } = await api('/recover/start', { id: pin.p.id });
-    show('recover'); $('#recmsg').textContent = msg;
+    $('#recmsg').textContent = msg;
     $('#probs').innerHTML = problems.map(q => `<label>${q} = <input inputmode="numeric"></label>`).join('');
+    show('recover');
   } catch (e) { show('pin'); drawPin($t`Code-Hilfe geht nur mit Internet.`); }
 }
 $('#forgot').onclick = () => loadProblems();
@@ -856,7 +860,7 @@ function modal(el, title, body, extraHead = '') {
   el.innerHTML = `<div class="box"><header>${title}<button data-x>✕</button></header>${extraHead}<div class="body">${body}</div></div>`;
   el.querySelector('[data-x]').onclick = () => { el.hidden = true; if (el.id === 'shop') shopDismiss = true; };
   el.onclick = e => { if (e.target === el) { el.hidden = true; if (el.id === 'shop') shopDismiss = true; } };
-  el.hidden = false;
+  el.hidden = false; focusInput(el);
 }
 // Vorlesen (Browser-Stimme in der gewählten Sprache); Info-Fenster zu oder Ton aus → Stimme aus
 const VOICE_LANG = { de: 'de-CH', fr: 'fr-CH', it: 'it-CH', en: 'en-GB' };
