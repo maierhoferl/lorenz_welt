@@ -925,8 +925,8 @@ function shopList() {
       buy: () => { G.lkw = (G.lkw || 0) + 1; toast($t`🚛 Du hast jetzt ${truckCount()} Fahrzeuge!`); } });
     if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: $t`Beste Stufe erreicht! 🏆`, info: line.levels[lv].info, can: false, price: 0 }); continue; }
     tabs[2].push({
-      // Upgrade ersetzt alle Fahrzeuge, darum kostet es pro Fahrzeug
-      icon: line.icon, name: next.name, price: next.price * (k === 'spedition' ? Math.max(1, truckCount()) : 1), info: next.info, can: true,
+      // Upgrade ersetzt alle Fahrzeuge, kostet aber fix pro Stufe – mehr Fahrzeuge machen es nicht teurer
+      icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
       desc: $t`${line.name} · jetzt: ${line.levels[lv].name}` + (k === 'spedition' && truckCount() > 1 ? ` (${truckCount()}×)` : ''),
       note: next.every ? $t`holt ${next.cap} fertige Waren alle ${next.every} s und verkauft sie` : next.cap ? $t`trägt ${next.cap} statt ${line.levels[lv].cap} Waren` : next.auto ? $t`🤖 arbeitet automatisch!` : $t`${next.speed / line.levels[lv].speed}× schneller`,
       buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); speak(`${next.name}. ${next.info}`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
