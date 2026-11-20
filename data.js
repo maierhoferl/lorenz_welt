@@ -647,6 +647,7 @@ const SHOP_LV = [30, 40, 50, 60]; // danach wachsen Laden und Händler weiter in
 const HOF_ADD = ['einen Dorfbrunnen und eine Holzbeige', 'einen Kornspeicher', 'einen zweiten Stock mit Geranien-Balkon', 'ein Glockentürmchen auf dem Stall', 'eine eigene Kapelle'];
 // Ab Land-Stufe 25 wächst der Hof zur kleinen Stadt: bei lv kommt ein Gebäude dazu (Kacheln, x/y = Mitte unten),
 // alle 40 Stufen bekommt es einen Stock mehr (f0 = Stöcke am Anfang, max = höchstens). Reihen: hinter dem Hof, am Hofweg, Osttasche, links vom Bach.
+// se: 1 = steht in der Neustadt in der Südost-Ecke (Platz sucht game.js → sightsOn, dann ohne x/y).
 const TOWN = [
   { lv: 25, x: 7.4, y: 12.3, k: 'haus' },
   { lv: 30, x: 8.5, y: 5.6, k: 'chalet' },
@@ -660,14 +661,41 @@ const TOWN = [
   { lv: 70, x: 16.5, y: 14.9, k: 'amt', name: 'Feuerwehr', icon: '🚒', wall: '#e9e2d6', sign: '#d52b1e', garage: 1 },
   { lv: 75, x: 5, y: 5.6, k: 'chalet' },
   { lv: 80, x: 10.9, y: 12.3, k: 'haus' },
-  { lv: 90, x: 13.75, y: 5.6, k: 'amt', name: 'Hotel', icon: '⭐', wall: '#f6ead0', sign: '#6b4fa3', f0: 2, max: 5 },
-  { lv: 100, x: 16.15, y: 12.3, k: 'amt', name: 'Spital', icon: '🏥', wall: '#f7f7f4', sign: '#3a9a5a' },
+  { lv: 90, k: 'amt', se: 1, name: 'Hotel', icon: '⭐', wall: '#f6ead0', sign: '#6b4fa3', f0: 2, max: 5 },
+  { lv: 100, k: 'amt', se: 1, name: 'Spital', icon: '🏥', wall: '#f7f7f4', sign: '#3a9a5a' },
   { lv: 110, x: 1.6, y: 6.6, k: 'chalet' },
-  { lv: 120, x: 15.5, y: 5.6, k: 'amt', name: 'Bibliothek', icon: '📚', wall: '#e8d8c0', sign: '#8a5a30' },
-  { lv: 130, x: 16.5, y: 17.5, k: 'amt', name: 'Kino', icon: '🎬', wall: '#3f3a4a', sign: '#e8303a' },
+  { lv: 120, k: 'amt', se: 1, name: 'Bibliothek', icon: '📚', wall: '#e8d8c0', sign: '#8a5a30' },
+  { lv: 130, k: 'amt', se: 1, name: 'Kino', icon: '🎬', wall: '#3f3a4a', sign: '#e8303a' },
   { lv: 140, x: 1.6, y: 11.4, k: 'haus' },
-  { lv: 150, x: 17.25, y: 5.6, k: 'amt', name: 'Museum', icon: '🖼️', wall: '#ece4d4', sign: '#4f6f5a' },
+  { lv: 150, k: 'amt', se: 1, name: 'Museum', icon: '🖼️', wall: '#ece4d4', sign: '#4f6f5a' },
 ];
+// Sehenswürdigkeiten der Schweiz für die freie Südost-Ecke (die späten Bänder im Süden bleiben kurz).
+// lv = ab Land-Stufe, w/h = Grösse in Kacheln, flat = flach am Boden (man läuft darüber). Platz sucht game.js → sightsOn,
+// Zeichnung in game.js → SIGHT_DRAW. TOWN-Häuser mit se: 1 ziehen ebenfalls dorthin (Neustadt).
+const SIGHTS = {
+  rheinfall:     { name: 'Rheinfall', icon: '💦', lv: 12, w: 7, h: 4.5,
+    info: 'Der Rheinfall bei Schaffhausen ist der mächtigste Wasserfall Europas: 150 Meter breit! Im Sommer stürzen jede Sekunde so viel Wasser hinunter, wie in 4000 Badewannen passt. Mitten im Wasserfall steht ein Felsen mit einer Schweizer Fahne – mit dem Boot kann man hinfahren und hinaufklettern.' },
+  kapellbruecke: { name: 'Kapellbrücke', icon: '🌉', lv: 18, w: 8, h: 4, flat: 1,
+    info: 'Die Kapellbrücke in Luzern ist fast 700 Jahre alt – die älteste gedeckte Holzbrücke Europas! Unter dem Dach hängen alte Bilder. 1993 hat sie gebrannt und wurde wieder aufgebaut. Der achteckige Wasserturm daneben war früher Gefängnis und Schatzkammer.' },
+  zytglogge:     { name: 'Zytglogge', icon: '🕰️', lv: 25, w: 3, h: 4.5,
+    info: 'Die Zytglogge in Bern war vor 800 Jahren ein Stadttor. Heute ist sie eine berühmte Uhr: Kurz vor jeder vollen Stunde kräht ein Hahn, Bären marschieren im Kreis und ein goldener Mann schlägt die Glocke. Die Uhr hier zeigt die echte Zeit!' },
+  oeschinensee:  { name: 'Oeschinensee', icon: '🏞️', lv: 32, w: 7, h: 4.5, flat: 1,
+    info: 'Der Oeschinensee bei Kandersteg leuchtet türkis. Das kommt von feinem Gesteinsmehl, das Gletscherbäche in den See tragen – es spiegelt das Licht. Im Winter friert der See zu: dann kann man darauf Schlittschuh laufen und Eisfischen!' },
+  matterhorn:    { name: 'Matterhorn', icon: '🏔️', lv: 38, w: 8, h: 7,
+    info: 'Das Matterhorn bei Zermatt ist 4478 Meter hoch und der berühmteste Berg der Schweiz – mit seiner krummen Spitze sieht es aus wie ein Horn. 1865 standen die ersten Bergsteiger oben. In Zermatt fahren keine Benzinautos, nur kleine Elektrowagen!' },
+  landwasser:    { name: 'Landwasserviadukt', icon: '🚂', lv: 44, w: 7, h: 4.5,
+    info: 'Über das Landwasserviadukt fährt der rote Zug der Rhätischen Bahn – 65 Meter hoch über dem Fluss! Am Ende fährt er direkt in einen Tunnel im Felsen. Gebaut wurde die Brücke vor über 120 Jahren aus Stein, ganz ohne grosse Kräne.' },
+  bundeshaus:    { name: 'Bundeshaus', icon: '🏛️', lv: 52, w: 6, h: 4,
+    info: 'Im Bundeshaus in Bern macht die Schweiz ihre Gesetze. 246 Leute aus allen Kantonen reden und stimmen hier ab. Auf dem Platz davor spritzen 26 Wasserfontänen – eine für jeden Kanton. Im Sommer spielen Kinder darin!' },
+  aletsch:       { name: 'Aletschgletscher', icon: '🧊', lv: 58, w: 6, h: 6,
+    info: 'Der Aletschgletscher ist der grösste Gletscher der Alpen: 20 Kilometer lang und an der dicksten Stelle fast 900 Meter Eis! Die dunklen Streifen sind Steine, die das Eis mitschleppt. Weil es wärmer wird, schmilzt der Gletscher leider jedes Jahr ein Stück.' },
+  jungfrau:      { name: 'Eiger, Mönch und Jungfrau', icon: '⛰️', lv: 66, w: 10, h: 6,
+    info: 'Eiger, Mönch und Jungfrau stehen nebeneinander im Berner Oberland. Ein Zug fährt mitten durch den Eiger hindurch bis aufs Jungfraujoch – auf 3454 Meter: der höchste Bahnhof Europas! Die steile Eiger-Nordwand ist eine der schwierigsten Kletterwände der Welt.' },
+  castelgrande:  { name: 'Castelgrande', icon: '🏰', lv: 74, w: 5, h: 4,
+    info: 'In Bellinzona im Tessin stehen gleich drei Burgen! Das Castelgrande ist die grösste, mit dicken Mauern und zwei Türmen. Früher bewachten sie den Weg über die Alpen. Südlich der Alpen ist es so mild, dass sogar Palmen wachsen.' },
+  saentis:       { name: 'Säntis', icon: '📡', lv: 82, w: 6, h: 6,
+    info: 'Der Säntis in der Ostschweiz ist 2502 Meter hoch. Oben steht ein 123 Meter hoher Antennenturm und eine Wetterstation, die seit über 140 Jahren das Wetter misst. Bei klarem Wetter sieht man von dort sechs Länder!' },
+};
 const PASTURE = { x: 19.2, y: 27.5, w: 10, h: 6.6 }; // Zaun (Kacheln), w wächst mit der Weide (fitWorld)
 
 // Feste Orte (Kacheln, x/y = Mitte unten)

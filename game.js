@@ -307,7 +307,7 @@ function addThing(type) {
   return t;
 }
 function newGame() {
-  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 14 * T, py: 10.2 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null };
+  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 14 * T, py: 10.2 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null, pass: {}, spot: {} };
   for (const k in TOOLS) G.tools[k] = 0;
   trucks.length = 0; // anderer Spieler: Fahrzeuge neu aufstellen
   addThing('feld').ripe = true;
@@ -704,6 +704,7 @@ function decoSpotOk(x, y) {
     }
   }
   for (const p of paths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; if (x > (Math.min(ax, bx) - 0.8) * T && x < (Math.max(ax, bx) + 0.8) * T && y > (Math.min(ay, by) - 0.6) * T && y < (Math.max(ay, by) + 1) * T) return false; } // nicht auf den Weg
+  if (sightsOn().some(s => !s.town && Math.abs(x / T - s.x) < s.w / 2 + 0.3 && y / T > s.y - s.h && y / T < s.y + 0.7)) return false; // Sehenswürdigkeiten
   if (townOn().some(b => Math.abs(x - b.x * T) < 1.1 * T && y > (b.y - 1.6) * T && y < (b.y + 0.5) * T)) return false; // Häuser vom Städtchen
   if (lotOn() && x > (LOT.x - 0.4) * T && x < (LOT.x + LOT.cols * LOT.bay + 1) * T && y > (LOT.y - 0.2) * T && y < (LOT.rows[1] + 1.4) * T) return false; // Parkplatz
   if (x > PASTURE.x * T - 20 && x < (PASTURE.x + PASTURE.w) * T + 20 && y > PASTURE.y * T - 20 && y < (PASTURE.y + PASTURE.h) * T + 30) return false;
@@ -711,6 +712,7 @@ function decoSpotOk(x, y) {
 }
 // Deko, die im Weg steht (altes Layout, oder ein Band ist darüber gewachsen), zieht auf die Wiese unter dem See
 function fixDeco() {
+  sightsOn(); // Plätze suchen, solange die Deko noch dasteht
   const land = G.deco.filter(d => DECOS[d.type].where === 'land'); G.deco = G.deco.filter(d => !land.includes(d));
   for (const d of land) {
     if (!decoSpotOk(d.x, d.y)) for (let i = 0; i < 600; i++) { const x = (2.5 + (i % 12) * 1.2) * T, y = (LAKE.y + LAKE.ry + 2 + Math.floor(i / 12) * 1.3) * T; if (decoSpotOk(x, y)) { Object.assign(d, { x, y }); break; } }
@@ -771,6 +773,7 @@ function interact(dt) {
   if (!near) for (const o of G.deco) if (DECOS[o.type].where === 'land') { const k = dist(G.px, G.py, o.x, o.y); if (k < dd) { dd = k; nearDeco = o; } }
   if (near?.type === 'laden') { if (!shopDismiss && $('#shop').hidden) openShop(); }
   else { shopDismiss = false; if (!$('#shop').hidden) $('#shop').hidden = true; }
+  visitSights();
 }
 
 function soundLevels() {
@@ -833,8 +836,9 @@ function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
   if (SHOP_LV.includes(l) || i === 1 || i === 3) f.push({ ic: '🏪', t: $t`Laden und Händler ziehen in grössere Häuser!`, d: $t`Mehr Regale, mehr Kundschaft, mehr Geld 💰` });
   if (l === 20) f.push({ ic: '⛪', t: $t`Neu im Laden: Kirche und Gülle-Verteiler`, d: $t`Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩` });
   const nb = TOWN.find(b => b.lv === l);
-  if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
+  if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: nb.se ? $t`Es steht in der Neustadt ganz im Südosten!` : $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
   else if (TOWN.some(b => l > b.lv && (l - b.lv) % 40 === 0 && (b.f0 || 1) + (l - b.lv) / 40 <= (b.max || (b.k === 'chalet' ? 3 : 4)))) f.push({ ic: '🏗️', t: $t`Im Städtchen wird ein Haus höher!`, d: $t`Ein Stock mehr – bis zu den Wolken? ☁️` });
+  for (const s of Object.values(SIGHTS)) if (s.lv === l) f.push({ ic: s.icon, t: $t`Neue Sehenswürdigkeit im Südosten: ${s.name}!`, d: $t`Lauf hin und hol dir den Stempel für deinen Reisepass! 📸` });
   return f;
 }
 const FUN = [$t`Die Kühe rufen: Muuuh-ega! 🐄`, $t`Sogar die Geissen machen einen Freudensprung! 🐐`, $t`Die Hühner gackern vor Stolz! 🐔`, $t`Das Murmeli pfeift dir ein Ständchen! 🎶`, $t`Der Nachbar staunt mit offenem Mund! 😮`, $t`Die Säuli wälzen sich vor Freude im Dreck! 🐖`];
@@ -1628,7 +1632,217 @@ function balcony(x, w, y) {
   flowers(x - w / 2, x + w / 2, y - 4);
 }
 // ---- Hof → Städtchen (TOWN) ----
-const townOn = () => TOWN.filter(b => G.land >= b.lv);
+const townOn = () => TOWN.filter(b => G.land >= b.lv && (!b.se || sightsOn().some(s => s.town === b))); // se: steht nur, wenn die Südost-Ecke Platz hat
+// ---- Südost-Ecke: Sehenswürdigkeiten (SIGHTS) und Neustadt (TOWN mit se) ----
+// Die späten Bänder im Süden bleiben kurz, Dorf und Acker machen die Welt breit → unten rechts ist Wiese frei.
+// Jedes Ding behält seinen Platz (G.spot), bis ein Band hineinwächst – dann zieht es in die Ecke ganz unten rechts.
+// So verteilen sie sich mit der Zeit übers ganze Dreieck. Neu gerechnet nur bei anderem Land/Spieler; Deko gilt als Hindernis.
+let sightMemo = null;
+function sightsOn() {
+  if (sightMemo?.g === G && sightMemo.land === G.land && sightMemo.w === WORLD.w) return sightMemo.list;
+  const busy = []; // [x0, x1, y0, y1] in Kacheln
+  for (const k in AREAS) {
+    const a = AREAS[k]; if (!areaOn(a) || a.x < ROAD_X) continue;
+    busy.push([0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), a.y + (areaRows(k) - 1) * a.dy + 0.8]);
+  }
+  if (areaOn(AREAS.terminal)) busy.push([0, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
+  for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push([d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
+  const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
+    .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 }))).sort((a, b) => a.lv - b.lv);
+  const list = [], spot = G.spot ||= {};
+  const fits = r => !busy.some(b => r[0] < b[1] && r[1] > b[0] && r[2] < b[3] && r[3] > b[2]) && r[0] > ROAD_X + 1 && r[1] < WORLD.w - 0.5 && r[2] > 4 && r[3] < WORLD.h + 0.3;
+  const put = (s, x, y) => { // unten Platz fürs Namensschild
+    const r = [x - s.w / 2, x + s.w / 2, y - s.h, y + 0.7]; if (!fits(r)) return false;
+    busy.push([r[0] - 0.5, r[1] + 0.5, r[2] - 0.3, r[3]]); list.push(Object.assign(s, { x, y })); spot[s.k || 't' + s.lv] = [x, y];
+    if (s.town) Object.assign(s.town, { x, y });
+    return true;
+  };
+  for (const s of todo) s.old = spot[s.k || 't' + s.lv];
+  for (const s of todo) if (Array.isArray(s.old) && put(s, +s.old[0], +s.old[1])) s.done = 1; // zuerst alle, die bleiben dürfen
+  // ponytail: Rasterscan O(Höhe·Breite·Hindernisse) je Ding, läuft nur beim Landkauf – Freiflächen-Liste, falls es mal ruckelt
+  for (const s of todo) if (!s.done) find: for (let y = Math.floor(WORLD.h - 0.5); y - s.h > 4; y--) for (let x = Math.floor(WORLD.w - 1 - s.w / 2); x - s.w / 2 > ROAD_X + 1; x--) if (put(s, x, y)) break find;
+  sightMemo = { g: G, land: G.land, w: WORLD.w, list, busy, gen: (sightMemo?.gen || 0) + 1 };
+  return list;
+}
+// Freie Südost-Wiese (Hintergrund-Cache): Wäldchen, Felsbrocken, Blumen, Tümpel und Heustadel – fest je Zelle –
+// und ein Wanderweg vom nächsten Bandweg zu allen Sehenswürdigkeiten
+function drawPanorama() {
+  const list = sightsOn(), { busy } = sightMemo, C = 2.5;
+  const free = (x, y) => !busy.some(b => x + C > b[0] && x < b[1] && y + C > b[2] && y < b[3]);
+  const ax = Math.max(ROAD_X + 2, Math.floor(bg.x / T / C) * C), bx = Math.min(WORLD.w - 1.5, (bg.x + bg.w) / T), ay = Math.max(5, Math.floor(bg.y / T / C) * C), by = Math.min(WORLD.h - 1.5, (bg.y + bg.h + 3 * T) / T);
+  for (let cx = ax; cx < bx; cx += C) for (let cy = ay; cy < by; cy += C) {
+    if (!free(cx, cy)) continue;
+    const r = seeded(Math.round(cx * 31 + cy * 977) % 233280), v = r(), px = (cx + C / 2 + r() - 0.5) * T, py = (cy + C / 2 + r() - 0.5) * T;
+    if (v < 0.28) Array.from({ length: 3 + Math.floor(r() * 4) }, () => [px + (r() - 0.5) * 80, py + (r() - 0.5) * 44, 0.8 + r() * 0.6]).sort((a, b) => a[1] - b[1]).forEach(f => tanne(...f)); // Wäldchen
+    else if (v < 0.36) { ellipse(px + 4, py + 2, 22, 7, 'rgba(0,0,0,.2)'); ellipse(px, py - 8, 20, 14, '#9a958c'); ellipse(px - 5, py - 13, 9, 6, '#b8b3a8'); } // Findling
+    else if (v < 0.56) for (let i = 0; i < 14; i++) ellipse(px + (r() - 0.5) * 90, py + (r() - 0.5) * 50, 2.6, 2.6, ['#f2f2f2', '#f2cf3b', '#e870b0', '#6b8fe0'][i % 4]); // Blumenwiese
+    else if (v < 0.6) { ellipse(px, py, 34, 14, '#3c7fb8'); ellipse(px - 6, py - 3, 22, 7, 'rgba(255,255,255,.25)'); for (let i = 0; i < 6; i++) line('#5c8a34', 1.6, px + 26 + i * 3, py + 4, px + 27 + i * 3, py - 10); } // Tümpel
+    else if (v < 0.64) alpHouse(px, py, 26, 4, 14, 10); // Heustadel
+  }
+  if (!list.some(s => !s.town)) return;
+  // Wanderweg: vom nächsten Bandweg-Ende immer zur nächsten Sehenswürdigkeit
+  const todo = list.filter(s => !s.town).map(s => [s.x, s.y + 0.9]), ends = paths().slice(PATHS.length + 1).map(p => p[1]);
+  const dmin = e => Math.min(...todo.map(s => Math.hypot(e[0] - s[0], e[1] - s[1])));
+  let cur = ends.reduce((b, e) => dmin(e) < dmin(b) ? e : b), pts = [cur];
+  while (todo.length) { todo.sort((a, b) => Math.hypot(a[0] - cur[0], a[1] - cur[1]) - Math.hypot(b[0] - cur[0], b[1] - cur[1])); cur = todo.shift(); pts.push(cur); }
+  ctx.lineCap = ctx.lineJoin = 'round';
+  for (const [w, c] of [[T * 0.6, '#b99a68'], [T * 0.42, '#dcc596']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); pts.forEach(([a, b], i) => i ? ctx.quadraticCurveTo((pts[i - 1][0] + a) / 2 * T + 30, (pts[i - 1][1] + b) / 2 * T - 30, a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
+  const [sx, sy] = pts[0]; line('#6b4a2b', 3, sx * T + 20, sy * T - 6, sx * T + 20, sy * T - 40); // gelber Wanderweg-Wegweiser
+  ctx.fillStyle = '#f2c21a'; ctx.beginPath(); ctx.moveTo(sx * T + 20, sy * T - 40); ctx.lineTo(sx * T + 46, sy * T - 40); ctx.lineTo(sx * T + 54, sy * T - 34); ctx.lineTo(sx * T + 46, sy * T - 28); ctx.lineTo(sx * T + 20, sy * T - 28); ctx.fill();
+}
+// Reisepass: erster Besuch = Stempel, Taschengeld und „Wusstest du?“
+function visitSights() {
+  for (const s of sightsOn()) {
+    if (s.town || G.pass[s.k] || Math.abs(G.px / T - s.x) > s.w / 2 || G.py / T < s.y - s.h || G.py / T > s.y + 0.7) continue;
+    const d = SIGHTS[s.k], fr = d.lv * 20;
+    G.pass[s.k] = 1; G.money += fr; AU.sfx('cash'); hud(); save();
+    floater(s.x * T, (s.y - s.h) * T, `📸 +${fr} Fr.`);
+    toast($t`📸 Stempel im Reisepass! ${Object.keys(G.pass).length} von ${Object.keys(SIGHTS).length} Sehenswürdigkeiten besucht.`);
+    showInfo(d);
+  }
+}
+// Berg: Umriss (Fuss links → Fuss rechts), Schattenseite rechts vom Gipfel px, Schnee oberhalb snowY
+function mount(pts, rock, px, snowY) {
+  const path = () => { ctx.beginPath(); for (const [a, b] of pts) ctx.lineTo(a, b); ctx.closePath(); };
+  const top = Math.min(...pts.map(p => p[1])), bot = Math.max(...pts.map(p => p[1])), L = pts[0][0] - 10, R = pts.at(-1)[0] + 10;
+  const g = ctx.createLinearGradient(0, top, 0, bot); g.addColorStop(0, shade(rock, 1.12)); g.addColorStop(1, shade(rock, 0.85));
+  path(); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); path(); ctx.clip();
+  ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(L, top - 10);
+  for (let a = L; a <= R; a += 8) ctx.lineTo(a, snowY + Math.sin(a * 0.09) * 8 + Math.sin(a * 0.23) * 5);
+  ctx.lineTo(R, top - 10); ctx.fill();
+  ctx.fillStyle = 'rgba(30,35,60,.22)'; ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px + (bot - top) * 0.22, bot); ctx.lineTo(R, bot); ctx.lineTo(R, top); ctx.fill(); // Schattenseite
+  ctx.restore();
+}
+function palm(x, y, s = 1) {
+  ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 6 * s, y - 25 * s, x + 3 * s, y - 48 * s); ctx.stroke();
+  for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + (i - 3) * 0.5 + Math.sin(time * 1.5 + i) * 0.05; ctx.strokeStyle = i % 2 ? '#2f8f3e' : '#3fa34d'; ctx.lineWidth = 4 * s; ctx.beginPath(); ctx.moveTo(x + 3 * s, y - 48 * s); ctx.quadraticCurveTo(x + 3 * s + Math.cos(a) * 18 * s, y - 48 * s + Math.sin(a) * 18 * s - 6 * s, x + 3 * s + Math.cos(a) * 30 * s, y - 48 * s + Math.sin(a) * 26 * s + 8 * s); ctx.stroke(); }
+}
+// x/y = Mitte unten, W/H = Grösse in Pixeln
+const SIGHT_DRAW = {
+  rheinfall(x, y, W, H) {
+    const t = y - H, L = x - W / 2, R = x + W / 2, lip = t + H * 0.38, pool = y - 22;
+    mount([[L, y - 6], [L, t + H * 0.12], [L + W * 0.22, t + H * 0.22], [L + W * 0.26, y - 6]], '#6f7a4a', L + W * 0.3, -1e4);
+    mount([[R - W * 0.24, y - 6], [R - W * 0.2, t + H * 0.25], [R, t + H * 0.15], [R, y - 6]], '#6f7a4a', R, -1e4);
+    ctx.fillStyle = '#4b8fca'; ctx.beginPath(); ctx.moveTo(L + W * 0.2, t + H * 0.2); ctx.lineTo(R - W * 0.2, t + H * 0.2); ctx.lineTo(R - W * 0.21, lip); ctx.lineTo(L + W * 0.23, lip); ctx.fill(); // Rhein oben
+    const fx0 = L + W * 0.23, fw = W * 0.56, g = ctx.createLinearGradient(0, lip, 0, pool); g.addColorStop(0, '#d8ecf8'); g.addColorStop(1, '#ffffff');
+    ctx.fillStyle = g; ctx.fillRect(fx0, lip, fw, pool - lip); // Wasserfall
+    for (let i = 0; i < 18; i++) { const fx = fx0 + (i + 0.5) * fw / 18, k = (time * 1.6 + i * 0.37) % 1; line('rgba(120,170,215,.55)', 2, fx, lip + k * (pool - lip) - 14, fx, lip + k * (pool - lip)); }
+    ellipse(x, pool + 4, W * 0.4, 16, '#3f86c4');
+    for (let i = 0; i < 10; i++) ellipse(fx0 + i * fw / 9, pool - 4 + Math.sin(time * 3 + i) * 3, 15, 10, 'rgba(255,255,255,.88)'); // Gischt
+    mount([[x - 14, pool], [x - 9, lip + 26], [x + 4, lip + 18], [x + 14, pool]], '#5d574b', x + 4, -1e4); flagPole(x, lip + 22, 22, 11, 3); // Felsen mit Fahne
+    house(L + W * 0.12, t + H * 0.22, 46, 30, '#efe3c8', '#8a3b2a', 16); ctx.fillStyle = '#efe3c8'; ctx.fillRect(L + W * 0.12 + 10, t + H * 0.22 - 62, 16, 34); poly([[L + W * 0.12 + 7, t + H * 0.22 - 62], [L + W * 0.12 + 18, t + H * 0.22 - 84], [L + W * 0.12 + 29, t + H * 0.22 - 62]], '#8a3b2a'); // Schloss Laufen
+  },
+  kapellbruecke(x, y, W, H) {
+    const t = y - H;
+    ctx.fillStyle = '#4a8fc8'; rrect(x - W / 2, t + H * 0.1, W, H * 0.9, 50); ctx.fill(); // Reuss
+    for (let i = 0; i < 9; i++) { const wx = x - W / 2 + 30 + i * W / 10 + Math.sin(time * 0.8 + i) * 8, wy = t + H * (0.3 + (i % 3) * 0.22); line('rgba(255,255,255,.35)', 2, wx, wy, wx + 22, wy); }
+    const ax = x - W / 2 + 14, ay = y - H * 0.22, bx = x + W / 2 - 14, by = t + H * 0.32, n = 16, P = i => [ax + (bx - ax) * i / n, ay + (by - ay) * i / n];
+    for (let i = 0; i <= n; i++) { const [px, py] = P(i); line('#4a3018', 3, px, py, px, py + 16); } // Pfähle
+    line('#8a5a30', 10, ax, ay, bx, by); // Gehweg
+    for (let i = 0; i <= n; i++) { const [px, py] = P(i); line('#5b3a1e', 2, px, py - 4, px, py - 18); ellipse(px, py - 6, 3, 2.4, i % 2 ? '#e8303a' : '#f29a2e'); } // Stützen, Blumen
+    line('#7a3a22', 12, ax - 4, ay - 20, bx + 4, by - 20); line('#9a4a2a', 4, ax - 4, ay - 24, bx + 4, by - 24); // Dach
+    const [wx, wy] = P(n * 0.6); const tx = wx + 14, ty = wy + 34; // Wasserturm, achteckig
+    ellipse(tx, ty, 26, 8, 'rgba(0,0,0,.25)');
+    const g = ctx.createLinearGradient(tx - 20, 0, tx + 20, 0); g.addColorStop(0, '#c9b89a'); g.addColorStop(1, '#8e7d62');
+    ctx.fillStyle = g; ctx.fillRect(tx - 20, ty - 96, 40, 96); line('rgba(0,0,0,.18)', 1, tx - 7, ty - 96, tx - 7, ty, tx + 7, ty, tx + 7, ty - 96);
+    win(tx - 4, ty - 70, 8, 10); poly([[tx - 24, ty - 94], [tx, ty - 132], [tx + 24, ty - 94]], '#7a3a22');
+  },
+  zytglogge(x, y, W, H) {
+    ctx.save(); ctx.translate(x, y - 34); ctx.scale(1.25, 1.25); DECO_DRAW.uhrturm(0, 0, { id: 7 }); ctx.restore();
+    ctx.fillStyle = '#a8957a'; ctx.fillRect(x - 40, y - 46, 80, 46); // Stadttor
+    ctx.fillStyle = '#2d241c'; ctx.beginPath(); ctx.moveTo(x - 16, y); ctx.lineTo(x - 16, y - 22); ctx.arc(x, y - 22, 16, Math.PI, 0); ctx.lineTo(x + 16, y); ctx.fill();
+    const b = Math.sin(time * 4) * 3; ellipse(x - 30, y - 56 + b, 6, 6, '#6b4423'); ellipse(x + 30, y - 56 - b, 6, 6, '#6b4423'); // tanzende Bären
+    ellipse(x - 34, y - 61 + b, 2.5, 2.5, '#6b4423'); ellipse(x - 26, y - 61 + b, 2.5, 2.5, '#6b4423'); ellipse(x + 26, y - 61 - b, 2.5, 2.5, '#6b4423'); ellipse(x + 34, y - 61 - b, 2.5, 2.5, '#6b4423');
+  },
+  oeschinensee(x, y, W, H) {
+    const t = y - H, ly = y - H * 0.3;
+    mount([[x - W / 2, ly], [x - W * 0.4, t], [x - W * 0.18, t + H * 0.14], [x + W * 0.04, t - 6], [x + W * 0.28, t + H * 0.12], [x + W / 2, t + H * 0.02], [x + W / 2, ly]], '#8d8a86', x + W * 0.04, t + H * 0.12);
+    for (const f of [-0.22, 0.2]) { line('rgba(255,255,255,.85)', 3, x + W * f, t + H * 0.2, x + W * f, ly - 4); }
+    const g = ctx.createLinearGradient(0, ly - H * 0.2, 0, y); g.addColorStop(0, '#36c1c9'); g.addColorStop(1, '#1d8fa6');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, ly, W * 0.46, H * 0.27, 0, 0, 7); ctx.fill();
+    if (SW[0]) { ctx.fillStyle = `rgba(235,245,250,${0.85 * SW[0]})`; ctx.beginPath(); ctx.ellipse(x, ly, W * 0.46, H * 0.27, 0, 0, 7); ctx.fill(); } // Winter: zugefroren
+    else { const bx = x + Math.sin(time * 0.25) * W * 0.25; ellipse(bx, ly + 6, 14, 5, '#a0522d'); line('#5b3a1e', 1.5, bx - 10, ly + 2 + Math.sin(time * 3) * 2, bx + 10, ly + 2 - Math.sin(time * 3) * 2); } // Ruderboot
+    for (let i = 0; i < 5; i++) fir(x - W * 0.45 + i * 14, y - 4 - (i % 2) * 6, 34, '#2f6a3a');
+    for (let i = 0; i < 4; i++) fir(x + W * 0.32 + i * 14, y - 4 - (i % 2) * 6, 32, '#2f6a3a');
+  },
+  matterhorn(x, y, W, H) {
+    const L = x - W / 2, R = x + W / 2, px = x + W * 0.04, py = y - H;
+    ellipse(x, y - 4, W / 2, 14, 'rgba(0,0,0,.18)');
+    mount([[L, y - 6], [L + W * 0.2, y - H * 0.42], [px - W * 0.1, py + H * 0.2], [px - W * 0.05, py + H * 0.1], [px - W * 0.08, py + 10], [px, py], [px + W * 0.07, py + H * 0.16], [px + W * 0.13, py + H * 0.3], [R, y - 6]], '#8b7d6e', px, py + H * 0.45);
+    ctx.strokeStyle = 'rgba(60,45,35,.35)'; ctx.lineWidth = 1.5; for (let i = 1; i < 6; i++) { const yy = py + H * 0.4 + i * H * 0.1; ctx.beginPath(); ctx.moveTo(x - W * 0.3 + i * 8, yy); ctx.lineTo(x + W * 0.1, yy - 18); ctx.stroke(); } // Felsbänder
+    flagPole(px, py + 2, 20, 10, 5);
+    for (let i = 0; i < 3; i++) { alpHouse(L + W * 0.12 + i * 36, y - 2, 28, 8, 10, 10); } // Zermatt
+  },
+  landwasser(x, y, W, H) {
+    const t = y - H, L = x - W / 2, R = x + W / 2, deck = t + H * 0.32, tx = R - W * 0.15;
+    mount([[L, y], [L, t + H * 0.25], [L + W * 0.12, deck + 12], [x - W * 0.05, y - 12], [x + W * 0.15, y - 12], [tx, deck + 12], [R, t + H * 0.1], [R, y]], '#4f7a3a', R, -1e4); // Schlucht
+    line('#5aa0d8', 8, L + W * 0.2, y - 8, R - W * 0.25, y - 14); // Landwasser
+    mount([[tx - 4, y - 10], [tx - 2, t], [R, t + 6], [R, y - 10]], '#7a7468', R, -1e4);
+    ctx.fillStyle = '#1d1a16'; ctx.beginPath(); ctx.moveTo(tx - 1, deck); ctx.lineTo(tx - 1, deck - 22); ctx.arc(tx + 13, deck - 22, 14, Math.PI, 0); ctx.lineTo(tx + 27, deck); ctx.fill(); // Tunnel
+    const x0 = L + W * 0.08, n = 6, sp = (tx - x0) / n;
+    ctx.fillStyle = '#b5a088'; ctx.fillRect(x0, deck, tx - x0, 12);
+    for (let i = 0; i <= n; i++) { const pxl = x0 + i * sp; ctx.fillRect(pxl - 6, deck, 12, y - 12 - deck); } // Pfeiler
+    ctx.strokeStyle = '#b5a088'; ctx.lineWidth = 6; for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x0 + (i + 0.5) * sp, deck + sp / 2 + 10, sp / 2 - 3, Math.PI, 0); ctx.stroke(); } // Bogen
+    ctx.fillStyle = '#7a7468'; ctx.fillRect(x0 - 30, deck - 40, 26, y - deck + 30); ctx.fillStyle = '#1d1a16'; ctx.beginPath(); ctx.moveTo(x0 - 4, deck); ctx.lineTo(x0 - 4, deck - 22); ctx.arc(x0 - 18, deck - 22, 14, 0, Math.PI, true); ctx.lineTo(x0 - 32, deck); ctx.fill(); // Tunnel links
+    ctx.save(); ctx.beginPath(); ctx.rect(x0 - 4, t - 50, tx - x0 + 10, H); ctx.clip(); // Zug fährt von Tunnel zu Tunnel
+    const k = (time * 70) % (tx - x0 + 400), zx = x0 - 20 + k;
+    for (let c = 0; c < 3; c++) { const cx = zx - c * 44; ctx.fillStyle = '#c8241a'; rrect(cx - 20, deck - 20, 40, 18, 4); ctx.fill(); ctx.fillStyle = '#d9eef8'; for (let w = 0; w < 3; w++) ctx.fillRect(cx - 15 + w * 11, deck - 16, 8, 6); }
+    ctx.restore();
+  },
+  bundeshaus(x, y, W, H) {
+    const w = W * 0.82, mw = w * 0.32, base = y - 26;
+    ctx.fillStyle = '#d9cfbf'; ctx.fillRect(x - W / 2, base, W, 26); // Bundesplatz
+    house(x - w * 0.33, base, w * 0.34, H * 0.36, '#d8c79e', '#5b6f63', 16); house(x + w * 0.33, base, w * 0.34, H * 0.36, '#d8c79e', '#5b6f63', 16);
+    for (const s of [-1, 1]) for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) win(x + s * w * 0.33 - w * 0.15 + c * w * 0.08, base - H * 0.32 + r * 26, 10, 14);
+    const mh = H * 0.5; ctx.fillStyle = '#e2d3ac'; ctx.fillRect(x - mw / 2, base - mh, mw, mh); // Mitteltrakt
+    for (let c = 0; c < 6; c++) { ctx.fillStyle = '#f2e8cc'; ctx.fillRect(x - mw / 2 + 8 + c * (mw - 16) / 5 - 3, base - mh + 24, 6, mh - 30); } // Säulen
+    poly([[x - mw / 2 - 4, base - mh + 2], [x, base - mh - 18], [x + mw / 2 + 4, base - mh + 2]], '#cdbd94');
+    ctx.fillStyle = '#4f8f73'; ctx.beginPath(); ctx.ellipse(x, base - mh - 14, mw * 0.32, mw * 0.36, 0, Math.PI, 0); ctx.fill(); // Kuppel
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(x - mw * 0.1, base - mh - 14, mw * 0.12, mw * 0.32, 0, Math.PI, 0); ctx.fill();
+    flagPole(x, base - mh - 14 - mw * 0.36, 22, 12, 9);
+    for (let i = 0; i < 13; i++) { const fx = x - W * 0.42 + i * W * 0.84 / 12, hh = 6 + 12 * Math.max(0, Math.sin(time * 2.2 + i * 0.7)); line('rgba(170,215,250,.95)', 2.5, fx, y - 6, fx, y - 6 - hh); } // 26 Fontänen (13 sieht man)
+  },
+  aletsch(x, y, W, H) {
+    const t = y - H, L = x - W / 2, R = x + W / 2;
+    mount([[L, y - 4], [L + W * 0.2, t], [L + W * 0.3, t + H * 0.2], [x + W * 0.05, y - 4]], '#7d7468', L + W * 0.2, t + H * 0.3);
+    mount([[x - W * 0.05, y - 4], [R - W * 0.28, t + H * 0.18], [R - W * 0.16, t + 8], [R, y - 4]], '#6c6358', R - W * 0.16, t + H * 0.3);
+    const C = s => x + Math.sin(s * 3.2 + 0.4) * W * 0.12, Yy = s => t + H * 0.06 + s * H * 0.86, wd = s => W * (0.2 - s * 0.09), N = 20;
+    const g = ctx.createLinearGradient(0, t, 0, y); g.addColorStop(0, '#f6fbff'); g.addColorStop(1, '#a9cfe3');
+    ctx.fillStyle = g; ctx.beginPath();
+    for (let i = 0; i <= N; i++) ctx.lineTo(C(i / N) - wd(i / N), Yy(i / N));
+    for (let i = N; i >= 0; i--) ctx.lineTo(C(i / N) + wd(i / N), Yy(i / N));
+    ctx.fill();
+    for (const m of [-0.35, 0.25]) { ctx.strokeStyle = 'rgba(70,65,60,.7)'; ctx.lineWidth = 3; ctx.beginPath(); for (let i = 1; i <= N; i++) ctx.lineTo(C(i / N) + m * wd(i / N), Yy(i / N)); ctx.stroke(); } // Mittelmoränen
+    for (let i = 2; i < N; i += 3) line('rgba(90,150,200,.55)', 1.5, C(i / N) - wd(i / N) * 0.8, Yy(i / N), C(i / N) - wd(i / N) * 0.5, Yy(i / N) + 4); // Gletscherspalten
+    line('#6fb0dd', 4, C(1), y - 2, C(1) + 18, y + 4); // Schmelzwasser
+  },
+  jungfrau(x, y, W, H) {
+    const pk = [[-0.3, 0.8, '#5b544c'], [0.02, 0.9, '#7a7166'], [0.3, 1, '#857b6f']]; // Eiger, Mönch, Jungfrau
+    for (const [o, h, c] of pk) { const cx = x + o * W; mount([[cx - W * 0.24, y - 4], [cx - W * 0.04, y - H * h + 12], [cx, y - H * h], [cx + W * 0.05, y - H * h + 14], [cx + W * 0.22, y - 4]], c, cx, y - H * h * (o < 0 ? 0.62 : 0.5)); }
+    const sx = x + W * 0.17, sy = y - H * 0.62; // Sphinx-Observatorium auf dem Jungfraujoch
+    ctx.fillStyle = '#9aa3ad'; ctx.fillRect(sx - 6, sy - 6, 12, 14); ellipse(sx, sy - 7, 8, 7, '#c9d1da'); line('#6c757e', 2, sx, sy - 14, sx, sy - 20);
+    ctx.fillStyle = '#1d1a16'; ctx.beginPath(); ctx.arc(x - W * 0.42, y - 4, 10, Math.PI, 0); ctx.fill(); // Bahntunnel in den Eiger
+  },
+  castelgrande(x, y, W, H) {
+    const t = y - H, top = t + H * 0.42;
+    mount([[x - W / 2, y], [x - W * 0.38, top + 10], [x + W * 0.36, top + 6], [x + W / 2, y]], '#8a8070', x + W * 0.3, -1e4); // Felshügel
+    ctx.fillStyle = '#d8d0c0'; ctx.fillRect(x - W * 0.38, top - 22, W * 0.74, 28); // Mauer
+    for (let c = x - W * 0.38; c < x + W * 0.36; c += 12) ctx.fillRect(c, top - 30, 7, 8); // Zinnen
+    const tower = (tx, h, c) => { ctx.fillStyle = c; ctx.fillRect(tx - 12, top - h, 24, h); for (let i = 0; i < 3; i++) ctx.fillRect(tx - 12 + i * 9, top - h - 8, 6, 8); win(tx - 3, top - h + 14, 6, 9); };
+    tower(x - W * 0.14, H * 0.55, '#ece6d8'); tower(x + W * 0.18, H * 0.45, '#9a9488'); // Torre Bianca, Torre Nera
+    palm(x - W * 0.42, y - 2, 0.9); palm(x + W * 0.44, y - 2, 0.8);
+  },
+  saentis(x, y, W, H) {
+    const px = x + W * 0.05, py = y - H + 44;
+    mount([[x - W / 2, y - 4], [x - W * 0.25, y - H * 0.45], [px - W * 0.08, py + 14], [px, py], [px + W * 0.12, py + 22], [x + W / 2, y - 4]], '#a69e8e', px, py + H * 0.18);
+    ctx.strokeStyle = 'rgba(90,80,65,.35)'; ctx.lineWidth = 2; for (let i = 1; i < 5; i++) { const yy = py + i * H * 0.13; ctx.beginPath(); ctx.moveTo(x - W * 0.35 + i * 10, yy + 20); ctx.lineTo(x + W * 0.3 - i * 6, yy); ctx.stroke(); } // Kalk-Schichten
+    ctx.fillStyle = '#d8d8d4'; ctx.fillRect(px - 14, py - 10, 28, 12); // Wetterstation
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#d52b1e' : '#f2f2f2'; ctx.fillRect(px - 2.5, py - 12 - (i + 1) * 7, 5, 7); } // Antennenturm
+    const sx = x - W * 0.45, sy = y - 8, k = (Math.sin(time * 0.3) + 1) / 2; line('#555', 1, sx, sy, px - 14, py - 4); // Schwebebahn
+    const cx = sx + (px - 14 - sx) * k, cy = sy + (py - 4 - sy) * k; line('#555', 1.5, cx, cy, cx, cy + 6); ctx.fillStyle = '#d52b1e'; rrect(cx - 6, cy + 6, 12, 9, 2); ctx.fill();
+  },
+};
 const townFloors = b => Math.min(b.max || (b.k === 'chalet' ? 3 : 4), (b.f0 || 1) + Math.floor((G.land - b.lv) / 40));
 const TOWN_WALL = ['#f3e3c3', '#e9c9a8', '#d9e4ea', '#f2d0c4', '#e4e9c8', '#f6f1e4'], TOWN_ROOF = ['#8a3b2a', '#6f4a3a', '#5a5f66', '#a0522d'];
 function drawTown(b) {
@@ -2916,7 +3130,7 @@ function drawSky(camX, vw) {
 // Neu gezeichnet bei Zoom, Landkauf (G.land bestimmt Bänder, Wege, Sumpf) oder wenn die Kamera aus dem Rand läuft.
 const bg = { c: document.createElement('canvas'), key: '' };
 function drawBg(camX, camY, vw, vh) {
-  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
+  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, sightsOn() && sightMemo.gen, SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
   if (key !== bg.key || camX < bg.x || camY < bg.y || camX + vw > bg.x + bg.w || camY + vh > bg.y + bg.h) {
     const m = Math.max(vw, vh) * 0.35, main = ctx;
     Object.assign(bg, { key, x: camX - m, y: camY - m, w: vw + 2 * m, h: vh + 2 * m });
@@ -2926,7 +3140,7 @@ function drawBg(camX, camY, vw, vh) {
       ctx.fillStyle = grassPat; ctx.fillRect(0, 0, WORLD.w * T, WORLD.h * T);
       drawAlps(); drawVoralp();
       for (const k in AREAS) if (AREAS[k].hill && areaOn(AREAS[k])) drawHill(AREAS[k], areaEnd(k));
-      drawSumpf();
+      drawSumpf(); drawPanorama();
       const roads = () => { ctx.lineCap = ctx.lineJoin = 'round'; // Wege
         for (const [w, c] of [[T * 1.5, '#b99a68'], [T * 1.2, '#d6bd8c']]) {
           ctx.strokeStyle = c; ctx.lineWidth = w;
@@ -3882,10 +4096,13 @@ function render() {
   }
   ctx.setLineDash([]);
   drawLot(); drawRails(camX, vw);
+  const sOn = sightsOn().filter(s => !s.town && (s.x + s.w / 2) * T > camX - 50 && (s.x - s.w / 2) * T < camX + vw + 50 && s.y * T > camY - 60 && (s.y - s.h) * T < camY + vh + 60);
+  for (const s of sOn) if (SIGHTS[s.k].flat) SIGHT_DRAW[s.k](s.x * T, s.y * T, s.w * T, s.h * T); // flach: man läuft darüber
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), evNow && !EVENTS[evNow.k].sky ? [[evNow.y, { ev: evNow }]] : [], townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), evNow && !EVENTS[evNow.k].sky ? [[evNow.y, { ev: evNow }]] : [], townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]),
+    sOn.filter(s => !SIGHTS[s.k].flat).map(s => [s.y * T, { sight: s }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
@@ -3896,6 +4113,7 @@ function render() {
     else if (t.folk) drawFolk(t.folk);
     else if (t.ev) evDraw(t.ev, time - t.ev.t0);
     else if (t.town) drawTown(t.town);
+    else if (t.sight) SIGHT_DRAW[t.sight.k](t.sight.x * T, t.sight.y * T, t.sight.w * T, t.sight.h * T);
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
       ctx.globalAlpha = 0.85; ellipse(t.x, t.y, 22, 8, ok ? 'rgba(80,200,80,.45)' : 'rgba(220,50,40,.5)');
@@ -3915,6 +4133,7 @@ function render() {
   }
   // Namen, Status, Warnungen
   for (const t of FIXED_E) label(t.x, t.y + 18, t.name, 14);
+  for (const s of sOn) label(s.x * T, s.y * T + 18, `${G.pass[s.k] ? '✅' : '📸'} ${SIGHTS[s.k].name}`, 14);
   for (const t of G.things) {
     const p = pos(t); if (!vis(p.x, p.y)) continue;
     const d = THINGS[t.type], top = topOf(t);

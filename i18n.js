@@ -19,6 +19,7 @@ function $t(s, ...v) { let i = 0; const k = s.join('{}'); return (TR?.ui[k] ?? k
   for (const k in ITEMS) set(ITEMS[k], TR.items?.[k]);
   for (const k in THINGS) set(THINGS[k], TR.things?.[k]);
   for (const k in DECOS) set(DECOS[k], TR.decos?.[k]);
+  for (const k in SIGHTS) set(SIGHTS[k], TR.sights?.[k]);
   for (const k in AREAS) set(AREAS[k], TR.areas?.[k]);
   for (const f of FIXED) set(f, TR.fixed?.[f.type]);
   for (const k in TOOLS) { const t = TR.tools?.[k]; if (!t) continue; TOOLS[k].name = t[0]; t[1].forEach((l, i) => set(TOOLS[k].levels[i], l)); }
