@@ -101,6 +101,7 @@ const AU = (() => {
     buy: () => { tone('sine', 1046, 1046, 0.5, 0.25); tone('sine', 1568, 1568, 0.6, 0.2, 0.12); },
     grow: () => [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, 0.3, 0.2, i * 0.13)),
     no: () => tone('square', 200, 140, 0.2, 0.1),
+    horn: () => { tone('square', 466, 466, 0.4, 0.06); tone('square', 370, 370, 0.6, 0.06, 0.45); }, // Lok-Zweiklang: hoch – tief
   };
   return {
     init, update,

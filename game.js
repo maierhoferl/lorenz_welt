@@ -484,6 +484,7 @@ function update(dt) {
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); seasonTick(); }
   folkTick(dt);
+  trainTick(dt);
   for (const k of packages) k.t += dt / k.dur;
   for (const f of floaters) { f.t += dt; f.y -= dt * 30; }
   for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; }
@@ -901,7 +902,7 @@ function shopList() {
       desc: d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
       note: free ? $t`kommt auf: ${AREAS[d.area].name}` : $t`⚠️ Kein Platz – kauf mehr Land!`, can: free,
       buy: () => {
-        const t = addThing(k); toast($t`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
+        const t = addThing(k); if (t && d.area === 'terminal') trains.push({ t, age: 0, y: trainLaneY(), first: true }); toast($t`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
         const u = checkUnlock(k);
         if (u) { toast($t`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
       },
@@ -1471,6 +1472,63 @@ function container(x, y, t, c, sack) {
 }
 DRAW.kakaoimport = (x, y, t) => container(x, y, t, '#c0552f', '#5a3220');
 DRAW.kaffeeimport = (x, y, t) => container(x, y, t, '#2f6a8f', '#3f6a2f');
+// Import-Zug: rote Lok wie bei der SBB, kommt vom Ostrand über die Terminal-Strasse, hält am Container, lädt ab, fährt rückwärts wieder weg (Pendelzug)
+// ponytail: Züge zu nahen Containern können sich überlappen – eigene Gleise je Container, falls es stört
+const trains = [], TR_IN = 5, TR_STOP = 2.5, TR_OUT = 4, TR_C = { kakaoimport: '#c0552f', kaffeeimport: '#2f6a8f' };
+const trainLaneY = () => AREAS.terminal.lane[0] * T;
+function trainX(k) { // Lok-Nase links; bremst rein, steht, beschleunigt raus
+  const stop = k.t.x - 120, D = WORLD.w * T + 60 - stop, a = k.age;
+  if (a < TR_IN) return stop + D * (1 - a / TR_IN) ** 2;
+  if (a < TR_IN + TR_STOP) return stop;
+  return stop + D * ((a - TR_IN - TR_STOP) / TR_OUT) ** 2;
+}
+function trainTick(dt) {
+  for (const t of G.things) { // Zug startet so, dass er genau ankommt, wenn der Container voll ist
+    const d = THINGS[t.type];
+    if (d.area === 'terminal' && !t.ripe && t.timer >= d.time - TR_IN && !trains.some(k => k.t === t)) trains.push({ t, age: t.timer - (d.time - TR_IN), y: trainLaneY() });
+  }
+  for (const k of trains) {
+    const a0 = k.age, X = trainX(k), near = Math.hypot(G.px - k.t.x, G.py - k.y) < 1000;
+    k.age += dt;
+    if (a0 < TR_IN - 2.5 && k.age >= TR_IN - 2.5 && near) AU.sfx('horn');
+    if (!eco && k.age > TR_IN - 1.6 && k.age < TR_IN) for (const wx of [14, 62, 86, 126, 152, 192]) if (Math.random() < dt * 14) // Bremsfunken
+      particles.push({ x: X + wx, y: k.y - 2, vx: rndf(20, 90), vy: rndf(-60, -15), life: 0.35, r: 1.2, c: '255,200,70' });
+    if (a0 < TR_IN && k.age >= TR_IN) { // abladen: Säcke fliegen vom Wagen in den Container
+      const d = THINGS[k.t.type];
+      for (let i = 0; i < d.n; i++) packages.push({ x0: X + 106 + (i % 2) * 66, y0: k.y - 40, x1: k.t.x - 14, y1: k.t.y - 30, icon: ITEMS[d.item].icon, t: 0, dur: 0.5 + i * 0.15 });
+      floater(k.t.x, k.t.y - 80, k.first ? '🚂 🇨🇭' : `🚂 +${d.n} ${ITEMS[d.item].icon}`);
+      if (near) AU.sfx('pop');
+    }
+  }
+  prune(trains, k => k.age < TR_IN + TR_STOP + TR_OUT);
+}
+function drawRails(camX, vw) {
+  const xs = G.things.filter(t => THINGS[t.type].area === 'terminal').map(t => t.x);
+  if (!xs.length) return;
+  const y = trainLaneY(), x0 = Math.max(Math.min(...xs) - 140, camX - 20), x1 = Math.min(WORLD.w * T, camX + vw + 20);
+  ctx.fillStyle = '#6b4a2b'; for (let x = x0 - x0 % 16; x < x1; x += 16) ctx.fillRect(x, y - 5, 5, 12); // Schwellen
+  line('#7d7468', 3, x0, y - 2, x1, y - 2); line('#7d7468', 3, x0, y + 4, x1, y + 4);
+}
+function drawTrain(k) {
+  const X = trainX(k), y = k.y, c = TR_C[k.t.type] || '#c0552f', mv = k.age < TR_IN || k.age > TR_IN + TR_STOP;
+  ellipse(X + 105, y + 2, 112, 6, 'rgba(0,0,0,.2)');
+  for (let i = 0; i < 2; i++) { // Containerwagen
+    const wx = X + 76 + i * 66;
+    line('#333', 2, wx - 6, y - 10, wx, y - 10);
+    ctx.fillStyle = '#4a4a4a'; ctx.fillRect(wx, y - 12, 60, 5);
+    ctx.fillStyle = c; ctx.fillRect(wx + 3, y - 38, 54, 26); ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let j = 0; j < 6; j++) ctx.fillRect(wx + 6 + j * 9, y - 36, 2, 22);
+    wheel(wx + 10, y - 2, 5); wheel(wx + 50, y - 2, 5);
+  }
+  // Lok: schräge Nase, weisser Streifen, Schweizer Kreuz
+  ctx.fillStyle = '#d42a20'; ctx.beginPath(); ctx.moveTo(X, y - 8); ctx.lineTo(X + 10, y - 38); ctx.lineTo(X + 70, y - 38); ctx.lineTo(X + 70, y - 8); ctx.fill();
+  ctx.fillStyle = '#2a3440'; ctx.beginPath(); ctx.moveTo(X + 6, y - 22); ctx.lineTo(X + 11, y - 35); ctx.lineTo(X + 22, y - 35); ctx.lineTo(X + 22, y - 22); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillRect(X + 3, y - 15, 67, 3); ctx.fillRect(X + 40, y - 33, 14, 14);
+  ctx.fillStyle = '#d42a20'; ctx.fillRect(X + 45, y - 31, 4, 10); ctx.fillRect(X + 42, y - 28, 10, 4);
+  ellipse(X + 3, y - 10, 2.5, 2.5, mv ? '#fff3b0' : '#c9c2a0'); // Scheinwerfer
+  line('#333', 2, X + 46, y - 38, X + 38, y - 47, X + 50, y - 54); line('#333', 2, X + 42, y - 54, X + 58, y - 54); // Stromabnehmer
+  if (mv && (time * 6 + k.t.id * 0.37) % 1 < 0.12) { ellipse(X + 50, y - 55, 6, 6, 'rgba(160,210,255,.5)'); ellipse(X + 50, y - 55, 2.5, 2.5, '#fff'); } // Funke am Fahrdraht
+  for (const wx of [14, 28, 48, 62]) wheel(X + wx, y - 2, 5);
+}
 const grown = t => t.ripe ? 1 : t.timer / THINGS[t.type].time;
 DRAW.bienenhaus = (x, y, t) => { // Bienenhaus mit bunten Fluglöchern; je mehr Bienen, desto bald Honig
   const g = grown(t), C = ['#e8483b', '#f2cf3b', '#3a6fd8', '#2f8f4e', '#f29a2e', '#f2f2f2'];
@@ -3561,17 +3619,18 @@ function render() {
     }
   }
   ctx.setLineDash([]);
-  drawLot();
+  drawLot(); drawRails(camX, vw);
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, t] of list) {
     if (!t) drawPlayer();
     else if (t.truck) drawTruck(t.truck);
+    else if (t.train) drawTrain(t.train);
     else if (t.folk) drawFolk(t.folk);
     else if (t.town) drawTown(t.town);
     else if (t.ghost) { // Vorschau: so würde es stehen
@@ -3584,7 +3643,7 @@ function render() {
     else if (t.type === 'kuh') drawCow(t);
     else (DRAW[t.type] || DRAW.default)(t.x, t.y, t);
   }
-  for (const p of particles) { ctx.fillStyle = `rgba(230,230,230,${p.life / 3})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+  for (const p of particles) { ctx.fillStyle = p.c ? `rgba(${p.c},${Math.min(1, p.life * 4)})` : `rgba(230,230,230,${p.life / 3})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
   // Pakete auf dem Weg
   ctx.font = '16px system-ui'; ctx.textAlign = 'center';
   for (const k of packages) {
