@@ -587,7 +587,9 @@ function spedition(dt) {
       const sp = {}, sur = it => sp[it] ??= surplus(it); // surplus() ist O(Gebäude) – je Ware nur einmal
       // ganz zuerst: Gebäude mit vollem Lager (dort steht die Arbeit), wertvollste zuerst
       const stuck = t => { const d = THINGS[t.type]; return d.kind === 'grow' ? t.store >= storeCap(d) : t.out + d.n > OUT_CAP; };
-      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => stuck(b) - stuck(a) || (stuck(a) ? 0 : over(b) - over(a)) || val(b) - val(a));
+      // Rohprodukte (kind 'grow') ganz hinten: nur mit Platz, der nach allen verarbeiteten Waren noch frei ist
+      const raw = t => THINGS[t.type].kind === 'grow';
+      const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => raw(a) - raw(b) || stuck(b) - stuck(a) || (stuck(a) ? 0 : over(b) - over(a)) || val(b) - val(a));
       // volles Lager oder Gebäude ohne Abnehmer: nicht auf den Takt warten (ohne Abnehmer schon ab 3 Stück)
       if (k.wait < lv.every && !todo.some(t => stuck(t) || t[fld(t)] > 2 && !hasConsumer(THINGS[t.type].item))) continue;
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
@@ -600,7 +602,14 @@ function spedition(dt) {
         if (left[n] <= 0) return; // alle voll
         idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; at[n] = p;
       });
-      idle.forEach(o => { if (o.route.length) { o.wait = 0; o.route.push(parkAt(trucks.indexOf(o))); } }); // zurück auf den eigenen Parkplatz
+      idle.forEach(o => {
+        if (!o.route.length) return;
+        // Halte nach nächstem Nachbarn ordnen: nahe Häuser nacheinander statt Zickzack nach Priorität
+        // ponytail: greedy nearest neighbour, O(n²) bei wenigen Halten egal
+        const rest = o.route, seq = []; let c = o;
+        while (rest.length) { const i = rest.reduce((b, r, m) => Math.hypot(r.x - c.x, r.y - c.y) < Math.hypot(rest[b].x - c.x, rest[b].y - c.y) ? m : b, 0); c = rest.splice(i, 1)[0]; seq.push(c); }
+        o.route = seq; o.wait = 0; o.route.push(parkAt(trucks.indexOf(o))); // zurück auf den eigenen Parkplatz
+      });
       continue;
     }
     k.wait += dt;
