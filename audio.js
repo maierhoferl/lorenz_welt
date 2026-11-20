@@ -102,6 +102,13 @@ const AU = (() => {
     grow: () => [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, 0.3, 0.2, i * 0.13)),
     no: () => tone('square', 200, 140, 0.2, 0.1),
     horn: () => { tone('square', 466, 466, 0.4, 0.06); tone('square', 370, 370, 0.6, 0.06, 0.45); }, // Lok-Zweiklang: hoch – tief
+    // Zufalls-Ereignisse
+    tutato: () => [[554, 0], [330, 0.32], [440, 0.64]].forEach(([f, d], i) => tone('sawtooth', f, f, i < 2 ? 0.3 : 0.7, 0.07, d)), // Postauto-Dreiklang cis–e–a
+    jet: () => { burst(3.2, 0.3, 'lowpass', 500, 1); tone('sawtooth', 140, 55, 3, 0.05); },
+    alphorn: () => alphorn(0.8),
+    pfiff: () => tone('sine', 2900, 2400, 0.5, 0.14),
+    woof: () => woof(0.8),
+    gugge: () => { for (let i = 0; i < 8; i++) burst(0.12, 0.35, 'lowpass', 180, 1, i * 0.25); [392, 392, 523, 466, 392].forEach((f, i) => tone('square', f, f, 0.22, 0.05, i * 0.5)); },
   };
   return {
     init, update,

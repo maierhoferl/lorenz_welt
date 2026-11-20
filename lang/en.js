@@ -7,6 +7,20 @@ var TR = {
     "🌸 Frühling! Die Bäume blühen und der Böögg brennt! 🔥": "🌸 Spring! The trees are blossoming and the Böögg is burning! 🔥",
     "☀️ Sommer! Gleitschirme über den Alpen und Feuerwerk zum 1. August 🎆": "☀️ Summer! Paragliders over the Alps and fireworks for 1 August 🎆",
     "🍂 Herbst! Alpabzug – die Kühe kommen geschmückt von der Alp 🐄🌻": "🍂 Autumn! Alpine descent – the cows come down decorated from the alp 🐄🌻",
+    // Zufalls-Ereignisse
+    "📯 Tü-ta-too! Das Postauto kommt!": "📯 Toot-ta-toot! The post bus is coming!",
+    "✈️ Die Patrouille Suisse donnert vorbei!": "✈️ The Patrouille Suisse roars past!",
+    "🎺 Ein Alphornbläser spielt ein Lied!": "🎺 An alphorn player is playing a tune!",
+    "🚩 Ein Fahnenschwinger wirft die Fahne hoch!": "🚩 A flag thrower tosses the flag up high!",
+    "🧀 Hilfe! Ein Käselaib rollt davon!": "🧀 Help! A cheese wheel is rolling away!",
+    "🐾 Ein Murmeli schaut aus dem Bau und pfeift!": "🐾 A marmot peeks out of its burrow and whistles!",
+    "🐕 Ein Bernhardiner mit Fässli trottet vorbei!": "🐕 A St. Bernard with a little barrel trots by!",
+    "🥁 Guggenmusik! Konfetti für alle!": "🥁 Carnival band! Confetti for everyone!",
+    "💪 Schwingen im Sägemehl – wer gewinnt?": "💪 Swiss wrestling in the sawdust – who will win?",
+    "🌈 Ein Regenbogen über den Alpen!": "🌈 A rainbow over the Alps!",
+    "Halt, mis Chäs! 🧀": "Stop, my cheese! 🧀",
+    "Hau ruck! 💪": "Heave-ho! 💪",
+    "Gewonnen! 🏆": "Winner! 🏆",
     // Land-Fest
     "Neues Gebiet im Süden: {}!": "New area in the south: {}!", "Dein Bauernhof bekommt {}!": "Your farm gets {}!", "Lauf hin und schau ihn dir an!": "Go and have a look!", "Laden und Händler ziehen in grössere Häuser!": "The shop and the trader move into bigger buildings!", "Mehr Regale, mehr Kundschaft, mehr Geld 💰": "More shelves, more customers, more money 💰", "Neu im Laden: Kirche und Gülle-Verteiler": "New in the shop: church and slurry spreader", "Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩": "The slurry stinks – but your wheat grows twice as much! 💩", "Dein Hof wächst zum Städtchen: {}!": "Your farm is growing into a little town: {}!", "Neue Nachbarn ziehen ein – sie finden dein Dorf toll!": "New neighbours are moving in – they love your village!", "Im Städtchen wird ein Haus höher!": "A house in the town is getting taller!", "Ein Stock mehr – bis zu den Wolken? ☁️": "One more floor – all the way to the clouds? ☁️", "Die Kühe rufen: Muuuh-ega! 🐄": "The cows shout: Mooo-ga! 🐄", "Sogar die Geissen machen einen Freudensprung! 🐐": "Even the goats jump for joy! 🐐", "Die Hühner gackern vor Stolz! 🐔": "The hens cluck with pride! 🐔", "Das Murmeli pfeift dir ein Ständchen! 🎶": "The marmot whistles you a little song! 🎶", "Der Nachbar staunt mit offenem Mund! 😮": "The neighbour stares with his mouth wide open! 😮", "Die Säuli wälzen sich vor Freude im Dreck! 🐖": "The piglets roll in the mud with joy! 🐖", "Land-Stufe {}!": "Land level {}!", "Super gemacht! Nächste Überraschung bei Land-Stufe {} 🎁": "Well done! Next surprise at land level {} 🎁", "Juhui, weiter!": "Hooray, let's go!",
     // Familien (Startbildschirm)

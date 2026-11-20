@@ -7,6 +7,20 @@ var TR = {
     "🌸 Frühling! Die Bäume blühen und der Böögg brennt! 🔥": "🌸 Printemps ! Les arbres fleurissent et le Böögg brûle ! 🔥",
     "☀️ Sommer! Gleitschirme über den Alpen und Feuerwerk zum 1. August 🎆": "☀️ Été ! Des parapentes au-dessus des Alpes et des feux d'artifice pour le 1er Août 🎆",
     "🍂 Herbst! Alpabzug – die Kühe kommen geschmückt von der Alp 🐄🌻": "🍂 Automne ! La désalpe – les vaches descendent de l'alpage toutes décorées 🐄🌻",
+    // Zufalls-Ereignisse
+    "📯 Tü-ta-too! Das Postauto kommt!": "📯 Tü-ta-too ! Voilà le car postal !",
+    "✈️ Die Patrouille Suisse donnert vorbei!": "✈️ La Patrouille Suisse passe en rugissant !",
+    "🎺 Ein Alphornbläser spielt ein Lied!": "🎺 Un joueur de cor des Alpes joue un air !",
+    "🚩 Ein Fahnenschwinger wirft die Fahne hoch!": "🚩 Un lanceur de drapeau lance le drapeau très haut !",
+    "🧀 Hilfe! Ein Käselaib rollt davon!": "🧀 Au secours ! Une meule de fromage s'enfuit !",
+    "🐾 Ein Murmeli schaut aus dem Bau und pfeift!": "🐾 Une marmotte sort de son terrier et siffle !",
+    "🐕 Ein Bernhardiner mit Fässli trottet vorbei!": "🐕 Un saint-bernard avec son tonnelet passe par là !",
+    "🥁 Guggenmusik! Konfetti für alle!": "🥁 Guggenmusik ! Des confettis pour tout le monde !",
+    "💪 Schwingen im Sägemehl – wer gewinnt?": "💪 Lutte suisse dans la sciure – qui va gagner ?",
+    "🌈 Ein Regenbogen über den Alpen!": "🌈 Un arc-en-ciel au-dessus des Alpes !",
+    "Halt, mis Chäs! 🧀": "Arrête, mon fromage ! 🧀",
+    "Hau ruck! 💪": "Oh hisse ! 💪",
+    "Gewonnen! 🏆": "Gagné ! 🏆",
     // Land-Fest
     "Neues Gebiet im Süden: {}!": "Nouvelle région au sud : {} !", "Dein Bauernhof bekommt {}!": "Ta ferme reçoit {} !", "Lauf hin und schau ihn dir an!": "Va voir !", "Laden und Händler ziehen in grössere Häuser!": "Le magasin et le marchand s’installent dans de plus grands bâtiments !", "Mehr Regale, mehr Kundschaft, mehr Geld 💰": "Plus d’étagères, plus de clients, plus d’argent 💰", "Neu im Laden: Kirche und Gülle-Verteiler": "Nouveau au magasin : église et épandeur à lisier", "Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩": "Le lisier pue – mais ton blé pousse deux fois plus ! 💩", "Dein Hof wächst zum Städtchen: {}!": "Ta ferme devient une petite ville : {} !", "Neue Nachbarn ziehen ein – sie finden dein Dorf toll!": "De nouveaux voisins emménagent – ils adorent ton village !", "Im Städtchen wird ein Haus höher!": "Une maison de la ville grandit !", "Ein Stock mehr – bis zu den Wolken? ☁️": "Un étage de plus – jusqu’aux nuages ? ☁️", "Die Kühe rufen: Muuuh-ega! 🐄": "Les vaches crient : Meuuuh-ga ! 🐄", "Sogar die Geissen machen einen Freudensprung! 🐐": "Même les chèvres sautent de joie ! 🐐", "Die Hühner gackern vor Stolz! 🐔": "Les poules gloussent de fierté ! 🐔", "Das Murmeli pfeift dir ein Ständchen! 🎶": "La marmotte te siffle une chanson ! 🎶", "Der Nachbar staunt mit offenem Mund! 😮": "Le voisin reste bouche bée ! 😮", "Die Säuli wälzen sich vor Freude im Dreck! 🐖": "Les cochons se roulent de joie dans la boue ! 🐖", "Land-Stufe {}!": "Niveau de terrain {} !", "Super gemacht! Nächste Überraschung bei Land-Stufe {} 🎁": "Bravo ! Prochaine surprise au niveau {} 🎁", "Juhui, weiter!": "Youpi, on continue !",
     // Familien (Startbildschirm)

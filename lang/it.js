@@ -7,6 +7,20 @@ var TR = {
     "🌸 Frühling! Die Bäume blühen und der Böögg brennt! 🔥": "🌸 Primavera! Gli alberi fioriscono e il Böögg brucia! 🔥",
     "☀️ Sommer! Gleitschirme über den Alpen und Feuerwerk zum 1. August 🎆": "☀️ Estate! Parapendii sopra le Alpi e fuochi d'artificio per il 1° agosto 🎆",
     "🍂 Herbst! Alpabzug – die Kühe kommen geschmückt von der Alp 🐄🌻": "🍂 Autunno! La discesa dall'alpe – le mucche tornano a valle tutte decorate 🐄🌻",
+    // Zufalls-Ereignisse
+    "📯 Tü-ta-too! Das Postauto kommt!": "📯 Tü-ta-too! Arriva l'autopostale!",
+    "✈️ Die Patrouille Suisse donnert vorbei!": "✈️ La Patrouille Suisse passa ruggendo!",
+    "🎺 Ein Alphornbläser spielt ein Lied!": "🎺 Un suonatore di corno delle Alpi suona una melodia!",
+    "🚩 Ein Fahnenschwinger wirft die Fahne hoch!": "🚩 Uno sbandieratore lancia la bandiera in alto!",
+    "🧀 Hilfe! Ein Käselaib rollt davon!": "🧀 Aiuto! Una forma di formaggio rotola via!",
+    "🐾 Ein Murmeli schaut aus dem Bau und pfeift!": "🐾 Una marmotta sbuca dalla tana e fischia!",
+    "🐕 Ein Bernhardiner mit Fässli trottet vorbei!": "🐕 Un San Bernardo con la botticella trotterella via!",
+    "🥁 Guggenmusik! Konfetti für alle!": "🥁 Guggenmusik! Coriandoli per tutti!",
+    "💪 Schwingen im Sägemehl – wer gewinnt?": "💪 Lotta svizzera nella segatura – chi vincerà?",
+    "🌈 Ein Regenbogen über den Alpen!": "🌈 Un arcobaleno sopra le Alpi!",
+    "Halt, mis Chäs! 🧀": "Ferma, il mio formaggio! 🧀",
+    "Hau ruck! 💪": "Oh issa! 💪",
+    "Gewonnen! 🏆": "Vinto! 🏆",
     // Land-Fest
     "Neues Gebiet im Süden: {}!": "Nuova zona a sud: {}!", "Dein Bauernhof bekommt {}!": "La tua fattoria riceve {}!", "Lauf hin und schau ihn dir an!": "Vai a vederla!", "Laden und Händler ziehen in grössere Häuser!": "Il negozio e il mercante si trasferiscono in edifici più grandi!", "Mehr Regale, mehr Kundschaft, mehr Geld 💰": "Più scaffali, più clienti, più soldi 💰", "Neu im Laden: Kirche und Gülle-Verteiler": "Novità nel negozio: chiesa e spandiliquame", "Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩": "Il liquame puzza – ma il tuo grano cresce il doppio! 💩", "Dein Hof wächst zum Städtchen: {}!": "La tua fattoria diventa una cittadina: {}!", "Neue Nachbarn ziehen ein – sie finden dein Dorf toll!": "Arrivano nuovi vicini – adorano il tuo villaggio!", "Im Städtchen wird ein Haus höher!": "Una casa della cittadina diventa più alta!", "Ein Stock mehr – bis zu den Wolken? ☁️": "Un piano in più – fino alle nuvole? ☁️", "Die Kühe rufen: Muuuh-ega! 🐄": "Le mucche gridano: Muuuh-ga! 🐄", "Sogar die Geissen machen einen Freudensprung! 🐐": "Anche le capre saltano di gioia! 🐐", "Die Hühner gackern vor Stolz! 🐔": "Le galline chiocciano di orgoglio! 🐔", "Das Murmeli pfeift dir ein Ständchen! 🎶": "La marmotta ti fischia una canzoncina! 🎶", "Der Nachbar staunt mit offenem Mund! 😮": "Il vicino resta a bocca aperta! 😮", "Die Säuli wälzen sich vor Freude im Dreck! 🐖": "I maialini si rotolano felici nel fango! 🐖", "Land-Stufe {}!": "Livello terreno {}!", "Super gemacht! Nächste Überraschung bei Land-Stufe {} 🎁": "Bravissimo! Prossima sorpresa al livello {} 🎁", "Juhui, weiter!": "Evviva, avanti!",
     // Familien (Startbildschirm)

@@ -483,7 +483,7 @@ function update(dt) {
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); seasonTick(); }
-  folkTick(dt);
+  folkTick(dt); evTick(dt);
   trainTick(dt);
   for (const k of packages) k.t += dt / k.dur;
   for (const f of floaters) { f.t += dt; f.y -= dt * 30; }
@@ -2823,17 +2823,26 @@ function mountainRange(R, pk, base, c1, c2, snowY) {
   ctx.restore();
 }
 // Himmel und Wolken (bewegt) liegen hinter dem Hintergrund-Cache, die Berge darin decken sie unten ab
-function drawSky() {
+function drawSky(camX, vw) {
   if (alps.Wp !== WORLD.w * T) alps = makeAlps(); // Welt breiter geworden
   const top = -ALPS * T, Wp = alps.Wp;
-  const g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#6fbcf0'); g.addColorStop(1, '#d9f0fb');
+  const g = ctx.createLinearGradient(0, top, 0, -20); g.addColorStop(0, '#5fb0ea'); g.addColorStop(0.6, '#a9dbf5'); g.addColorStop(1, '#e6f5fb');
   ctx.fillStyle = g; ctx.fillRect(0, top, Wp, -top + 2);
+  // Sonne mit Lichthof – wandert langsam mit der Kamera (weit weg = Parallaxe)
+  const sx = camX * 0.85 + vw * 0.62, sy = top + 95, sr = ctx.createRadialGradient(sx, sy, 10, sx, sy, 190);
+  sr.addColorStop(0, `rgba(255,248,215,${0.9 - SW[0] * 0.4})`); sr.addColorStop(0.25, 'rgba(255,240,190,.35)'); sr.addColorStop(1, 'rgba(255,240,190,0)');
+  ctx.fillStyle = sr; ctx.fillRect(sx - 190, sy - 190, 380, 380); ellipse(sx, sy, 24, 24, '#fff8dc');
   if (SW[0]) { ctx.fillStyle = `rgba(222,230,238,${0.55 * SW[0]})`; ctx.fillRect(0, top, Wp, -top + 2); } // Winter: Hochnebel-Himmel
   if (SW[3]) { ctx.fillStyle = `rgba(255,196,130,${0.28 * SW[3]})`; ctx.fillRect(0, top, Wp, -top + 2); } // Herbst: goldenes Licht
-  for (let i = 0; i < 7; i++) { // Wolken
-    const cx = ((time * (6 + i) + i * 523) % (Wp + 300)) - 150, cy = top + 40 + (i * 37) % 90;
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
-    for (const [dx, dy, rr] of [[0, 0, 22], [22, 4, 17], [-22, 5, 16], [10, -10, 16]]) { ctx.beginPath(); ctx.arc(cx + dx, cy + dy, rr, 0, 7); ctx.fill(); }
+  const puff = [[0, 0, 22], [22, 4, 17], [-22, 5, 16], [10, -10, 16], [-8, -8, 13]];
+  for (let i = 0; i < 7; i++) { // Wolken: blaugrauer Bauch, weisse Kuppe, Glanz von der Sonne
+    const cx = ((time * (6 + i) + i * 523) % (Wp + 300)) - 150, cy = top + 40 + (i * 37) % 90, sc = 0.8 + (i % 3) * 0.2;
+    for (const [c, oy] of [['rgba(196,212,230,.9)', 4], ['rgba(255,255,255,.92)', 0]]) { ctx.fillStyle = c; ctx.beginPath(); for (const [dx, dy, rr] of puff) { ctx.moveTo(cx + dx * sc + rr * sc, cy + dy * sc + oy); ctx.arc(cx + dx * sc, cy + dy * sc + oy, rr * sc, 0, 7); } ctx.fill(); }
+    ellipse(cx + 4 * sc, cy - 12 * sc, 9 * sc, 4 * sc, 'rgba(255,255,255,.9)');
+  }
+  if (!SW[0]) for (let i = 0; i < 5; i++) { // Vogelschwarm
+    const bx = ((time * 22 + i * 17) % (Wp + 400)) - 200 + (i % 2) * 14, by = top + 120 + Math.abs(i - 2) * 9 + Math.sin(time + i) * 4, f = Math.sin(time * 9 + i) * 3;
+    line('rgba(40,50,60,.7)', 1.6, bx - 6, by - f, bx, by + 1, bx + 6, by - f);
   }
 }
 // Hintergrund-Cache: unbewegte Landschaft einmal in eine Canvas rund um den Bildausschnitt, pro Frame nur ein drawImage.
@@ -3379,6 +3388,179 @@ function balloons() {
   }
 }
 
+// =================== Zufalls-Ereignisse ===================
+// Alle 40–90 s passiert im Bild etwas typisch Schweizerisches: Postauto, Patrouille Suisse, Alphorn, Fahnenschwinger,
+// davonrollender Käselaib, Murmeli, Bernhardiner, Guggenmusik, Schwingen, Regenbogen. Reine Kulisse, keine Klicks.
+// Zum Ausprobieren: ?ereignis=postauto (kommt dann alle 20 s wieder)
+const view = { x: 0, y: 0, w: 800, h: 600 }; // Kamera vom letzten Frame (render setzt sie)
+const EV_FIX = new URLSearchParams(location.search).get('ereignis');
+let evNow = null, evNext = 30, evPrev = null;
+const EVENTS = {
+  postauto: { dur: 13, walk: 1, msg: () => $t`📯 Tü-ta-too! Das Postauto kommt!`, sfx: 'tutato' },
+  patrouille: { dur: 8, sky: 1, msg: () => $t`✈️ Die Patrouille Suisse donnert vorbei!`, sfx: 'jet' },
+  alphorn: { dur: 12, msg: () => $t`🎺 Ein Alphornbläser spielt ein Lied!`, sfx: 'alphorn' },
+  fahne: { dur: 12, msg: () => $t`🚩 Ein Fahnenschwinger wirft die Fahne hoch!` },
+  kaese: { dur: 9, walk: 1, msg: () => $t`🧀 Hilfe! Ein Käselaib rollt davon!` },
+  murmeli: { dur: 9, msg: () => $t`🐾 Ein Murmeli schaut aus dem Bau und pfeift!`, sfx: 'pfiff' },
+  bernhardiner: { dur: 14, walk: 1, msg: () => $t`🐕 Ein Bernhardiner mit Fässli trottet vorbei!`, sfx: 'woof' },
+  gugge: { dur: 14, walk: 1, msg: () => $t`🥁 Guggenmusik! Konfetti für alle!`, sfx: 'gugge' },
+  schwingen: { dur: 13, msg: () => $t`💪 Schwingen im Sägemehl – wer gewinnt?` },
+  regenbogen: { dur: 24, sky: 1, msg: () => $t`🌈 Ein Regenbogen über den Alpen!` },
+};
+function evTick(dt) {
+  if (evNow && time - evNow.t0 > EVENTS[evNow.k].dur) evNow = null;
+  if (evNow || (evNext -= dt) > 0) return;
+  evNext = EV_FIX ? 20 : 40 + Math.random() * 50;
+  const keys = Object.keys(EVENTS).filter(k => k !== evPrev), k = EVENTS[EV_FIX] ? EV_FIX : keys[Math.floor(Math.random() * keys.length)], e = EVENTS[k];
+  evPrev = k;
+  const d = Math.random() < 0.5 ? 1 : -1;
+  let x = G.px + d * (90 + Math.random() * 60), y = clamp(G.py + 30 + Math.random() * 40, 2 * T, (WORLD.h - 1) * T);
+  if (inLake(x, y, 40) || inMts(x, y)) x = G.px - d * 120; // nicht im See oder Berg
+  if (e.walk) { x = d > 0 ? view.x - 140 : view.x + view.w + 140; y = clamp(G.py + 45, 2 * T, (WORLD.h - 1) * T); }
+  evNow = { k, t0: time, x, y, d, x1: d > 0 ? view.x + view.w + 140 : view.x - 140 };
+  toast(e.msg(), null, true); if (e.sfx) AU.sfx(e.sfx);
+}
+const evFade = (u, dur) => clamp(Math.min(u / 0.8, (dur - u) / 0.8), 0, 1);
+function postauto(x, y, d) { // gelbes Postauto mit rotem Streifen
+  const b = Math.abs(Math.sin(time * 14)) * 0.8;
+  ellipse(x, y, 44, 7, 'rgba(0,0,0,.22)');
+  ctx.save(); ctx.translate(x, y - b); ctx.scale(d, 1);
+  ctx.fillStyle = '#f5c400'; rrect(-40, -40, 80, 34, 7); ctx.fill();
+  ctx.fillStyle = '#d6a800'; ctx.fillRect(-40, -12, 80, 5);
+  ctx.fillStyle = '#d52b1e'; ctx.fillRect(-40, -17, 80, 3);
+  ctx.fillStyle = '#2b3a4a'; rrect(-35, -35, 60, 13, 3); ctx.fill();
+  ctx.fillStyle = '#9fd3ef'; for (let i = 0; i < 5; i++) ctx.fillRect(-33 + i * 12, -33, 10, 9);
+  for (let i = 0; i < 5; i++) ellipse(-28 + i * 12, -27, 2.4, 2.4, ['#f1c9a5', '#8d5a3a', '#f1c9a5', '#f6d9b8', '#c98e64'][i]); // Fahrgäste
+  ctx.fillStyle = '#bfe5f7'; rrect(28, -35, 11, 20, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(30, -33, 3, 16);
+  ellipse(38, -10, 2.5, 2, '#fff8c0'); ctx.fillStyle = '#5a5a5a'; ctx.fillRect(-36, -45, 50, 5); // Gepäckträger
+  ctx.restore();
+  wheel(x - 24 * d, y - 4 - b, 6.5); wheel(x + 24 * d, y - 4 - b, 6.5);
+}
+function jet(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#d52b1e'; ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(4, -3); ctx.lineTo(-14, -3); ctx.lineTo(-14, 3); ctx.lineTo(4, 3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-8, -13); ctx.lineTo(-12, -13); ctx.lineTo(-6, 0); ctx.lineTo(-12, 9); ctx.lineTo(-8, 9); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-10, -2); ctx.lineTo(-16, -9); ctx.lineTo(-14, 0); ctx.fill();
+  ellipse(8, -2, 4, 1.6, '#bfe5f7'); ctx.fillStyle = '#fff'; ctx.fillRect(-7, -6, 4, 1.4); ctx.fillRect(-5.7, -7.3, 1.4, 4);
+  ctx.restore();
+}
+function marmot(x, y, up) { // Murmeli steht auf den Hinterbeinen, up = 0…1 wie weit es herausschaut
+  ellipse(x, y, 16, 5, '#7a5a38'); ellipse(x, y - 1, 10, 3, '#3a2a1a');
+  if (up < 0.05) return;
+  ctx.save(); ctx.beginPath(); ctx.rect(x - 20, y - 60, 40, 59); ctx.clip();
+  const h = up * 26, by = y - h;
+  ellipse(x, by + 10, 8, 12, '#9a7048'); ellipse(x, by + 12, 5, 8, '#c9a476');
+  ellipse(x, by - 4, 6.5, 6, '#9a7048'); ellipse(x - 5, by - 8, 2, 2, '#7a5a38'); ellipse(x + 5, by - 8, 2, 2, '#7a5a38');
+  ellipse(x, by - 1, 3.5, 2.5, '#d9bc94'); ellipse(x, by - 2.5, 1.2, 0.9, '#222');
+  ellipse(x - 2.5, by - 5, 1, 1, '#222'); ellipse(x + 2.5, by - 5, 1, 1, '#222');
+  ellipse(x - 4, by + 6, 2, 3, '#7a5a38'); ellipse(x + 4, by + 6, 2, 3, '#7a5a38');
+  ctx.restore();
+}
+function stBernard(x, y, d) { // Bernhardiner mit Schnapsfässli am Hals
+  const ph = Math.sin(time * 10) * 2.5;
+  ctx.save(); ctx.translate(x, y); ctx.scale(d, 1);
+  ellipse(0, 0, 18, 4, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = '#f2ece0'; for (const [lx, o] of [[-12, ph], [-7, -ph], [8, -ph], [13, ph]]) ctx.fillRect(lx - 2 + o * 0.4, -12, 4, 12);
+  ellipse(0, -17, 18, 9, '#f2ece0'); ellipse(-4, -20, 9, 6, '#a0522d'); ellipse(8, -18, 5, 5, '#a0522d');
+  ellipse(19, -25, 8, 7, '#f2ece0'); ellipse(19, -28, 7, 4, '#a0522d'); ellipse(15, -23, 3, 6, '#7a3d1d'); // Kopf, Schlappohr
+  ellipse(26, -22, 4, 3, '#f2ece0'); ellipse(29, -23, 1.6, 1.3, '#222'); ellipse(21, -28, 1.1, 1.1, '#222');
+  line('#f2ece0', 4, -17, -19, -23, -25 + ph);
+  ctx.save(); ctx.translate(16, -15); ctx.rotate(Math.PI / 2); barrel(0, 5, 3.6, 10, '#b5652b'); ctx.restore();
+  ctx.restore();
+}
+function cheeseWheel(x, y, a) {
+  ellipse(x, y, 16, 4, 'rgba(0,0,0,.2)');
+  ctx.save(); ctx.translate(x, y - 16); ctx.rotate(a);
+  ellipse(0, 0, 16, 16, '#e0a43a'); ellipse(0, 0, 13, 13, '#f3cf6b');
+  for (const [cx, cy] of [[-5, -4], [4, 3], [2, -7], [-3, 6]]) ellipse(cx, cy, 2, 2, '#d9a945');
+  ctx.fillStyle = '#d52b1e'; ctx.fillRect(-4, -1.5, 8, 3); ctx.fillRect(-1.5, -4, 3, 8);
+  ctx.restore();
+}
+function evDraw(e, u) { // Ereignisse am Boden – mit den Gebäuden nach y sortiert
+  const D = EVENTS[e.k].dur, p = u / D, x = e.x + (e.x1 - e.x) * p, y = e.y;
+  ctx.globalAlpha = evFade(u, D);
+  if (e.k === 'postauto') { postauto(x, y, e.d); if (u % 4 < 1.4) label(x + 30 * e.d, y - 58, 'Tü-ta-too! 📯', 14); }
+  else if (e.k === 'bernhardiner') { stBernard(x, y, e.d); if (u % 5 < 1) label(x, y - 46, 'Wuff! 🐾', 14); }
+  else if (e.k === 'kaese') {
+    const b = Math.abs(Math.sin(u * 6)) * 14;
+    cheeseWheel(x + 70 * e.d, y - b, u * 9 * e.d);
+    ctx.save(); ctx.translate(x, y - Math.abs(Math.sin(u * 12)) * 2); ctx.scale(e.d, 1); person(0, 0, '#2f6fc4', '#222', 1.3 + Math.sin(u * 14) * 0.3); ctx.restore();
+    label(x, y - 46, $t`Halt, mis Chäs! 🧀`, 14);
+  }
+  else if (e.k === 'gugge') {
+    for (let i = 0; i < 4; i++) {
+      const xx = x - i * 34 * e.d, yy = y + (i % 2) * 8, c = ['#e8303a', '#ffd34d', '#2f9fd6', '#8a3bb8'][i];
+      ctx.save(); ctx.translate(xx, yy - Math.abs(Math.sin(u * 8 + i)) * 2); ctx.scale(e.d, 1);
+      person(0, 0, c, ['#ffd34d', '#3d8b2f', '#e8303a', '#f5a3c7'][i], i % 2 ? 0.2 + Math.sin(u * 16) * 0.3 : -0.4);
+      ellipse(0, -34, 7, 4, c); line('#222', 1, -4, -36, -6, -42); // Fasnachts-Hut mit Feder
+      if (i % 2) { ctx.fillStyle = '#e8c35a'; ctx.fillRect(10, -20, 10, 3); ellipse(21, -18.5, 3, 4, '#e8c35a'); } // Trompete
+      else { ellipse(6, -11, 6, 5, '#fff'); ctx.strokeStyle = '#d52b1e'; ctx.lineWidth = 1.5; ctx.strokeRect(1, -15, 10, 8); } // Trommel
+      ctx.restore();
+    }
+    if (u % 2 < 1) label(x - 50 * e.d, y - 52, '🎶 Bum-ba-di-bum! 🎶', 14);
+  }
+  else if (e.k === 'alphorn') {
+    ellipse(e.x + 30, y, 44, 6, 'rgba(0,0,0,.18)');
+    line('#8a5a2b', 4, e.x + 4, y - 22, e.x + 30, y - 10, e.x + 62, y - 3); line('#5b3a1e', 1.5, e.x + 20, y - 15, e.x + 22, y - 14); // Horn
+    ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.ellipse(e.x + 66, y - 6, 5, 8, -0.3, 0, 7); ctx.fill(); ellipse(e.x + 66, y - 6, 2.5, 5, '#3a2a1a');
+    ctx.save(); ctx.translate(e.x, y); person(0, 0, '#2f4f8f', '#222', 0.3); ctx.restore();
+    for (let i = 0; i < 3; i++) { const k = (u * 0.5 + i / 3) % 1; ctx.globalAlpha = evFade(u, D) * (1 - k); label(e.x + 66 + Math.sin(k * 6 + i) * 10, y - 16 - k * 60, i % 2 ? '♪' : '♫', 18); }
+  }
+  else if (e.k === 'fahne') {
+    ellipse(e.x, y, 10, 3, 'rgba(0,0,0,.2)');
+    const c = u % 4, up = c > 2.6 ? Math.sin((c - 2.6) / 1.4 * Math.PI) : 0, a = c * 5;
+    ctx.save(); ctx.translate(e.x, y); person(0, 0, '#fff', '#d52b1e', up ? 1.4 : Math.sin(a) * 0.9); ctx.restore();
+    const [hx, hy] = up ? [e.x + 5, y - 40 - up * 90] : hand(e.x, y, Math.sin(a) * 0.9);
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(up ? c * 6 : Math.sin(a) * 1.2 - 0.6);
+    line('#e8c35a', 2, 0, 6, 0, -30); swissFlag(1, -30, 22, 2); ctx.restore();
+    if (up > 0.9) label(e.x, y - 60, 'Hopp! 🇨🇭', 14);
+  }
+  else if (e.k === 'murmeli') { const s = u % 4.5, up = s < 0.4 ? s / 0.4 : s < 3.4 ? 1 : s < 3.8 ? (3.8 - s) / 0.4 : 0; marmot(e.x, y, up); if (up > 0.9 && s < 2) label(e.x, y - 44, 'Piiiiiiiep! 📢', 13); const n = Math.floor(u / 4.5); if (e.pf !== n) { if (e.pf != null) AU.sfx('pfiff'); e.pf = n; } }
+  else if (e.k === 'schwingen') {
+    ellipse(e.x, y, 54, 16, '#e3c98a'); ellipse(e.x, y - 1, 46, 12, '#efd9a2');
+    const done = p > 0.62, sway = Math.sin(u * 3) * 6;
+    if (!done) {
+      for (const s of [1, -1]) { ctx.save(); ctx.translate(e.x - 9 * s + sway, y); ctx.scale(s, 1); ctx.rotate(0.25); person(0, 0, s > 0 ? '#e9e2cf' : '#2f6fc4', null, -0.1); ctx.restore(); }
+      if (u % 2 < 1) label(e.x, y - 46, $t`Hau ruck! 💪`, 14);
+    } else {
+      ctx.save(); ctx.translate(e.x + 14, y - 2); ctx.rotate(-Math.PI / 2); person(0, 0, '#2f6fc4', null, 0.2); ctx.restore(); // auf dem Rücken
+      ctx.save(); ctx.translate(e.x - 14, y); person(0, 0, '#e9e2cf', null, 1.5); ctx.restore();
+      label(e.x - 14, y - 44, $t`Gewonnen! 🏆`, 14);
+      for (let i = 0; i < 6; i++) { const k = (u * 1.3 + i / 6) % 1; ellipse(e.x - 30 + i * 12, y - 6 - k * 20, 2, 2, `rgba(220,190,120,${1 - k})`); } // Sägemehl stiebt
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function evSky(e, u) { // Ereignisse am Himmel – über allem, an der Kamera ausgerichtet
+  const D = EVENTS[e.k].dur, p = u / D;
+  if (e.k === 'patrouille') {
+    const x0 = e.d > 0 ? view.x - 200 + (view.w + 500) * p : view.x + view.w + 200 - (view.w + 500) * p, y0 = view.y + view.h * 0.16;
+    const F = [[0, 0], [-34, -18], [-34, 18], [-68, -36], [-68, 36], [-80, 0]];
+    F.forEach(([fx, fy], i) => {
+      const x = x0 + fx * e.d, y = y0 + fy + Math.sin(u * 2 + i) * 2, L = 260;
+      const g = ctx.createLinearGradient(x, y, x - L * e.d, y); g.addColorStop(0, i === 5 ? 'rgba(213,43,30,.75)' : 'rgba(255,255,255,.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x - 14 * e.d, y); ctx.lineTo(x - L * e.d, y); ctx.stroke();
+      ctx.save(); ctx.translate(x, y); ctx.scale(e.d, 1); jet(0, 0, 1.1); ctx.restore();
+    });
+  }
+  else if (e.k === 'gugge') { // Konfetti regnet übers ganze Bild
+    const n = eco ? 40 : 90;
+    for (let i = 0; i < n; i++) {
+      const r1 = (i * 0.6180339) % 1, r2 = (i * 0.7548776) % 1, x = view.x + r1 * view.w + Math.sin(u * 3 + i) * 12, y = view.y + ((r2 * view.h + u * (60 + r1 * 60)) % view.h);
+      ctx.fillStyle = ['#e8303a', '#ffd34d', '#2f9fd6', '#3d8b2f', '#f5a3c7', '#fff'][i % 6];
+      ctx.globalAlpha = evFade(u, D); ctx.save(); ctx.translate(x, y); ctx.rotate(u * 4 + i); ctx.fillRect(-3, -1.5, 6, 3); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+function rainbow() { // hinter den Bergen (vor dem Hintergrund-Cache gezeichnet)
+  if (evNow?.k !== 'regenbogen') return;
+  const u = time - evNow.t0, cx = view.x + view.w * 0.55, R = ALPS * T * 0.85;
+  ctx.globalAlpha = evFade(u, EVENTS.regenbogen.dur) * 0.4;
+  ['#e8303a', '#f28c28', '#ffd34d', '#4fb84a', '#2f9fd6', '#6a4fc4'].forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(cx, 10, R - i * 8, Math.PI, 0); ctx.stroke(); });
+  ctx.globalAlpha = 1;
+}
+
 // ---- Deko-Zeichnungen (x/y = Fusspunkt) ----
 const DECO_DRAW = {
   steinmann(x, y) {
@@ -3585,6 +3767,18 @@ const DECO_DRAW = {
   },
 };
 
+const vig = { c: null, k: '' };
+function vignette() { // weicher dunkler Rand und warmes Licht oben links – ein vorberechnetes Bild, kostet pro Frame nur ein drawImage
+  const k = W + 'x' + H;
+  if (vig.k !== k) {
+    vig.k = k; vig.c = document.createElement('canvas'); vig.c.width = Math.max(1, W >> 1); vig.c.height = Math.max(1, H >> 1);
+    const x = vig.c.getContext('2d'), w = vig.c.width, h = vig.c.height;
+    const r = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.hypot(w, h) * 0.6);
+    r.addColorStop(0, 'rgba(30,25,10,0)'); r.addColorStop(1, 'rgba(30,25,10,.28)'); x.fillStyle = r; x.fillRect(0, 0, w, h);
+    const l = x.createLinearGradient(0, 0, w * 0.6, h * 0.6); l.addColorStop(0, 'rgba(255,230,160,.12)'); l.addColorStop(1, 'rgba(255,230,160,0)'); x.fillStyle = l; x.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(vig.c, 0, 0, W, H);
+}
 function render() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   calcZoom();
@@ -3594,7 +3788,8 @@ function render() {
   // nur zeichnen, was (fast) im Bild ist; y = Fusspunkt, Gebäude ragen bis ~250 px nach oben
   const vis = (x, y) => x > camX - 200 && x < camX + vw + 200 && y > camY - 60 && y < camY + vh + 260;
   ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -camX * DPR * ZOOM, -camY * DPR * ZOOM);
-  drawSky(); drawBg(camX, camY, vw, vh);
+  Object.assign(view, { x: camX, y: camY, w: vw, h: vh });
+  drawSky(camX, vw); rainbow(); drawBg(camX, camY, vw, vh);
   ctx.lineCap = ctx.lineJoin = 'round';
   seasonBack(camX, vw);
   if (G.deco.some(d => d.type === 'gondelbahn')) gondola();
@@ -3623,7 +3818,7 @@ function render() {
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
-    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
+    G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), evNow && !EVENTS[evNow.k].sky ? [[evNow.y, { ev: evNow }]] : [], townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
@@ -3632,6 +3827,7 @@ function render() {
     else if (t.truck) drawTruck(t.truck);
     else if (t.train) drawTrain(t.train);
     else if (t.folk) drawFolk(t.folk);
+    else if (t.ev) evDraw(t.ev, time - t.ev.t0);
     else if (t.town) drawTown(t.town);
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
@@ -3678,11 +3874,12 @@ function render() {
     ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(G.px, hy, 12, 0, 7); ctx.stroke();
     ctx.strokeStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(G.px, hy, 12, -Math.PI / 2, -Math.PI / 2 + harvest.p * Math.PI * 2); ctx.stroke();
   }
-  balloons(); seasonFx(camX, camY, vw, vh);
+  balloons(); seasonFx(camX, camY, vw, vh); if (evNow) evSky(evNow, time - evNow.t0);
   for (const f of floaters) { ctx.globalAlpha = clamp(1.6 - f.t, 0, 1); label(f.x, f.y, f.text, 18); }
   ctx.globalAlpha = 1;
   // Bildschirm-Joystick
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  vignette();
   if (joy) {
     const dx = joy.x - joy.x0, dy = joy.y - joy.y0, l = Math.hypot(dx, dy), k = l > 50 ? 50 / l : 1;
     ellipse(joy.x0, joy.y0, 55, 55, 'rgba(255,255,255,.18)');
