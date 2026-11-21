@@ -604,9 +604,16 @@ function drawLot() {
   ctx.fillStyle = '#2f6fc4'; rrect(x + w - 26, y + hh / 2 - 10, 20, 20, 4); ctx.fill(); // P-Schild
   ctx.font = '800 15px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('P', x + w - 16, y + hh / 2 + 6);
 }
-// Zweigstellen: jedes Fahrzeug verkauft nach der Tour beim Händler oder der Zweigstelle, die über die Strasse am nächsten liegt,
+// Zweigstellen: jedes Fahrzeug verkauft nach der Tour beim Händler oder der Zweigstelle, die über die Strasse am nächsten liegt (parkSell),
 // und parkt dort (home) – die nächste Tour startet von da. So fahren Lastwagen in weit entfernten Bändern viel kürzer.
-const nearestSell = (p, h) => [h, ...branches()].map(s => [s, roadLen(p, s)]).reduce((a, b) => b[1] < a[1] ? b : a)[0];
+// Parkplatz nach der Tour: der nächste – ausser dort stehen schon mehr als ihr Anteil, dann ein leererer, der höchstens 1.5× so weit ist.
+// So verteilen sich die Wagen auf Händler und Zweigstellen, statt sich an einer zu stauen.
+// ponytail: fester Faktor 1.5, Gewichtung nach Arbeit in der Nähe falls nötig
+const homed = (s, k) => trucks.filter(o => o !== k && o.home === s).length;
+function parkSell(k, p, h) {
+  const all = [h, ...branches()].map(s => [s, roadLen(p, s)]).sort((a, b) => a[1] - b[1]), fair = Math.ceil(trucks.length / all.length);
+  return (all.find(([s, d]) => homed(s, k) < fair && d <= all[0][1] * 1.5) || all[0])[0];
+}
 const roadLen = (a, b) => road(a, b).reduce((s, q) => (s.d += Math.hypot(q.x - s.p.x, q.y - s.p.y), s.p = q, s), { d: 0, p: a }).d;
 function parkSpot(k, s, h) { // freies Parkfeld bei Händler (eigenes Feld auf dem Parkplatz) oder Zweigstelle (4 Felder)
   if (s === h) return parkAt(trucks.indexOf(k));
@@ -616,7 +623,10 @@ function parkSpot(k, s, h) { // freies Parkfeld bei Händler (eigenes Feld auf d
 }
 function spedition(dt) {
   const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition');
-  while (trucks.length < truckCount()) { const i = trucks.length, p = parkAt(i); trucks.push({ x: p.x, y: p.y, h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0, home: h }); }
+  while (trucks.length < truckCount()) { // neue Wagen auf Händler und Zweigstellen verteilen: dorthin, wo am wenigsten stehen
+    const i = trucks.length, home = [h, ...branches()].reduce((a, b) => homed(b) < homed(a) ? b : a), k = { h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0, home };
+    trucks.push(k); Object.assign(k, parkSpot(k, home, h)); if (home !== h) k.h = -Math.PI / 2;
+  }
   for (const [i, k] of trucks.entries()) {
     if (!k.route.length) { // im Depot
       k.wait += dt;
@@ -653,7 +663,7 @@ function spedition(dt) {
         const seq = []; let c = o;
         for (const rest of [o.route.filter(r => r.hot), o.route.filter(r => !r.hot)])
           while (rest.length) { const i = rest.reduce((b, r, m) => Math.hypot(r.x - c.x, r.y - c.y) < Math.hypot(rest[b].x - c.x, rest[b].y - c.y) ? m : b, 0); c = rest.splice(i, 1)[0]; seq.push(c); }
-        const sell = nearestSell(seq.at(-1), h);
+        const sell = parkSell(o, seq.at(-1), h);
         o.route = seq; o.wait = 0; o.home = sell; o.route.push({ ...parkSpot(o, sell, h), sell }); // verkaufen und dort parken
       });
       continue;
@@ -670,7 +680,7 @@ function spedition(dt) {
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? r.t[f] : 0; // immer den ganzen Vorrat mitnehmen, auch wenn es über die Ladung geht
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
       G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
-      if (k.load >= lv.cap) { const s = nearestSell(k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
+      if (k.load >= lv.cap) { const s = parkSell(k, k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
       else { // unterwegs voll gewordenes verarbeitetes Gebäude (Arbeit steht), das kein Wagen eingeplant hat: nächstes gleich als nächsten Halt einschieben
         const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
         const hot = G.things.filter(t => !busy.has(t) && THINGS[t.type].kind !== 'grow' && t.out + THINGS[t.type].n > OUT_CAP && k.load + t.out <= lv.cap && surplus(THINGS[t.type].item));
