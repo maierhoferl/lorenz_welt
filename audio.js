@@ -94,6 +94,43 @@ const AU = (() => {
       }
     }
   }
+
+  // Ländler-Musik im 3/4-Takt: Handorgel-Melodie + Bass „um-pa-pa“. Eigene Melodie, 16 Takte in Schleife.
+  const BEAT = 0.4, CH = { C: [48, 60, 64, 67], G: [43, 59, 62, 67], F: [41, 60, 65, 69] };
+  const SONG = [ // [Akkord, [Ton (MIDI, 0 = Pause), Schläge]...]
+    ['C', 76, .5, 79, .5, 84, 1, 79, 1], ['C', 76, .5, 79, .5, 84, 1, 76, 1], ['G', 74, .5, 77, .5, 83, 1, 79, 1], ['G', 79, .5, 77, .5, 74, 1, 71, 1],
+    ['G', 74, .5, 77, .5, 83, 1, 86, 1], ['G', 83, .5, 79, .5, 77, 1, 74, 1], ['C', 76, 1, 79, 1, 76, .5, 74, .5], ['C', 72, 2, 0, 1],
+    ['F', 77, .5, 81, .5, 84, 1, 81, 1], ['F', 77, .5, 81, .5, 84, 1, 89, 1], ['C', 88, .5, 84, .5, 79, 1, 76, 1], ['C', 79, .5, 76, .5, 72, 1, 76, 1],
+    ['G', 74, .5, 77, .5, 79, 1, 83, 1], ['G', 86, 1, 83, .5, 79, .5, 77, 1], ['C', 84, 1, 79, .5, 76, .5, 74, 1], ['C', 72, 2, 0, 1],
+  ];
+  const hz = m => 440 * 2 ** ((m - 69) / 12);
+  function note(type, m, t, d, vol, cut, det = 0) {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = hz(m); o.detune.value = det;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.02); g.gain.setValueAtTime(vol, t + d * 0.8); g.gain.linearRampToValueAtTime(0, t + d);
+    o.connect(filt('lowpass', cut)).connect(g).connect(mus.g); o.start(t); o.stop(t + d + 0.05);
+  }
+  let mus = null;
+  function bar(b, t) {
+    const [c, ...mel] = SONG[b], ch = CH[c];
+    note('triangle', ch[0] + (b & 1 ? 7 : 0), t, BEAT * 0.9, 0.3, 600);                       // um (Grundton, jeder 2. Takt Quinte)
+    for (const i of [1, 2]) for (const m of ch.slice(1)) note('square', m, t + i * BEAT, BEAT * 0.45, 0.025, 1400); // pa pa
+    for (let i = 0, tt = t; i < mel.length; i += 2) {
+      const d = mel[i + 1] * BEAT;
+      if (mel[i]) for (const det of [-8, 8]) note('sawtooth', mel[i], tt, d * 0.95, 0.045, 2600, det); // zwei verstimmte Stimmen = Handorgel
+      tt += d;
+    }
+  }
+  function music() {
+    if (!ac) return false;
+    if (mus) { const m = mus; mus = null; clearInterval(m.timer); m.g.gain.setTargetAtTime(0, ac.currentTime, 0.2); setTimeout(() => m.g.disconnect(), 1500); return false; }
+    mus = { g: ac.createGain(), t: ac.currentTime + 0.1, b: 0 }; mus.g.connect(master);
+    const tick = () => { // ponytail: setInterval-Planer, Hintergrund-Tabs drosseln – Lücke wird übersprungen statt nachgeholt
+      if (mus.t < ac.currentTime) mus.t = ac.currentTime + 0.05;
+      while (mus.t < ac.currentTime + 0.8) { bar(mus.b, mus.t); mus.t += 3 * BEAT; mus.b = (mus.b + 1) % SONG.length; }
+    };
+    tick(); mus.timer = setInterval(tick, 250);
+    return true;
+  }
   const SFX = {
     pop: () => tone('sine', 400, 900, 0.12, 0.3),
     drop: () => tone('square', 320, 180, 0.08, 0.08),
@@ -111,7 +148,7 @@ const AU = (() => {
     gugge: () => { for (let i = 0; i < 8; i++) burst(0.12, 0.35, 'lowpass', 180, 1, i * 0.25); [392, 392, 523, 466, 392].forEach((f, i) => tone('square', f, f, 0.22, 0.05, i * 0.5)); },
   };
   return {
-    init, update,
+    init, update, music,
     sfx: k => { if (ac && on) try { SFX[k](); } catch (e) {} },
     toggle: () => { on = !on; if (master) master.gain.value = on ? 0.5 : 0; if (ac) on ? ac.resume() : ac.suspend(); if (!on) window.speechSynthesis?.cancel(); return on; },
     pause: () => ac?.suspend(), // Audio-Thread anhalten (Tab weg, Spiel verlassen): spart Akku, init() weckt ihn wieder

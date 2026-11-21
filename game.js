@@ -396,6 +396,7 @@ $('#tuexit').onclick = () => $('#bexit').click();
 $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
+$('#bmusic').onclick = e => { AU.init(); e.currentTarget.style.opacity = AU.music() ? 1 : 0.5; };
 function ecoUi() { $('#beco').style.opacity = eco ? 1 : 0.5; resize(); }
 $('#beco').onclick = () => { eco = !eco; store.set('lw_eco', eco); ecoUi(); toast(eco ? $t`🔋 Stromsparen an` : $t`🔋 Stromsparen aus`); };
 ecoUi();
@@ -673,9 +674,9 @@ function checkStage() {
 function addInv(item, n) { G.inv[item] = (G.inv[item] || 0) + n; }
 let toastKeys = {};
 function toast(msg, key, soft) {
-  if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 5; }
+  if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 10; }
   const d = document.createElement('div'); d.textContent = msg; if (soft) { d.className = 'soft'; document.body.append(d); } else $('#toast').append(d);
-  setTimeout(() => d.remove(), 5000);
+  setTimeout(() => d.remove(), 10000);
 }
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }
 function take(t, field) { // Ware vom Lager in die Tasche

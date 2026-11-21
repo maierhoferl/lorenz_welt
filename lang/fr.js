@@ -77,7 +77,7 @@ var TR = {
     'Code vergessen?': 'Code oublié ?', 'Code vergessen? Löse alle Rechnungen!': 'Code oublié ? Résous tous les calculs !', 'Prüfen': 'Vérifier',
     "Genug gespielt für heute! Morgen geht's weiter.": 'Assez joué pour aujourd’hui ! On continue demain.',
     'Eltern-Code': 'Code des parents', 'Code': 'Code', 'Weiterspielen': 'Continuer à jouer', 'Spieler wechseln': 'Changer de joueur',
-    'Rauszoomen (−)': 'Dézoomer (−)', 'Reinzoomen (+)': 'Zoomer (+)', 'Produktions-Plan': 'Plan de production', 'Ton an/aus': 'Son on/off', 'Stromsparen an/aus': 'Économie de batterie on/off', '🔋 Stromsparen an': '🔋 Économie de batterie activée', '🔋 Stromsparen aus': '🔋 Économie de batterie désactivée',
+    'Rauszoomen (−)': 'Dézoomer (−)', 'Reinzoomen (+)': 'Zoomer (+)', 'Produktions-Plan': 'Plan de production', 'Musik an/aus': 'Musique on/off', 'Ton an/aus': 'Son on/off', 'Stromsparen an/aus': 'Économie de batterie on/off', '🔋 Stromsparen an': '🔋 Économie de batterie activée', '🔋 Stromsparen aus': '🔋 Économie de batterie désactivée',
 
     '🔒 {} Jahre': '🔒 {} ans', '✨ neu': '✨ nouveau', 'Neuer Spieler': 'Nouveau joueur',
     'Wer spielt?': 'Qui joue ?', 'Wer spielt? (offline – Spielstand nur auf diesem Gerät)': 'Qui joue ? (hors ligne – partie seulement sur cet appareil)',
