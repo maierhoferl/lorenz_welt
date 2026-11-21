@@ -580,9 +580,19 @@ function drawLot() {
   ctx.fillStyle = '#2f6fc4'; rrect(x + w - 26, y + hh / 2 - 10, 20, 20, 4); ctx.fill(); // P-Schild
   ctx.font = '800 15px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('P', x + w - 16, y + hh / 2 + 6);
 }
+// Zweigstellen: jedes Fahrzeug verkauft nach der Tour beim Händler oder der Zweigstelle, die über die Strasse am nächsten liegt,
+// und parkt dort (home) – die nächste Tour startet von da. So fahren Lastwagen in weit entfernten Bändern viel kürzer.
+const nearestSell = (p, h) => [h, ...branches()].map(s => [s, roadLen(p, s)]).reduce((a, b) => b[1] < a[1] ? b : a)[0];
+const roadLen = (a, b) => road(a, b).reduce((s, q) => (s.d += Math.hypot(q.x - s.p.x, q.y - s.p.y), s.p = q, s), { d: 0, p: a }).d;
+function parkSpot(k, s, h) { // freies Parkfeld bei Händler (eigenes Feld auf dem Parkplatz) oder Zweigstelle (4 Felder)
+  if (s === h) return parkAt(trucks.indexOf(k));
+  const taken = new Set(trucks.filter(o => o !== k && o.home === s).map(o => o.bay));
+  k.bay = FIL_BAY.findIndex((_, i) => !taken.has(i)); if (k.bay < 0) k.bay = trucks.indexOf(k) % FIL_BAY.length; // mehr als 4: stehen doppelt
+  return { x: s.x + FIL_BAY[k.bay] * T, y: s.y + FIL_PY * T };
+}
 function spedition(dt) {
   const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition');
-  while (trucks.length < truckCount()) { const i = trucks.length, p = parkAt(i); trucks.push({ x: p.x, y: p.y, h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0 }); }
+  while (trucks.length < truckCount()) { const i = trucks.length, p = parkAt(i); trucks.push({ x: p.x, y: p.y, h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0, home: h }); }
   for (const [i, k] of trucks.entries()) {
     if (!k.route.length) { // im Depot
       k.wait += dt;
@@ -602,10 +612,12 @@ function spedition(dt) {
       if (!todo.length) { k.wait = lv.every - 2; continue; } // nichts zu holen: gleich nochmal schauen
       // alle freien Fahrzeuge fahren gemeinsam los: erster Halt reihum (so sieht man mehrere unterwegs),
       // danach geht jedes Gebäude an das Fahrzeug mit Platz, dessen letzter Halt am nächsten liegt
-      const idle = trucks.filter(o => !o.route.length), left = idle.map(() => lv.cap), at = idle.map(o => ({ x: o.x, y: o.y }));
+      // (mit Zweigstellen: erster Halt ans nächste Fahrzeug, das noch keinen hat – so holt jedes in seiner Nähe ab)
+      const idle = trucks.filter(o => !o.route.length), left = idle.map(() => lv.cap), at = idle.map(o => ({ x: o.x, y: o.y })), fil = branches().length;
       todo.forEach((t, j) => {
         const p = pos(t), d = m => left[m] > 0 ? Math.hypot(p.x - at[m].x, p.y - at[m].y) : Infinity;
-        const n = j < idle.length ? j : idle.reduce((b, _, m) => d(m) < d(b) ? m : b, 0);
+        const free = idle.map((_, m) => m).filter(m => !idle[m].route.length);
+        const n = j < idle.length ? (fil ? free.reduce((b, m) => d(m) < d(b) ? m : b, free[0]) : j) : idle.reduce((b, _, m) => d(m) < d(b) ? m : b, 0);
         if (left[n] <= 0) return; // alle voll
         idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; at[n] = p;
       });
@@ -615,7 +627,8 @@ function spedition(dt) {
         // ponytail: greedy nearest neighbour, O(n²) bei wenigen Halten egal
         const rest = o.route, seq = []; let c = o;
         while (rest.length) { const i = rest.reduce((b, r, m) => Math.hypot(r.x - c.x, r.y - c.y) < Math.hypot(rest[b].x - c.x, rest[b].y - c.y) ? m : b, 0); c = rest.splice(i, 1)[0]; seq.push(c); }
-        o.route = seq; o.wait = 0; o.route.push(parkAt(trucks.indexOf(o))); // zurück auf den eigenen Parkplatz
+        const sell = nearestSell(seq.at(-1), h);
+        o.route = seq; o.wait = 0; o.home = sell; o.route.push({ ...parkSpot(o, sell, h), sell }); // verkaufen und dort parken
       });
       continue;
     }
@@ -631,8 +644,8 @@ function spedition(dt) {
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? r.t[f] : 0; // immer den ganzen Vorrat mitnehmen, auch wenn es über die Ladung geht
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
       G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
-      if (k.load >= lv.cap) k.route = k.route.filter(q => !q.t); // voll: restliche Halte auslassen, direkt zum Händler
-    } else if (k.sum) { floater(h.x, h.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.cargo = {}; }
+      if (k.load >= lv.cap) { const s = nearestSell(k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
+    } else if (k.sum) { const s = r.sell || h; floater(s.x, s.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.cargo = {}; }
   }
 }
 function warnings() {
@@ -708,9 +721,17 @@ function inLake(x, y, m = 0) {
   return Math.hypot(dx, dy) < LAKE.rx * lakeR(a) + m;
 }
 const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k ? 1 : 0);
-const ghostPos = () => ({ x: G.px + Math.cos(trH) * 46, y: G.py + 2 + Math.sin(trH) * 46 });
+const ghostPos = () => { const r = DECOS[G.carry]?.sell ? 2.6 * T : 46; return { x: G.px + Math.cos(trH) * r, y: G.py + 2 + Math.sin(trH) * r }; }; // Zweigstelle ist gross: weiter vorne
 let nearDeco = null;
-function decoSpotOk(x, y) {
+// Zweigstelle: Haus + Parkplatz davor (Kacheln relativ zu x/y); FIL_BAY = Parkfelder (x-Versatz), Lastwagen stehen in Zeile FIL_PY
+const FIL = [-2.5, 2.5, -2.3, 2.7], FIL_BAY = [-1.725, -0.575, 0.575, 1.725], FIL_PY = 1.55;
+const branches = () => G.deco.filter(d => DECOS[d.type].sell);
+const inFil = (x, y, b, m = 0) => x > b.x + (FIL[0] - m) * T && x < b.x + (FIL[1] + m) * T && y > b.y + (FIL[2] - m) * T && y < b.y + (FIL[3] + m) * T;
+function decoSpotOk(x, y, k = G.carry) {
+  if (DECOS[k]?.sell) { // ganze Fläche frei? Raster über Haus und Parkplatz prüfen
+    for (const a of [-2.4, -1.2, 0, 1.2, 2.4]) for (const b of [-2.2, -1, 0.3, 1.5, 2.6]) if (!decoSpotOk(x + a * T, y + b * T, '')) return false;
+    return !G.deco.some(d => DECOS[d.type].where === 'land' && inFil(d.x, d.y, { x, y }, 0.4));
+  }
   if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6) || inMts(x, y) || nearRiver(x, y, 0.6 * T)) return false;
   for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
   for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko
@@ -726,6 +747,7 @@ function decoSpotOk(x, y) {
   if (townOn().some(b => Math.abs(x - b.x * T) < 1.1 * T && y > (b.y - 1.6) * T && y < (b.y + 0.5) * T)) return false; // Häuser vom Städtchen
   if (lotOn() && x > (LOT.x - 0.4) * T && x < (LOT.x + LOT.cols * LOT.bay + 1) * T && y > (LOT.y - 0.2) * T && y < (LOT.rows[1] + 1.4) * T) return false; // Parkplatz
   if (x > PASTURE.x * T - 20 && x < (PASTURE.x + PASTURE.w) * T + 20 && y > PASTURE.y * T - 20 && y < (PASTURE.y + PASTURE.h) * T + 30) return false;
+  if (branches().some(b => inFil(x, y, b, 0.3))) return false; // nicht in die Zweigstelle
   return !G.deco.some(d => DECOS[d.type].where === 'land' && dist(x, y, d.x, d.y) < 0.6 * T);
 }
 // Deko, die im Weg steht (altes Layout, oder ein Band ist darüber gewachsen), zieht auf die Wiese unter dem See
@@ -733,7 +755,10 @@ function fixDeco() {
   sightsOn(); // Plätze suchen, solange die Deko noch dasteht
   const land = G.deco.filter(d => DECOS[d.type].where === 'land'); G.deco = G.deco.filter(d => !land.includes(d));
   for (const d of land) {
-    if (!decoSpotOk(d.x, d.y)) for (let i = 0; i < 600; i++) { const x = (2.5 + (i % 12) * 1.2) * T, y = (LAKE.y + LAKE.ry + 2 + Math.floor(i / 12) * 1.3) * T; if (decoSpotOk(x, y)) { Object.assign(d, { x, y }); break; } }
+    if (DECOS[d.type].sell && !decoSpotOk(d.x, d.y, d.type)) { // Zweigstelle: nur so weit wie nötig verschieben, sie soll nah bei den Gebäuden bleiben
+      out: for (let r = 1; r < 60; r++) for (let a = 0; a < 8 * r; a++) { const x = d.x + Math.cos(a / (8 * r) * 6.283) * r * 0.5 * T, y = d.y + Math.sin(a / (8 * r) * 6.283) * r * 0.5 * T; if (decoSpotOk(x, y, d.type)) { Object.assign(d, { x, y }); break out; } }
+    }
+    if (!decoSpotOk(d.x, d.y, d.type)) for (let i = 0; i < 600; i++) { const x = (2.5 + (i % 12) * 1.2) * T, y = (LAKE.y + LAKE.ry + 2 + Math.floor(i / 12) * 1.3) * T; if (decoSpotOk(x, y, d.type)) { Object.assign(d, { x, y }); break; } }
     G.deco.push(d);
   }
 }
@@ -753,7 +778,7 @@ function buyDeco(k) {
 
 function interact(dt) {
   near = null; let nd = 1e9;
-  for (const t of G.things.concat(FIXED_E)) { const d = reach(t); if (d < nd) { nd = d; near = t; } }
+  for (const t of G.things.concat(FIXED_E, branches())) { const d = reach(t); if (d < nd) { nd = d; near = t; } }
   if (near !== lastNear) {
     lastNear = near;
     if (near && !G.seen[near.type]) { G.seen[near.type] = 1; showInfo(near); }
@@ -783,12 +808,12 @@ function interact(dt) {
     }
     if (near.out > 0 && surplus(d.item)) take(near, 'out');
   }
-  if (near?.type === 'haendler' && bagCount() > 0) {
+  if ((near?.type === 'haendler' || DECOS[near?.type]?.sell) && bagCount() > 0) {
     let sum = 0; for (const k in G.inv) sum += G.inv[k] * ITEMS[k].price;
     G.inv = {}; G.money += sum; AU.sfx('cash'); floater(near.x, near.y - 90, `+${sum} Fr. 💰`);
   }
   nearDeco = null; let dd = 1.1 * T;
-  if (!near) for (const o of G.deco) if (DECOS[o.type].where === 'land') { const k = dist(G.px, G.py, o.x, o.y); if (k < dd) { dd = k; nearDeco = o; } }
+  if (!near) for (const o of G.deco) if (DECOS[o.type].where === 'land' && !DECOS[o.type].sell) { const k = dist(G.px, G.py, o.x, o.y); if (k < dd) { dd = k; nearDeco = o; } }
   if (near?.type === 'laden') { if (!shopDismiss && $('#shop').hidden) openShop(); }
   else { shopDismiss = false; if (!$('#shop').hidden) $('#shop').hidden = true; }
   visitSights();
@@ -828,6 +853,10 @@ function hud() {
     return set(`<div><b>${dc.icon} ${dc.name}</b><div>${$t`Deko – macht nichts, ist aber schön! 😊`}</div></div><button>${$t`✋ Umstellen`}</button><button>ℹ️</button>`, () => pickDeco(o), () => showInfo(dc));
   }
   if (!t) { px.hidden = true; return; }
+  if (DECOS[t.type]?.sell) {
+    const dc = DECOS[t.type], n = trucks.filter(k => k.home === t && !k.route.length).length;
+    return set(`<div><b>${dc.icon} ${dc.name}</b><div>${$t`Komm mit vollen Taschen – du bekommst Geldscheine!`}${n ? ' ' + $t`🚛 ${n} Fahrzeuge parken hier.` : ''}</div></div><button>${$t`✋ Umstellen`}</button><button>ℹ️</button>`, () => pickDeco(t), () => showInfo(dc));
+  }
   const d = THINGS[t.type] || t;
   let st = '';
   if (d.kind === 'grow') {
@@ -857,6 +886,7 @@ function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
   if (i >= 0) f.push({ ic: '🏡', t: $t`Dein Bauernhof bekommt ${HOF_ADD[i]}!`, d: $t`Lauf hin und schau ihn dir an!` });
   if (SHOP_LV.includes(l) || i === 1 || i === 3) f.push({ ic: '🏪', t: $t`Laden und Händler ziehen in grössere Häuser!`, d: $t`Mehr Regale, mehr Kundschaft, mehr Geld 💰` });
   if (l === 20) f.push({ ic: '⛪', t: $t`Neu im Laden: Kirche und Gülle-Verteiler`, d: $t`Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩` });
+  if (l === DECOS.filiale.land) f.push({ ic: '🏪', t: $t`Neu im Laden: Händler-Zweigstelle`, d: $t`Deine Lastwagen verkaufen beim nächsten Händler – kürzere Wege! 🚛` });
   const nb = TOWN.find(b => b.lv === l);
   if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: nb.se ? $t`Es steht in der Neustadt ganz im Südosten!` : $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
   else if (TOWN.some(b => l > b.lv && (l - b.lv) % 40 === 0 && (b.f0 || 1) + (l - b.lv) / 40 <= (b.max || (b.k === 'chalet' ? 3 : 4)))) f.push({ ic: '🏗️', t: $t`Im Städtchen wird ein Haus höher!`, d: $t`Ein Stock mehr – bis zu den Wolken? ☁️` });
@@ -901,7 +931,7 @@ function speak(html) {
 }
 new MutationObserver(() => { if ($('#info').hidden) window.speechSynthesis?.cancel(); }).observe($('#info'), { attributes: true, attributeFilter: ['hidden'] });
 function showInfo(t) {
-  const d = THINGS[t.type] || t;
+  const d = THINGS[t.type] || DECOS[t.type] || t;
   let extra = '';
   if (d.kind === 'grow') { const tl = toolLv(d.tool); extra = $t`<p><b>Dein Werkzeug: ${tl.name}.</b> ${tl.info}</p><p>Ergibt ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name} alle ${d.time} Sekunden.</p>`; }
   if (d.kind === 'factory') extra = $t`<p><b>Rezept:</b> ${recipe(d)} in ${d.time} Sekunden.</p>`;
@@ -958,6 +988,13 @@ function shopList() {
       buy: () => { G.tools[k]++; modal($('#info'), $t`${line.icon} ${next.name} – so funktioniert's`, `<p>${next.info}</p><button class="btn" data-ok>${$t`Super!`}</button>`); speak(`${next.name}. ${next.info}`); $('#info [data-ok]').onclick = () => $('#info').hidden = true; },
     });
   }
+  if (G.land >= DECOS.filiale.land) { // Händler-Zweigstelle: Lastwagen verkaufen beim nächsten Händler und parken dort
+    const d = DECOS.filiale, n = decoCount('filiale'), full = n >= d.max, busy = !!G.carry;
+    tabs[2].push({ icon: d.icon, name: d.name, price: d.price + n * 25000, info: d.info, can: !full && !busy, neu: !n,
+      desc: $t`Du stellst sie hin, wo du willst – deine Lastwagen verkaufen beim nächsten Händler und fahren kürzer`,
+      note: full ? $t`✅ Schon gekauft` : busy ? $t`Stell zuerst ${DECOS[G.carry].name} ab` : n ? $t`Hast du schon ${n}×` : '',
+      buy: () => buyDeco('filiale') });
+  }
   const lp = LAND_PRICES[G.land] ?? LAND_PRICES.at(-1) + (G.land - LAND_PRICES.length + 1) * 2000;
   tabs[3].push({
     icon: '🗺️', name: $t`Land Stufe ${G.land + 1}`, price: lp, can: true,
@@ -973,6 +1010,7 @@ function shopList() {
     info: $t`Fast jedes Schweizer Dorf hat eine Kirche mit einem hohen Turm. Die Turmuhr zeigt allen die Zeit, und die Glocken läuten zum Mittag und am Sonntag. Früher hörte man sie bis weit auf die Felder hinaus.`,
     buy: () => { G.kirche = 1; toast($t`⛪ Deine Kirche steht jetzt neben dem Bauernhof!`); AU.sfx('grow'); } });
   for (const [k, d] of Object.entries(DECOS)) {
+    if (d.land) continue; // Zweigstelle: steht bei den Werkzeugen
     const full = d.max && decoCount(k) >= d.max, busy = d.where === 'land' && G.carry;
     tabs[4].push({ icon: d.icon, name: d.name, price: d.price, info: d.info, can: !full && !busy, neu: !decoCount(k),
       desc: { land: $t`Du stellst es hin, wo du willst`, see: $t`Schwimmt auf dem See`, luft: $t`Fliegt über deine Welt`, berg: $t`Fährt in die Berge` }[d.where],
@@ -1682,7 +1720,7 @@ function sightsOn() {
   };
   const busy = bandRects();
   G.land += 6; const later = bandRects(); G.land -= 6; // so gross sind die Bänder in 6 Land-Stufen: neuer Platz für Sehenswürdigkeiten bleibt eine Weile frei
-  for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push([d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
+  for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push(DECOS[d.type].sell ? [d.x / T + FIL[0], d.x / T + FIL[1], d.y / T + FIL[2], d.y / T + FIL[3]] : [d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
   const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
     .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 })),
       Object.entries(AREAS).filter(([, a]) => a.hub && areaOn(a)).map(([k, a]) => ({ k, hub: a, lv: a.from, w: a.cols * a.dx + 0.8, h: hubH(a) }))).sort((a, b) => a.lv - b.lv);
@@ -4055,6 +4093,29 @@ function rainbow() { // hinter den Bergen (vor dem Hintergrund-Cache gezeichnet)
 
 // ---- Deko-Zeichnungen (x/y = Fusspunkt) ----
 const DECO_DRAW = {
+  filiale(x, y) { // Händler-Zweigstelle: Lagerhalle mit Rolltor und Laderampe, davor Parkplatz mit 4 Feldern
+    const px0 = x + FIL[0] * T + 6, pw = (FIL[1] - FIL[0]) * T - 12, py0 = y + 0.3 * T, ph = (FIL[3] - 0.3) * T - 10;
+    ctx.fillStyle = '#b9b2a2'; rrect(px0 - 5, py0 - 5, pw + 10, ph + 10, 10); ctx.fill(); // Randstein
+    ctx.fillStyle = '#5d6166'; rrect(px0, py0, pw, ph, 7); ctx.fill();
+    ctx.fillStyle = '#e8e2d0'; for (let i = 0; i <= FIL_BAY.length; i++) { const bx = x + (FIL_BAY[0] - 0.575 + i * 1.15) * T; ctx.fillRect(bx - 1.5, py0 + 8, 3, ph - 16); } // Parkfeld-Striche
+    const w = 200, h = 78, x0 = x - w / 2;
+    ellipse(x + 6, y, w / 2 + 12, 10, 'rgba(0,0,0,.22)');
+    const g = ctx.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, '#b4c4ce'); g.addColorStop(1, '#7d93a2'); ctx.fillStyle = g; ctx.fillRect(x0, y - h, w, h);
+    for (let px = x0 + 4; px < x0 + w; px += 7) line('rgba(255,255,255,.18)', 1.5, px, y - h, px, y); // Wellblech
+    ctx.fillStyle = '#3f5563'; ctx.beginPath(); ctx.moveTo(x0 - 8, y - h); ctx.lineTo(x0 + 16, y - h - 18); ctx.lineTo(x0 + w - 16, y - h - 18); ctx.lineTo(x0 + w + 8, y - h); ctx.fill(); // Dach
+    ctx.fillStyle = '#f4f4f0'; ctx.fillRect(x0 + 8, y - 58, 60, 58); shopWin(x0 + 14, y - 52, 48, 22, '#4a4f56'); shopWin(x0 + 14, y - 26, 22, 26, '#4a4f56'); // Büro
+    haendlerMann(x0 + 50, y - 20); ctx.fillStyle = '#d0c4a8'; ctx.fillRect(x0 + 38, y - 10, 26, 10);
+    for (let i = 0; i < 2; i++) { // zwei Rolltore mit Rampe
+      const rx = x0 + 80 + i * 58; ctx.fillStyle = '#2f3b44'; ctx.fillRect(rx - 3, y - 56, 52, 56);
+      const op = 28 + Math.sin(time * 0.6 + i * 2) * 8; ctx.fillStyle = '#c9ced2'; ctx.fillRect(rx, y - 53, 46, 53 - op);
+      for (let py = y - 48; py < y - op; py += 5) line('#9aa1a7', 1, rx, py, rx + 46, py);
+      crate(rx + 23, y - 6, ['#d8332a', '#e0b54a'][i], 8);
+      ctx.fillStyle = '#ffd23a'; ctx.fillRect(rx - 3, y - 6, 52, 6); for (let j = 0; j < 5; j++) { ctx.fillStyle = '#2a2a2a'; ctx.fillRect(rx - 1 + j * 10, y - 6, 5, 6); }
+    }
+    ctx.fillStyle = '#d52b1e'; rrect(x - 62, y - h + 4, 124, 18, 5); ctx.fill();
+    ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText($t`ZWEIGSTELLE 💰`, x, y - h + 17);
+    flagPole(x0 + w - 12, y - h - 14, 40, 18, 3);
+  },
   steinmann(x, y) {
     ellipse(x + 3, y, 14, 4, 'rgba(0,0,0,.22)');
     for (const [dx, dy, rx, ry, c] of [[0, -4, 12, 5, '#8d8d86'], [1, -12, 9.5, 4.5, '#a3a39b'], [-1, -19.5, 7.5, 4, '#7f8079'], [1, -25.5, 5.5, 3.2, '#9c9c94'], [0, -30.5, 3.5, 2.4, '#b0b0a8']]) {
@@ -4346,6 +4407,7 @@ function render() {
   }
   // Namen, Status, Warnungen
   for (const t of FIXED_E) label(t.x, t.y + 18, t.name, 14);
+  for (const b of branches()) if (vis(b.x, b.y)) label(b.x, b.y + (FIL[3] + 0.1) * T, DECOS[b.type].name, 13);
   for (const s of sOn) s.hub ? label(s.x * T, s.y * T + 22, `${s.hub.icon} ${s.hub.name}`, 18) : label(s.x * T, s.y * T + 18, `${G.pass[s.k] ? '✅' : '📸'} ${SIGHTS[s.k].name}`, 14);
   for (const t of G.things) {
     const p = pos(t); if (!vis(p.x, p.y)) continue;

@@ -831,6 +831,9 @@ const DECOS = {
     info: 'Auf Schweizer Seen fahren noch echte Raddampfer, manche über 100 Jahre alt! Eine Dampfmaschine dreht die zwei grossen Schaufelräder an der Seite. Durch die Fenster im Bauch des Schiffs sieht man die Maschine arbeiten.' },
   ballon:     { name: 'Heissluftballon', icon: '🎈', price: 600, where: 'luft', max: 6,
     info: 'Ein Brenner macht die Luft im Ballon heiss. Heisse Luft ist leichter als kalte – darum steigt der Ballon! Lenken kann man ihn nicht, er fliegt mit dem Wind. In Château-d’Oex treffen sich jeden Winter Ballone aus der ganzen Welt.' },
+  // land: erst ab dieser Land-Stufe, im Laden unter 🔧 Werkzeuge (nicht Deko) – sell: hier kann man verkaufen, Spediteur fährt hin
+  filiale:    { name: 'Händler-Zweigstelle', icon: '🏪', price: 75000, where: 'land', land: 90, max: 6, sell: 1,
+    info: 'Eine Zweigstelle ist ein kleiner Ableger vom grossen Händler – mitten zwischen deinen Feldern und Gebäuden. Deine Lastwagen müssen nicht mehr den ganzen Weg zurückfahren: Sie verkaufen bei der nächsten Zweigstelle und parken gleich dort. Kurze Wege sparen Zeit und Diesel! Grosse Firmen haben darum viele Verteilzentren im ganzen Land.' },
   gondelbahn: { name: 'Gondelbahn', icon: '🚡', price: 1500, where: 'berg', max: 1,
     info: 'Eine Gondelbahn hängt an einem dicken Stahlseil. Ein starker Motor in der Station zieht das Seil – die Gondeln fahren über Täler und Felsen bis auf den Berg. Die Schweiz hat über 2000 Seilbahnen!' },
 };
