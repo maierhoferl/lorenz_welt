@@ -293,13 +293,15 @@ function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun w
   WORLD.h = Math.max(...on.map(bh), hubs.length ? Math.max(...on.filter(k => AREAS[k].x > ROAD_X).map(bh)) + hh + 2 : 0);
 }
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
-function paths() {
+// paths(): dazu die Zufahrten der Zweigstellen (werden automatisch gebaut); basePaths(): nur das feste Strassennetz
+const paths = () => basePaths().concat(branches().map(b => spur(b).pts.map(q => [q.x / T, q.y / T])));
+function basePaths() {
   const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
   return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, Math.max(...L.map(l => l[0]))]]], L.map(([y, x]) => [[ROAD_X, y], [x, y]]));
 }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
-  for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i)) return i;
+  for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i) && !underBranch(area, slotPos(area, i))) return i; // Zweigstelle steht auf dem Platz
   return -1;
 }
 function addThing(type) {
@@ -545,7 +547,7 @@ function transfers() {
 const wet = (a, b) => { for (let s = 0; s <= 1; s += 0.05) if (inLake(a.x + (b.x - a.x) * s, a.y + (b.y - a.y) * s, 0.5)) return true; return false; };
 function snap(p) { // nächster Strassenpunkt (Pixel); main = auf der Hauptstrasse, sonst auf dem Querweg in Zeile y
   let best = null, bd = Infinity;
-  for (const pl of paths()) for (let j = 1; j < pl.length; j++) {
+  for (const pl of basePaths()) for (let j = 1; j < pl.length; j++) {
     const [ax, ay] = pl[j - 1], [bx, by] = pl[j], main = ax === bx;
     if (main && ax !== ROAD_X) continue; // Hof-Stummel
     const q = { x: clamp(p.x, Math.min(ax, bx) * T, Math.max(ax, bx) * T), y: clamp(p.y, Math.min(ay, by) * T, Math.max(ay, by) * T), main }, d = Math.hypot(q.x - p.x, q.y - p.y);
@@ -554,10 +556,32 @@ function snap(p) { // nächster Strassenpunkt (Pixel); main = auf der Hauptstras
   return best;
 }
 function road(a, b) { // Wegpunkte von a nach b: Zufahrt → Querweg → Hauptstrasse → Querweg → Zufahrt
-  const sa = snap(a), sb = snap(b), R = ROAD_X * T;
+  // in einer Zweigstelle (Start oder Ziel): über ihre eigene Zufahrtsstrasse statt quer übers Land
+  const ba = branches().find(o => inFil(a.x, a.y, o, 0.1)), bb = branches().find(o => inFil(b.x, b.y, o, 0.1));
+  const pa = ba ? spur(ba) : null, pb = bb ? spur(bb) : null;
+  if (ba && ba === bb) return [b];
+  const sa = pa ? pa.end : snap(a), sb = pb ? pb.end : snap(b), R = ROAD_X * T;
   if (!sa || !sb) return [b];
-  if (!sa.main && !sb.main && sa.y === sb.y) return [sa, sb, b]; // gleicher Querweg
-  return [sa, { x: R, y: sa.y }, { x: R, y: sb.y }, sb, b];
+  const head = pa ? pa.pts.slice(1, -1) : [], tail = pb ? pb.pts.slice(1, -1).reverse() : [];
+  const mid = !sa.main && !sb.main && sa.y === sb.y ? [sa, sb] : [sa, { x: R, y: sa.y }, { x: R, y: sb.y }, sb]; // gleicher Querweg?
+  return [...head, ...mid, ...tail, b];
+}
+// Zufahrt einer Zweigstelle: vom Parkplatz zur nächsten Strasse, nur gerade Stücke. Liegt die Strasse hinter dem Haus (Norden),
+// führt sie seitlich am Haus vorbei. pts in Pixeln (Parkplatz → Strasse), end = Strassenpunkt wie snap()
+const spurMemo = new WeakMap();
+function spur(b) {
+  const key = [b.x, b.y, b.s, G.land].join(); let m = spurMemo.get(b);
+  if (m?.key === key) return m;
+  const sc = b.s || 1, lot = { x: b.x, y: b.y + FIL_PY * sc * T }, s0 = snap(lot);
+  let pts = [lot], end = s0;
+  if (s0 && s0.y >= lot.y) { end = snap({ x: b.x, y: s0.y }) || s0; pts.push({ x: b.x, y: end.y }); } // Strasse vorne: gerade hinaus
+  else if (s0) { // hinten: seitlich am Haus vorbei
+    const sx = b.x + ((s0.x < b.x ? FIL[0] : FIL[1]) * sc + (s0.x < b.x ? -0.7 : 0.7)) * T;
+    end = snap({ x: sx, y: s0.y }) || s0; pts.push({ x: sx, y: lot.y }, { x: sx, y: end.y });
+  }
+  if (end) pts.push({ x: end.x, y: end.y });
+  pts = pts.filter((q, i) => !i || Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y) > 1);
+  m = { key, pts, end }; spurMemo.set(b, m); return m;
 }
 const fld = t => THINGS[t.type].kind === 'grow' ? 'store' : 'out'; // Lagerfeld: Ernte vs. fertige Ware
 const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
@@ -588,7 +612,7 @@ function parkSpot(k, s, h) { // freies Parkfeld bei Händler (eigenes Feld auf d
   if (s === h) return parkAt(trucks.indexOf(k));
   const taken = new Set(trucks.filter(o => o !== k && o.home === s).map(o => o.bay));
   k.bay = FIL_BAY.findIndex((_, i) => !taken.has(i)); if (k.bay < 0) k.bay = trucks.indexOf(k) % FIL_BAY.length; // mehr als 4: stehen doppelt
-  return { x: s.x + FIL_BAY[k.bay] * T, y: s.y + FIL_PY * T };
+  const sc = s.s || 1; return { x: s.x + FIL_BAY[k.bay] * sc * T, y: s.y + FIL_PY * sc * T };
 }
 function spedition(dt) {
   const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition');
@@ -721,20 +745,46 @@ function inLake(x, y, m = 0) {
   return Math.hypot(dx, dy) < LAKE.rx * lakeR(a) + m;
 }
 const decoCount = k => G.deco.filter(d => d.type === k).length + (G.carry === k ? 1 : 0);
-const ghostPos = () => { const r = DECOS[G.carry]?.sell ? 2.6 * T : 46; return { x: G.px + Math.cos(trH) * r, y: G.py + 2 + Math.sin(trH) * r }; }; // Zweigstelle ist gross: weiter vorne
+const ghostPos = () => { const f = DECOS[G.carry]?.sell, r = f ? 2.2 * T : 46, p = { x: G.px + Math.cos(trH) * r, y: G.py + 2 + Math.sin(trH) * r }; return f ? filSnap(p.x, p.y) : p; }; // Zweigstelle ist gross: weiter vorne
 let nearDeco = null;
 // Zweigstelle: Haus + Parkplatz davor (Kacheln relativ zu x/y); FIL_BAY = Parkfelder (x-Versatz), Lastwagen stehen in Zeile FIL_PY
 const FIL = [-2.5, 2.5, -2.3, 2.7], FIL_BAY = [-1.725, -0.575, 0.575, 1.725], FIL_PY = 1.55;
 const branches = () => G.deco.filter(d => DECOS[d.type].sell);
-const inFil = (x, y, b, m = 0) => x > b.x + (FIL[0] - m) * T && x < b.x + (FIL[1] + m) * T && y > b.y + (FIL[2] - m) * T && y < b.y + (FIL[3] + m) * T;
+// b.s = Grösse (1 = normal; auf Bauplätzen in einem Band kleiner, damit sie zwischen die Strassen passt)
+const filRect = (b, m = 0) => { const s = b.s || 1; return [b.x + (FIL[0] * s - m) * T, b.x + (FIL[1] * s + m) * T, b.y + (FIL[2] * s - m) * T, b.y + (FIL[3] * s + m) * T]; };
+const inFil = (x, y, b, m = 0) => { const r = filRect(b, m); return x > r[0] && x < r[1] && y > r[2] && y < r[3]; };
+const overlap = (a, b) => a[0] < b[1] && a[1] > b[0] && a[2] < b[3] && a[3] > b[2];
+function slotRect(k, p) { // Fläche eines Bauplatzes (Pixel), wie decoSpotOk sie freihält
+  const a = AREAS[k];
+  if (k === 'acker') return [p.x - 2.8 * T, p.x + 2.8 * T, p.y - 1.9 * T, p.y + 1.9 * T];
+  return [p.x - a.dx / 2 * T, p.x + a.dx / 2 * T, p.y - (k === 'dorf' || a.hub ? 2.6 : 1.4) * T, p.y + 0.6 * T];
+}
+const underBranch = (k, p) => k !== 'weide' && branches().some(b => overlap(slotRect(k, p), filRect(b)));
+const FIL_S = [1, 0.9, 0.8, 0.7, 0.6];
+// Zweigstelle: grösste Grösse, die hier passt (oder 0). Leere Bauplätze darf sie belegen, besetzte nicht.
+function filFitAt(x, y, s) {
+  for (const a of [-2.4, -1.2, 0, 1.2, 2.4]) for (const b of [-2.2, -1, 0.3, 1.5, 2.6]) if (!decoSpotOk(x + a * s * T, y + b * s * T, 'plot')) return false;
+  const r = filRect({ x, y, s });
+  return !G.things.some(t => THINGS[t.type].area !== 'weide' && overlap(slotRect(THINGS[t.type].area, t), r))
+    && !G.deco.some(d => DECOS[d.type].where === 'land' && inFil(d.x, d.y, { x, y, s }, 0.4));
+}
+const filFit = (x, y) => FIL_S.find(s => filFitAt(x, y, s)) || 0;
+// Beim Tragen einrasten: zwischen zwei Band-Strassen genau in die Mitte rücken (sonst müsste man aufs Pixel genau zielen)
+let filMemo = null;
+function filSnap(x, y) {
+  const key = [x >> 2, y >> 2, G.deco.length, G.things.length, G.land].join();
+  if (filMemo?.key === key) return filMemo.p;
+  const tx = x / T, ty = y / T, ys = basePaths().flatMap(p => p.slice(1).filter((q, j) => q[1] === p[j][1] && tx >= Math.min(q[0], p[j][0]) && tx <= Math.max(q[0], p[j][0])).map(q => q[1]));
+  const l1 = Math.max(...ys.filter(v => v <= ty)), l2 = Math.min(...ys.filter(v => v > ty));
+  let p = { x, y }; const s0 = filFit(x, y);
+  if (isFinite(l1) && isFinite(l2)) for (const s of FIL_S.filter(s => s > s0)) { const yc = ((l1 + 1) + (l2 - 0.6)) / 2 - 0.2 * s; if (filFitAt(x, yc * T, s)) { p = { x, y: yc * T }; break; } } // grösser, wenn mittig
+  filMemo = { key, p }; return p;
+}
 function decoSpotOk(x, y, k = G.carry) {
-  if (DECOS[k]?.sell) { // ganze Fläche frei? Raster über Haus und Parkplatz prüfen
-    for (const a of [-2.4, -1.2, 0, 1.2, 2.4]) for (const b of [-2.2, -1, 0.3, 1.5, 2.6]) if (!decoSpotOk(x + a * T, y + b * T, '')) return false;
-    return !G.deco.some(d => DECOS[d.type].where === 'land' && inFil(d.x, d.y, { x, y }, 0.4));
-  }
+  if (DECOS[k]?.sell) return filFit(x, y);
   if (x < T || x > (WORLD.w - 1) * T || y < 2 * T || y > (WORLD.h - 0.3) * T || inLake(x, y, 0.6) || inMts(x, y) || nearRiver(x, y, 0.6 * T)) return false;
   for (const f of FIXED_E) if (Math.abs(x - f.x) < 3 * T && y < f.y + 0.8 * T && y > f.y - 1.5 * T) return false;
-  for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko
+  if (k !== 'plot') for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko (plot: Zweigstelle darf auf leere Plätze)
     if (k === 'weide') continue;
     const a = AREAS[k];
     for (let i = 0; i < slotsAvail(k); i++) {
@@ -755,18 +805,23 @@ function fixDeco() {
   sightsOn(); // Plätze suchen, solange die Deko noch dasteht
   const land = G.deco.filter(d => DECOS[d.type].where === 'land'); G.deco = G.deco.filter(d => !land.includes(d));
   for (const d of land) {
+    if (DECOS[d.type].sell) d.s = clamp(+d.s || 1, 0.6, 1);
     if (DECOS[d.type].sell && !decoSpotOk(d.x, d.y, d.type)) { // Zweigstelle: nur so weit wie nötig verschieben, sie soll nah bei den Gebäuden bleiben
       out: for (let r = 1; r < 60; r++) for (let a = 0; a < 8 * r; a++) { const x = d.x + Math.cos(a / (8 * r) * 6.283) * r * 0.5 * T, y = d.y + Math.sin(a / (8 * r) * 6.283) * r * 0.5 * T; if (decoSpotOk(x, y, d.type)) { Object.assign(d, { x, y }); break out; } }
     }
     if (!decoSpotOk(d.x, d.y, d.type)) for (let i = 0; i < 600; i++) { const x = (2.5 + (i % 12) * 1.2) * T, y = (LAKE.y + LAKE.ry + 2 + Math.floor(i / 12) * 1.3) * T; if (decoSpotOk(x, y, d.type)) { Object.assign(d, { x, y }); break; } }
+    if (DECOS[d.type].sell) d.s = decoSpotOk(d.x, d.y, d.type) || d.s;
     G.deco.push(d);
   }
 }
 function placeDeco() {
   if (!G.carry) return;
   const { x, y } = ghostPos();
-  if (!decoSpotOk(x, y)) { AU.sfx('no'); toast($t`Hier ist kein Platz – such dir ein freies Stück Wiese! 🌼`, 'noplace'); return; }
-  G.deco.push({ id: G.nid++, type: G.carry, x, y }); G.carry = null; AU.sfx('buy'); save(); hud();
+  const ok = decoSpotOk(x, y);
+  if (!ok) { AU.sfx('no'); toast($t`Hier ist kein Platz – such dir ein freies Stück Wiese! 🌼`, 'noplace'); return; }
+  const d = { id: G.nid++, type: G.carry, x, y };
+  if (DECOS[G.carry].sell) { d.s = ok; toast($t`🛣️ Die Bauarbeiter bauen gleich eine Strasse zur Zweigstelle!`); }
+  G.deco.push(d); G.carry = null; AU.sfx('buy'); save(); hud();
 }
 function pickDeco(d) { if (G.carry) return; G.deco.splice(G.deco.indexOf(d), 1); G.carry = d.type; AU.sfx('pop'); hud(); }
 function buyDeco(k) {
@@ -991,7 +1046,7 @@ function shopList() {
   if (G.land >= DECOS.filiale.land) { // Händler-Zweigstelle: Lastwagen verkaufen beim nächsten Händler und parken dort
     const d = DECOS.filiale, n = decoCount('filiale'), full = n >= d.max, busy = !!G.carry;
     tabs[2].push({ icon: d.icon, name: d.name, price: d.price + n * 25000, info: d.info, can: !full && !busy, neu: !n,
-      desc: $t`Du stellst sie hin, wo du willst – deine Lastwagen verkaufen beim nächsten Händler und fahren kürzer`,
+      desc: $t`Du stellst sie hin, wo du willst – auch auf leere Bauplätze. Sie bekommt eine eigene Strasse, und deine Lastwagen verkaufen beim nächsten Händler`,
       note: full ? $t`✅ Schon gekauft` : busy ? $t`Stell zuerst ${DECOS[G.carry].name} ab` : n ? $t`Hast du schon ${n}×` : '',
       buy: () => buyDeco('filiale') });
   }
@@ -1700,7 +1755,7 @@ const townOn = () => TOWN.filter(b => G.land >= b.lv && (!b.se || sightsOn().som
 // Nächster Punkt auf einem Weg: [Abstand, x, y] (Kacheln)
 function nearPath(x, y) {
   let best = [1e9];
-  for (const p of paths()) for (let j = 1; j < p.length; j++) {
+  for (const p of basePaths()) for (let j = 1; j < p.length; j++) {
     const [ax, ay] = p[j - 1], dx = p[j][0] - ax, dy = p[j][1] - ay, t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1), d = Math.hypot(x - ax - t * dx, y - ay - t * dy);
     if (d < best[0]) best = [d, ax + t * dx, ay + t * dy];
   }
@@ -1720,7 +1775,7 @@ function sightsOn() {
   };
   const busy = bandRects();
   G.land += 6; const later = bandRects(); G.land -= 6; // so gross sind die Bänder in 6 Land-Stufen: neuer Platz für Sehenswürdigkeiten bleibt eine Weile frei
-  for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push(DECOS[d.type].sell ? [d.x / T + FIL[0], d.x / T + FIL[1], d.y / T + FIL[2], d.y / T + FIL[3]] : [d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
+  for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push(DECOS[d.type].sell ? filRect(d).map(v => v / T) : [d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
   const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
     .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 })),
       Object.entries(AREAS).filter(([, a]) => a.hub && areaOn(a)).map(([k, a]) => ({ k, hub: a, lv: a.from, w: a.cols * a.dx + 0.8, h: hubH(a) }))).sort((a, b) => a.lv - b.lv);
@@ -1736,7 +1791,7 @@ function sightsOn() {
   for (const s of todo) s.old = spot[key(s)];
   for (const s of todo) if (Array.isArray(s.old) && put(s, +s.old[0], +s.old[1])) s.done = 1; // zuerst alle, die bleiben dürfen
   // Sehenswürdigkeit: freier Platz nahe einem Wegende, Strafe für Nachbarn unter 16 Kacheln → verteilt über die Bänder
-  const ends = paths().map(p => p.at(-1));
+  const ends = basePaths().map(p => p.at(-1));
   for (const s of todo) if (!s.done && !s.town && !s.hub) {
     let best = null;
     for (const [ex, ey] of ends) for (let y = Math.round(ey - 1); y <= ey + s.h + 2; y++) for (let x = Math.round(ex - s.w / 2); x <= ex + s.w / 2 + 30; x++) {
@@ -3379,7 +3434,7 @@ function drawSky(camX, vw) {
 // Neu gezeichnet bei Zoom, Landkauf (G.land bestimmt Bänder, Wege, Sumpf) oder wenn die Kamera aus dem Rand läuft.
 const bg = { c: document.createElement('canvas'), key: '' };
 function drawBg(camX, camY, vw, vh) {
-  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, sightsOn() && sightMemo.gen, SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
+  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, sightsOn() && sightMemo.gen, branches().map(b => [b.x | 0, b.y | 0, b.s]).join('/'), SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
   if (key !== bg.key || camX < bg.x || camY < bg.y || camX + vw > bg.x + bg.w || camY + vh > bg.y + bg.h) {
     const m = Math.max(vw, vh) * 0.35, main = ctx;
     Object.assign(bg, { key, x: camX - m, y: camY - m, w: vw + 2 * m, h: vh + 2 * m });
@@ -4093,7 +4148,11 @@ function rainbow() { // hinter den Bergen (vor dem Hintergrund-Cache gezeichnet)
 
 // ---- Deko-Zeichnungen (x/y = Fusspunkt) ----
 const DECO_DRAW = {
-  filiale(x, y) { // Händler-Zweigstelle: Lagerhalle mit Rolltor und Laderampe, davor Parkplatz mit 4 Feldern
+  filiale(x, y, d) { // auf Bauplätzen kleiner (d.s)
+    const s = d?.s || 1; if (s === 1) return DECO_DRAW.filiale1(x, y);
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); DECO_DRAW.filiale1(0, 0); ctx.restore();
+  },
+  filiale1(x, y) { // Händler-Zweigstelle: Lagerhalle mit Rolltor und Laderampe, davor Parkplatz mit 4 Feldern
     const px0 = x + FIL[0] * T + 6, pw = (FIL[1] - FIL[0]) * T - 12, py0 = y + 0.3 * T, ph = (FIL[3] - 0.3) * T - 10;
     ctx.fillStyle = '#b9b2a2'; rrect(px0 - 5, py0 - 5, pw + 10, ph + 10, 10); ctx.fill(); // Randstein
     ctx.fillStyle = '#5d6166'; rrect(px0, py0, pw, ph, 7); ctx.fill();
@@ -4391,7 +4450,7 @@ function render() {
     else if (t.ghost) { // Vorschau: so würde es stehen
       const ok = decoSpotOk(t.x, t.y);
       ctx.globalAlpha = 0.85; ellipse(t.x, t.y, 22, 8, ok ? 'rgba(80,200,80,.45)' : 'rgba(220,50,40,.5)');
-      ctx.globalAlpha = 0.6; DECO_DRAW[t.ghost](t.x, t.y, { id: 0 }); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.6; DECO_DRAW[t.ghost](t.x, t.y, { id: 0, s: ok || 1 }); ctx.globalAlpha = 1;
     }
     else if (DECOS[t.type] && !THINGS[t.type]) DECO_DRAW[t.type](t.x, t.y, t);
     else if (t.type === 'baum') drawTree(t);
@@ -4407,7 +4466,7 @@ function render() {
   }
   // Namen, Status, Warnungen
   for (const t of FIXED_E) label(t.x, t.y + 18, t.name, 14);
-  for (const b of branches()) if (vis(b.x, b.y)) label(b.x, b.y + (FIL[3] + 0.1) * T, DECOS[b.type].name, 13);
+  for (const b of branches()) if (vis(b.x, b.y)) label(b.x, b.y + (FIL[3] * (b.s || 1) + 0.1) * T, DECOS[b.type].name, 13);
   for (const s of sOn) s.hub ? label(s.x * T, s.y * T + 22, `${s.hub.icon} ${s.hub.name}`, 18) : label(s.x * T, s.y * T + 18, `${G.pass[s.k] ? '✅' : '📸'} ${SIGHTS[s.k].name}`, 14);
   for (const t of G.things) {
     const p = pos(t); if (!vis(p.x, p.y)) continue;
