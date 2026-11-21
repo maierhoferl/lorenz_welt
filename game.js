@@ -374,7 +374,7 @@ function startGame(p, key, server) {
   pt = playTime(); if (pt.s >= (pt.lim || LIMIT)) timeUp();
   hud(); toast('ontouchstart' in window ? $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten oder wisch über den Bildschirm.` : $t`Willkommen, ${P.name}! Lauf mit den Pfeiltasten (oder WASD).`);
 }
-// ---- Tageslimit: 30 Min. pro Spieler und Tag, Eltern-Code gibt je 5 Min. dazu ----
+// ---- Tageslimit: 30 Min. pro Spieler und Tag, Eltern-Code stellt die Minuten bis zur nächsten Sperre ein ----
 const LIMIT = 30 * 60, PARENT = 'lorenzmaierhofer'; // ponytail: Klartext im Client – hält Kinder auf, nicht DevTools/localStorage
 const today = () => new Date().toLocaleDateString('sv');
 const playTime = () => { const t = store.get('lw_time_' + P.id); return t?.d === today() ? t : { d: today(), s: 0 }; };
@@ -386,11 +386,12 @@ function tickTime(dt) {
   if (before < LIMIT - 300 && pt.s >= LIMIT - 300) toast($t`⏰ Noch 5 Minuten Spielzeit für heute!`);
   if (pt.s >= (pt.lim || LIMIT)) timeUp();
 }
-function timeUp() { store.set('lw_time_' + P.id, pt); save(true); closeModals(); $('#tupass').value = ''; $('#tumsg').textContent = ''; show('timeup'); }
+function timeUp() { store.set('lw_time_' + P.id, pt); save(true); closeModals(); $('#tupass').value = ''; $('#tupass').hidden = false; $('#tuminw').hidden = true; $('#tumsg').textContent = ''; show('timeup'); }
 $('#tuform').onsubmit = e => {
   e.preventDefault();
   if ($('#tupass').value !== PARENT) { $('#tumsg').textContent = $t`Falscher Code`; return; }
-  pt.lim = pt.s + 5 * 60; store.set('lw_time_' + P.id, pt); show('game'); resize();
+  if ($('#tuminw').hidden) { $('#tupass').hidden = true; $('#tuminw').hidden = false; $('#tumsg').textContent = ''; $('#tumin').select(); return; } // Schritt 2: Minuten wählen
+  pt.lim = pt.s + Math.min(600, Math.max(1, Math.round(+$('#tumin').value) || 5)) * 60; store.set('lw_time_' + P.id, pt); show('game'); resize();
 };
 $('#tuexit').onclick = () => $('#bexit').click();
 $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); renderSelect(); };

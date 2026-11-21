@@ -76,7 +76,7 @@ var TR = {
     'Name': 'Name', 'Alter:': 'Age:', "Los geht's!": "Let's go!", 'Abbrechen': 'Cancel',
     'Code vergessen?': 'Forgot your code?', 'Code vergessen? Löse alle Rechnungen!': 'Forgot your code? Solve all the sums!', 'Prüfen': 'Check',
     "Genug gespielt für heute! Morgen geht's weiter.": "That's enough playing for today! See you tomorrow.",
-    'Eltern-Code': 'Parent code', 'Code': 'Code', 'Weiterspielen': 'Keep playing', 'Spieler wechseln': 'Switch player',
+    'Eltern-Code': 'Parent code', 'Code': 'Code', 'Weiterspielen': 'Keep playing', 'Spieler wechseln': 'Switch player', 'Minuten bis zur nächsten Sperre': 'Minutes until the next lock',
     'Rauszoomen (−)': 'Zoom out (−)', 'Reinzoomen (+)': 'Zoom in (+)', 'Produktions-Plan': 'Production plan', 'Musik an/aus': 'Music on/off', 'Ton an/aus': 'Sound on/off', 'Stromsparen an/aus': 'Battery saver on/off', '🔋 Stromsparen an': '🔋 Battery saver on', '🔋 Stromsparen aus': '🔋 Battery saver off',
 
     '🔒 {} Jahre': '🔒 {} years', '✨ neu': '✨ new', 'Neuer Spieler': 'New player',
