@@ -1239,6 +1239,7 @@ function openPlan() {
   modal($('#plan'), $t`📊 Dein Produktions-Plan`, `${legend}<div style="overflow:auto">${svg}</div><h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small><small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`, head);
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
+  { const tb = el.querySelector('.tabs'), on = tb?.querySelector('.on'); if (on && tb.scrollWidth > tb.clientWidth) tb.scrollLeft = on.offsetLeft - (tb.clientWidth - on.offsetWidth) / 2; } // aktiver Reiter sichtbar (Handy: wischbare Reihe)
   let focus = null; // Antippen: Zulieferer und Abnehmer bleiben hell, der Rest wird blass
   el.querySelectorAll('[data-k]').forEach(g => g.onclick = e => {
     const k = g.dataset.k;
