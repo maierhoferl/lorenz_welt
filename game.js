@@ -676,9 +676,11 @@ function addInv(item, n) { G.inv[item] = (G.inv[item] || 0) + n; }
 let toastKeys = {};
 function toast(msg, key, soft) {
   if (key) { if (toastKeys[key] > time) return; toastKeys[key] = time + 10; }
-  const d = document.createElement('div'); d.textContent = msg; if (soft) { d.className = 'soft'; document.body.append(d); } else $('#toast').append(d);
+  const d = document.createElement('div'); d.textContent = msg; if (soft) d.className = 'soft'; $('#toast').append(d);
   setTimeout(() => d.remove(), 10000);
 }
+// Meldungen sitzen über der Info-Leiste unten; deren Höhe wechselt (ein-/ausgeblendet, umgebrochen)
+new ResizeObserver(() => { const px = $('#prox'); document.documentElement.style.setProperty('--proxh', px.hidden ? '0px' : px.offsetHeight + 10 + 'px'); }).observe($('#prox'));
 function floater(x, y, text) { floaters.push({ x, y, text, t: 0 }); }
 function take(t, field) { // Ware vom Lager in die Tasche
   const item = THINGS[t.type].item, free = bagCap() - bagCount(), n = Math.min(t[field], free);
