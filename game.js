@@ -263,13 +263,16 @@ function checkUnlock(k) {
   return G.unlocks < UNLOCKS.length ? UNLOCKS[G.unlocks++] : null;
 }
 
-function slotsAvail(area) { const a = AREAS[area], f = a.from || 0; return G.land < f ? 0 : a.base + a.per * (G.land - f); }
+function slotsAvail(area) { const a = AREAS[area], f = a.from || 0, n = G.land < f ? 0 : a.base + a.per * (G.land - f); return a.hub ? Math.min(a.max, n) : n; }
 function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
   const a = AREAS[area];
+  if (a.hub) { const s = sightsOn().find(s => s.k === area); return { x: (s.x - s.w / 2 + 0.4 + (i % a.cols + 0.5) * a.dx) * T, y: (s.y - 0.5 - Math.floor(i / a.cols) * a.dy) * T }; } // Geschäftszentrum: Reihe 0 unten
   const [c, r] = a.cols ? [i % a.cols, Math.floor(i / a.cols)] : [Math.floor(i / a.rows), i % a.rows];
   return { x: (a.x + c * a.dx) * T, y: (a.y + r * a.dy) * T };
 }
 const areaOn = a => G.land >= (a.from || 0);
+const hubH = a => 3.4 + (Math.ceil(a.max / a.cols) - 1) * a.dy; // Geschäftszentrum gleich in voller Grösse: wächst nicht, zieht also nicht um
+const bands = () => Object.keys(AREAS).filter(k => areaOn(AREAS[k]) && !AREAS[k].hub); // Geschäftszentren sind keine Bänder
 const areaEnd = k => { const a = AREAS[k], n = slotsAvail(k); return a.x + Math.max(0, (a.cols ? Math.min(a.cols, n) : Math.ceil(n / a.rows)) - 1) * a.dx; }; // x der letzten Spalte
 const areaRows = k => { const a = AREAS[k]; return a.cols ? Math.max(1, Math.ceil(slotsAvail(k) / a.cols)) : a.rows; };
 // Gülle-Verteiler (ab Land-Stufe 20): sammelt Dung von den Tieren und düngt die Weizenfelder → doppelte Ernte
@@ -282,14 +285,16 @@ function relayout() { // Plätze neu setzen (alte Spielstände hatten ein andere
   }
 }
 function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun wächst mit
-  const on = Object.keys(AREAS).filter(k => areaOn(AREAS[k]));
+  const on = bands();
   PASTURE.w = Math.max(10, areaEnd('weide') - PASTURE.x + 1.6);
   WORLD.w = Math.max(48, ...on.map(k => Math.ceil(areaEnd(k) + 3)));
-  WORLD.h = Math.max(...on.map(k => { const a = AREAS[k]; return Math.max(a.y + (areaRows(k) - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); }));
+  const bh = k => { const a = AREAS[k]; return Math.max(a.y + (areaRows(k) - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); };
+  const hubs = Object.values(AREAS).filter(a => a.hub && areaOn(a)), hh = Math.max(0, ...hubs.map(hubH)); // Geschäftsviertel: eigener Streifen unter den Bändern, da wächst kein Band hinein
+  WORLD.h = Math.max(...on.map(bh), hubs.length ? Math.max(...on.filter(k => AREAS[k].x > ROAD_X).map(bh)) + hh + 2 : 0);
 }
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 function paths() {
-  const on = Object.keys(AREAS).filter(k => areaOn(AREAS[k])), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
+  const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
   return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, Math.max(...L.map(l => l[0]))]]], L.map(([y, x]) => [[ROAD_X, y], [x, y]]));
 }
 function freeSlot(area) {
@@ -333,7 +338,7 @@ function loadGame(server) {
     G.deco = (G.deco || []).filter(d => DECOS[d.type]);
     if (G.carry && !DECOS[G.carry]) G.carry = null;
     const u0 = G.unlocks;
-    relayout(); fitWorld();
+    fitWorld(); relayout(); // erst Weltgrösse: Geschäftszentren suchen ihren Platz darin
     fixDeco();
     for (const t of G.things) checkUnlock(t.type); // alte Spielstände: schon gebaute Endstationen zählen
     G.unlocks = Math.max(G.unlocks, Math.min(Object.keys(G.fin).length, UNLOCKS.length)); // jede Endstation schaltet 1 Kette frei – auch Ketten, die erst später ins Spiel kamen
@@ -709,7 +714,7 @@ function decoSpotOk(x, y) {
     const a = AREAS[k];
     for (let i = 0; i < slotsAvail(k); i++) {
       const p = slotPos(k, i);
-      if (k === 'acker' ? Math.abs(x - p.x) < 2.8 * T && Math.abs(y - p.y) < 1.9 * T : Math.abs(x - p.x) < a.dx / 2 * T && y > p.y - (k === 'dorf' ? 2.6 : 1.4) * T && y < p.y + 0.6 * T) return false;
+      if (k === 'acker' ? Math.abs(x - p.x) < 2.8 * T && Math.abs(y - p.y) < 1.9 * T : Math.abs(x - p.x) < a.dx / 2 * T && y > p.y - (k === 'dorf' || a.hub ? 2.6 : 1.4) * T && y < p.y + 0.6 * T) return false;
     }
   }
   for (const p of paths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; if (x > (Math.min(ax, bx) - 0.8) * T && x < (Math.max(ax, bx) + 0.8) * T && y > (Math.min(ay, by) - 0.6) * T && y < (Math.max(ay, by) + 1) * T) return false; } // nicht auf den Weg
@@ -837,8 +842,12 @@ function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
   const f = [];
   for (const [k, a] of Object.entries(AREAS)) if (a.from === l) {
     const th = Object.values(THINGS).filter(t => t.land === l && !UNLOCKS.flat().some(u => THINGS[u] === t)), tl = Object.values(TOOLS).find(t => t.land === l);
-    f.push({ ic: th.find(t => t.area === k)?.icon || '🎉', t: $t`Neues Gebiet im Süden: ${a.name}!`,
+    f.push({ ic: a.icon || th.find(t => t.area === k)?.icon || '🎉', t: a.hub ? $t`Neues Geschäftszentrum im Südosten: ${a.name}!` : $t`Neues Gebiet im Süden: ${a.name}!`,
       d: th.map(t => `${t.icon} ${t.name}`).concat(tl ? [`${tl.icon} ${tl.name}`] : []).join(' · ') });
+  }
+  if (!f.length) { // Stufe ohne neues Gebiet: neue Gebäude in einem Geschäftszentrum
+    const th = Object.values(THINGS).filter(t => t.land === l && !UNLOCKS.flat().some(u => THINGS[u] === t));
+    if (th.length) f.push({ ic: th[0].icon, t: $t`${AREAS[th[0].area].name} wächst!`, d: th.map(t => `${t.icon} ${t.name}`).join(' · ') });
   }
   const i = HOF_LV.indexOf(l);
   if (i >= 0) f.push({ ic: '🏡', t: $t`Dein Bauernhof bekommt ${HOF_ADD[i]}!`, d: $t`Lauf hin und schau ihn dir an!` });
@@ -1651,13 +1660,14 @@ function sightsOn() {
   if (sightMemo?.g === G && sightMemo.land === G.land && sightMemo.w === WORLD.w) return sightMemo.list;
   const busy = []; // [x0, x1, y0, y1] in Kacheln
   for (const k in AREAS) {
-    const a = AREAS[k]; if (!areaOn(a) || a.x < ROAD_X) continue;
+    const a = AREAS[k]; if (!areaOn(a) || a.hub || a.x < ROAD_X) continue;
     busy.push([0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), a.y + (areaRows(k) - 1) * a.dy + 0.8]);
   }
   if (areaOn(AREAS.terminal)) busy.push([0, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
   for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push([d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
   const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
-    .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 }))).sort((a, b) => a.lv - b.lv);
+    .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 })),
+      Object.entries(AREAS).filter(([, a]) => a.hub && areaOn(a)).map(([k, a]) => ({ k, hub: a, lv: a.from, w: a.cols * a.dx + 0.8, h: hubH(a) }))).sort((a, b) => a.lv - b.lv);
   const list = [], spot = G.spot ||= {};
   const fits = r => !busy.some(b => r[0] < b[1] && r[1] > b[0] && r[2] < b[3] && r[3] > b[2]) && r[0] > ROAD_X + 1 && r[1] < WORLD.w - 0.5 && r[2] > 4 && r[3] < WORLD.h + 0.3;
   const put = (s, x, y) => { // unten Platz fürs Namensschild
@@ -1670,6 +1680,8 @@ function sightsOn() {
   for (const s of todo) if (Array.isArray(s.old) && put(s, +s.old[0], +s.old[1])) s.done = 1; // zuerst alle, die bleiben dürfen
   // ponytail: Rasterscan O(Höhe·Breite·Hindernisse) je Ding, läuft nur beim Landkauf – Freiflächen-Liste, falls es mal ruckelt
   for (const s of todo) if (!s.done) find: for (let y = Math.floor(WORLD.h - 0.5); y - s.h > 4; y--) for (let x = Math.floor(WORLD.w - 1 - s.w / 2); x - s.w / 2 > ROAD_X + 1; x--) if (put(s, x, y)) break find;
+  // ponytail: Geschäftszentrum ohne freien Platz steht notfalls ganz unten rechts, auch wenn es etwas überlappt – bei 200 Stufen ist dort immer Wiese
+  for (const s of todo) if (s.hub && !list.includes(s)) list.push(Object.assign(s, { x: WORLD.w - s.w / 2 - 1, y: WORLD.h - 0.8 }));
   sightMemo = { g: G, land: G.land, w: WORLD.w, list, busy, gen: (sightMemo?.gen || 0) + 1 };
   return list;
 }
@@ -1702,7 +1714,7 @@ function drawPanorama() {
 // Reisepass: erster Besuch = Stempel, Taschengeld und „Wusstest du?“
 function visitSights() {
   for (const s of sightsOn()) {
-    if (s.town || G.pass[s.k] || Math.abs(G.px / T - s.x) > s.w / 2 || G.py / T < s.y - s.h || G.py / T > s.y + 0.7) continue;
+    if (s.town || s.hub || G.pass[s.k] || Math.abs(G.px / T - s.x) > s.w / 2 || G.py / T < s.y - s.h || G.py / T > s.y + 0.7) continue;
     const d = SIGHTS[s.k], fr = d.lv * 20;
     G.pass[s.k] = 1; G.money += fr; AU.sfx('cash'); hud(); save();
     floater(s.x * T, (s.y - s.h) * T, `📸 +${fr} Fr.`);
@@ -2757,6 +2769,166 @@ DRAW.jubilaeumsbeck = (x, y, t) => { // drei Stockwerke Torte, 100 Kerzen (na ja
 };
 DRAW.default = (x, y, t) => { const d = THINGS[t.type]; house(x, y, 104, 60, '#e8dcc4', '#8a5a3a'); win(x - 40, y - 44, 20, 16, t.working); door(x + 10, y, 18, 30); sign(x, y - 68, d.name.toUpperCase() + ' ' + d.icon); };
 const HGT = { erdbeerfeld: 40, kraeuterbeet: 40, kuerbisfeld: 40, maisfeld: 80, schaf: 56, wald: 110, quelle: 56, shakebar: 136, toertlibeck: 114, spinnerei: 124, strickstube: 128, popcornmaschine: 130, polentagrotto: 92, zaeltlifabrik: 112, teestube: 118, saegerei: 106, schreinerei: 132, suppenchuchi: 116, schnitzerei: 108, sprudelei: 136, sirupkueche: 126, jubilaeumsbeck: 132, geiss: 60, ruebenfeld: 40, kirschbaum: 106, geisskaeserei: 110, chaeschueechli_beck: 112, zuckerfabrik: 104, taefeli_kueche: 110, nougat_kueche: 124, konfiserie: 104, kirschtorte_beck: 118, bienenhaus: 66, kartoffelfeld: 40, kastanienbaum: 106, laeckerli_huus: 118, biberbeck: 124, roestibeiz: 118, raclettestube: 122, chipsfabrik: 120, marronistand: 92, vermicelles_kueche: 128, gelateria: 130, sennhuette: 96, gruyerestube: 136, maelzerei: 128, malzfabrik: 120, schoggistube: 122, meringuerie: 128, tortenmeister: 156, schoggifabrik: 110, doerrhaus: 122, kafistube: 118, schneckenbeck: 122, zopfbeck: 116, keksbaeckerei: 122, saftpresse: 124, schoggikonditorei: 124, kaffeeroesterei: 116, rebe: 62, fischteich: 50, huhn: 70, masthuhn: 70, schwein: 60, kakaoimport: 80, kaffeeimport: 80, fonduestube: 105, hof: 112, haendler: 110, laden: 130, muehle: 170, baeckerei: 115, molkerei: 110, kaeserei: 110, konditorei: 110, baum: 92, kuh: 50, feld: 1.5 * T + 8 };
+// ===== Geschäftszentren (AREAS mit hub): Pflasterplatz, ein Hausstil je Zentrum, eigene Bilder für die Rohstoff-Quellen =====
+function drawHub(s) { // flach unter allem: Pflaster mit Randstein, Bäumchen in den oberen Ecken, Fahne
+  const x0 = (s.x - s.w / 2) * T, y0 = (s.y - s.h) * T, W = s.w * T, H = (s.h + 0.7) * T, g = s.hub.ground;
+  ctx.fillStyle = shade(g, 1.18); rrect(x0 - 5, y0 - 5, W + 10, H + 10, 16); ctx.fill();
+  ctx.fillStyle = g; rrect(x0, y0, W, H, 12); ctx.fill();
+  ctx.strokeStyle = shade(g, 0.9); ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = x0 + 24; x < x0 + W; x += 24) { ctx.moveTo(x, y0 + 4); ctx.lineTo(x, y0 + H - 4); }
+  for (let y = y0 + 24; y < y0 + H; y += 24) { ctx.moveTo(x0 + 4, y); ctx.lineTo(x0 + W - 4, y); }
+  ctx.stroke();
+  for (const bx of [x0 + 16, x0 + W - 16]) { ellipse(bx, y0 + 22, 12, 4, 'rgba(0,0,0,.2)'); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(bx - 2, y0 + 8, 4, 14); ellipse(bx, y0 + 4, 12, 11, '#3f8a3a'); }
+  flagPole(x0 + 14, y0 + H - 6, 70, 18, s.x);
+}
+function emblem(x, y, t, sz = 22) { // Produkt thront auf dem Dach und hüpft, solange gearbeitet wird
+  const j = t.working ? Math.abs(Math.sin(time * 4 + t.id)) * 4 : 0;
+  ctx.font = `${sz}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(ITEMS[THINGS[t.type].item].icon, x, y - j);
+}
+const BIZ = {
+  industrie(x, y, t) { // Backstein-Halle mit Sheddach (Glas zeigt nach Norden) und rauchendem Kamin
+    ellipse(x + 6, y, 62, 10, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#a5523a'; ctx.fillRect(x - 56, y - 50, 112, 50);
+    ctx.strokeStyle = 'rgba(60,20,10,.25)'; ctx.lineWidth = 1; ctx.beginPath(); for (let yy = y - 44; yy < y; yy += 6) { ctx.moveTo(x - 56, yy); ctx.lineTo(x + 56, yy); } ctx.stroke();
+    for (let i = 0; i < 4; i++) { const a = x - 56 + i * 28; ctx.fillStyle = '#bfe0f5'; ctx.fillRect(a, y - 68, 4, 18); ctx.fillStyle = '#5a5f66'; ctx.beginPath(); ctx.moveTo(a + 4, y - 68); ctx.lineTo(a + 28, y - 50); ctx.lineTo(a + 4, y - 50); ctx.fill(); }
+    for (const wx of [-46, -22, 2]) win(x + wx, y - 40, 16, 18, t.working);
+    ctx.fillStyle = '#5a5f66'; ctx.fillRect(x + 24, y - 28, 24, 28); // Rolltor
+    ctx.fillStyle = '#7a3a28'; ctx.fillRect(x + 36, y - 104, 12, 36); ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 36, y - 98, 12, 3);
+    if (t.working) for (let i = 0; i < 3; i++) { const k = (time * 0.6 + i / 3) % 1; ellipse(x + 42 + k * 14, y - 108 - k * 30, 5 + k * 8, 4 + k * 6, `rgba(210,210,210,${0.6 * (1 - k)})`); }
+    emblem(x - 16, y - 76, t); sign(x - 4, y - 58, bname(t));
+  },
+  uhrental(x, y, t) { // Uhrmacherhaus aus dem Jura: lange Fensterbänder, weil man für winzige Teile viel Licht braucht
+    house(x, y, 104, 62, '#f2ede0', '#4a4a52', 26);
+    for (const r of [y - 54, y - 34]) for (let i = 0; i < 7; i++) { ctx.fillStyle = '#5b5048'; ctx.fillRect(x - 50 + i * 14, r - 1, 13, 15); ctx.fillStyle = t.working ? '#ffe3a0' : '#bfe0f5'; ctx.fillRect(x - 49 + i * 14, r, 11, 13); }
+    door(x, y, 16, 18, '#3a4a6a');
+    const cx = x, cy = y - 80, a = time * 0.6 + t.id; // Uhr am Giebel – der Sekundenzeiger läuft
+    ellipse(cx, cy, 10, 10, '#fff'); ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 7); ctx.stroke();
+    line('#222', 2, cx, cy, cx + Math.sin(a / 12) * 5, cy - Math.cos(a / 12) * 5); line('#c8102e', 1.2, cx, cy, cx + Math.sin(a) * 8, cy - Math.cos(a) * 8);
+    emblem(x + 44, y - 94, t, 18); sign(x, y - 66, bname(t));
+  },
+  bankenplatz(x, y, t) { // Bank mit Säulen und Giebel wie am Paradeplatz
+    ellipse(x + 6, y, 62, 9, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#cfc8b8'; ctx.fillRect(x - 56, y - 8, 112, 8); ctx.fillStyle = '#e2dccd'; ctx.fillRect(x - 50, y - 60, 100, 52);
+    ctx.fillStyle = '#f4efe2'; for (const cx of [-44, -26, 18, 36]) { ctx.fillRect(x + cx, y - 56, 8, 48); ctx.fillRect(x + cx - 2, y - 58, 12, 4); }
+    ctx.fillStyle = '#c8c0ae'; ctx.beginPath(); ctx.moveTo(x - 58, y - 60); ctx.lineTo(x, y - 84); ctx.lineTo(x + 58, y - 60); ctx.fill();
+    door(x, y - 8, 20, 30, '#4a3a28'); ellipse(x, y - 39, 10, 4, '#4a3a28');
+    emblem(x, y - 88, t, 20); sign(x, y - 66, bname(t));
+  },
+  pharma(x, y, t) { // weisses Labor und ein Turm, der oben in Stufen schmaler wird
+    ellipse(x + 6, y, 62, 9, 'rgba(0,0,0,.2)');
+    ctx.fillStyle = '#f4f6f4'; ctx.fillRect(x - 56, y - 44, 72, 44); ctx.fillRect(x + 16, y - 80, 38, 80); ctx.fillRect(x + 16, y - 92, 30, 12); ctx.fillRect(x + 16, y - 102, 22, 10);
+    ctx.fillStyle = t.working ? '#ffe3a0' : '#9cc4d8'; for (let yy = y - 76; yy < y - 4; yy += 9) ctx.fillRect(x + 19, yy, 32, 4); ctx.fillRect(x - 52, y - 34, 64, 8); ctx.fillRect(x - 52, y - 20, 64, 8);
+    ctx.fillStyle = '#2f9a4e'; ctx.fillRect(x - 47, y - 56, 12, 4); ctx.fillRect(x - 43, y - 60, 4, 12); // grünes Apotheken-Kreuz
+    emblem(x - 14, y - 52, t); sign(x - 20, y - 48, bname(t));
+  },
+  technopark(x, y, t) { // Glaswürfel mit Antenne, das rote Licht blinkt
+    ellipse(x + 6, y, 60, 9, 'rgba(0,0,0,.2)');
+    const g = ctx.createLinearGradient(x - 50, y - 64, x + 50, y); g.addColorStop(0, '#a8d6f0'); g.addColorStop(1, '#3a6f9a');
+    ctx.fillStyle = g; ctx.fillRect(x - 50, y - 64, 100, 64);
+    if (t.working) { ctx.fillStyle = 'rgba(255,230,150,.35)'; ctx.fillRect(x - 50, y - 64 + ((time * 30) % 64), 100, 6); }
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); for (let i = 1; i < 5; i++) { ctx.moveTo(x - 50 + i * 20, y - 64); ctx.lineTo(x - 50 + i * 20, y); } for (let j = 1; j < 4; j++) { ctx.moveTo(x - 50, y - j * 16); ctx.lineTo(x + 50, y - j * 16); } ctx.stroke();
+    ctx.fillStyle = '#3a4048'; ctx.fillRect(x - 54, y - 68, 108, 5);
+    line('#555', 2, x + 36, y - 68, x + 36, y - 94); ellipse(x + 36, y - 95, 2.5, 2.5, Math.sin(time * 5) > 0 ? '#ff3a2e' : '#7a1a14');
+    emblem(x - 10, y - 76, t); sign(x, y - 50, bname(t));
+  },
+  kicampus(x, y, t) { // dunkles Glas mit leuchtenden Leiterbahnen – sie pulsieren, wenn die KI rechnet
+    ellipse(x + 6, y, 60, 9, 'rgba(0,0,0,.25)');
+    ctx.fillStyle = '#23283a'; rrect(x - 52, y - 66, 104, 66, 10); ctx.fill();
+    const p = t.working ? 0.5 + 0.5 * Math.sin(time * 4 + t.id) : 0.15, neon = `rgba(90,220,255,${0.35 + 0.65 * p})`;
+    ctx.strokeStyle = neon; ctx.lineWidth = 2; rrect(x - 52, y - 66, 104, 66, 10); ctx.stroke();
+    for (let i = 0; i < 5; i++) { const bx = x - 42 + i * 21, by = y - 30 - (i % 2) * 14; line(neon, 1.5, bx, y - 4, bx, by, bx + 9, by - 9); ellipse(bx + 9, by - 9, 2.4, 2.4, neon); }
+    emblem(x, y - 74, t); sign(x, y - 52, bname(t));
+  },
+};
+for (const [k, d] of Object.entries(THINGS)) if (AREAS[d.area].hub && d.kind === 'factory') DRAW[k] = BIZ[d.area];
+const crateOf = (t, x, y, c) => { if (t.store > 0) crate(x, y, c, Math.min(t.store, 12)); };
+DRAW.kraftwerk = (x, y, t) => { // Staumauer mit Stausee dahinter, unten das Maschinenhaus, daneben ein Strommast
+  const g = grown(t);
+  ellipse(x, y, 64, 10, 'rgba(0,0,0,.22)');
+  ellipse(x, y - 56, 54, 10, '#3c7fb8'); ellipse(x - 12, y - 58, 26, 3, 'rgba(255,255,255,.3)');
+  const gr = ctx.createLinearGradient(x - 50, 0, x + 50, 0); gr.addColorStop(0, '#d8d4cc'); gr.addColorStop(1, '#a8a49c');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x - 56, y - 54); ctx.quadraticCurveTo(x, y - 44, x + 56, y - 54); ctx.lineTo(x + 44, y); ctx.lineTo(x - 44, y); ctx.fill();
+  ctx.fillStyle = '#e8e4da'; ctx.fillRect(x - 14, y - 18, 28, 18); ctx.fillStyle = '#f2c21a'; ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillText('⚡', x, y - 5);
+  ctx.strokeStyle = 'rgba(140,200,240,.9)'; ctx.lineWidth = 2 + g * 3; ctx.beginPath(); ctx.moveTo(x + 18, y - 10); ctx.quadraticCurveTo(x + 30, y - 8, x + 34, y); ctx.stroke();
+  line('#6a6e74', 2, x + 52, y, x + 58, y - 62, x + 64, y); line('#6a6e74', 2, x + 50, y - 46, x + 66, y - 46); line('#6a6e74', 1.5, x + 52, y - 30, x + 64, y - 30);
+  crateOf(t, x - 60, y + 4, '#f2cf3b');
+};
+DRAW.bergwerk = (x, y, t) => { // Berg mit Stollen, das Grubenwägeli rollt heraus, sobald es voll ist
+  const g = grown(t);
+  ellipse(x, y, 64, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#8a8478'; ctx.beginPath(); ctx.moveTo(x - 64, y); ctx.quadraticCurveTo(x - 36, y - 86, x + 6, y - 72); ctx.quadraticCurveTo(x + 50, y - 62, x + 64, y); ctx.fill();
+  ctx.fillStyle = '#1e1a16'; ctx.beginPath(); ctx.arc(x - 14, y, 18, Math.PI, 0); ctx.fill();
+  line('#7a5230', 4, x - 33, y, x - 33, y - 20, x + 5, y - 20, x + 5, y);
+  line('#6b4a2b', 2, x - 14, y + 2, x + 56, y + 2); line('#6b4a2b', 2, x - 14, y - 4, x + 56, y - 4);
+  const cx = x - 14 + g * 48; ctx.fillStyle = '#5a5f66'; ctx.fillRect(cx - 10, y - 16, 20, 12); wheel(cx - 6, y - 3, 3); wheel(cx + 6, y - 3, 3);
+  if (g > 0.5) for (let i = 0; i < 4; i++) ellipse(cx - 6 + i * 4, y - 17 - (i % 2) * 2, 3.5, 3, '#6a4a3a');
+  crateOf(t, x + 70, y + 4, '#6a4a3a');
+};
+DRAW.goldwaschplatz = (x, y, t) => { // Bach mit Waschrinne, das Gold glitzert in der Pfanne
+  const g = grown(t);
+  ctx.strokeStyle = '#5a9ad0'; ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 64, y - 10); ctx.quadraticCurveTo(x - 10, y - 30, x + 20, y - 4); ctx.quadraticCurveTo(x + 40, y + 10, x + 64, y + 2); ctx.stroke();
+  ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 30, y - 30, 40, 9); ctx.fillStyle = '#c8a06a'; ctx.fillRect(x - 28, y - 28, 36, 5);
+  ellipse(x + 30, y - 14, 14, 5, '#3a3a3a'); ellipse(x + 30, y - 15, 11, 3.5, '#c8a06a');
+  for (let i = 0; i < 6; i++) if (i < g * 6) { const tw = Math.sin(time * 6 + i * 2) > 0.3; ellipse(x + 24 + (i * 7 % 12), y - 15 + (i % 2), tw ? 2 : 1.2, tw ? 2 : 1.2, '#ffd23a'); }
+  crateOf(t, x - 56, y + 8, '#ffd23a');
+};
+DRAW.rubinofen = (x, y, t) => { // Backsteinofen, im Fenster glüht die Flamme; rote Steine wachsen
+  const g = grown(t);
+  ellipse(x, y, 46, 9, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#b0503a'; ctx.beginPath(); ctx.moveTo(x - 40, y); ctx.lineTo(x - 40, y - 34); ctx.quadraticCurveTo(x, y - 70, x + 40, y - 34); ctx.lineTo(x + 40, y); ctx.fill();
+  ctx.fillStyle = '#7a3a28'; ctx.fillRect(x + 14, y - 74, 10, 24);
+  const f = 0.6 + 0.4 * Math.sin(time * 9 + t.id); ctx.fillStyle = `rgba(255,${120 + f * 80},40,1)`; ctx.beginPath(); ctx.arc(x, y - 16, 12, Math.PI, 0); ctx.fill(); ctx.fillRect(x - 12, y - 16, 24, 16);
+  for (let i = 0; i < 5; i++) if (i < g * 5) { ctx.fillStyle = '#d0102e'; ctx.beginPath(); const rx = x - 34 + i * 6, ry = y + 6; ctx.moveTo(rx, ry - 6); ctx.lineTo(rx + 3, ry); ctx.lineTo(rx, ry + 2); ctx.lineTo(rx - 3, ry); ctx.fill(); }
+  crateOf(t, x + 54, y + 4, '#d0102e');
+};
+DRAW.bankschalter = (x, y, t) => { BIZ.bankenplatz(x, y, t); ctx.font = '18px system-ui'; ctx.fillText('🐷', x + 50, y - 2); crateOf(t, x - 66, y + 4, '#e8c35a'); };
+DRAW.gewaechshaus = (x, y, t) => { // Glashaus mit Rundbogen, drinnen wachsen die Heilpflanzen
+  const g = grown(t);
+  ellipse(x, y, 60, 9, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = 'rgba(200,235,225,.55)'; ctx.beginPath(); ctx.moveTo(x - 54, y); ctx.lineTo(x - 54, y - 34); ctx.quadraticCurveTo(x, y - 76, x + 54, y - 34); ctx.lineTo(x + 54, y); ctx.fill();
+  for (let i = 0; i < 7; i++) { const px = x - 44 + i * 15, h = 8 + g * 22 * (0.7 + (i % 3) * 0.15); line('#3f8a3a', 2, px, y - 2, px, y - h); ellipse(px - 4, y - h + 2, 5, 3, '#4fa04a'); ellipse(px + 4, y - h + 6, 5, 3, '#5cae4a'); if (g > 0.8) ellipse(px, y - h - 2, 2.5, 2.5, '#c88ae0'); }
+  ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 54, y); ctx.lineTo(x - 54, y - 34); ctx.quadraticCurveTo(x, y - 76, x + 54, y - 34); ctx.lineTo(x + 54, y);
+  for (let i = -2; i <= 2; i++) { ctx.moveTo(x + i * 18, y); ctx.lineTo(x + i * 18, y - 40 - (2 - Math.abs(i)) * 6); } ctx.stroke();
+  crateOf(t, x + 68, y + 4, '#4fa04a');
+};
+DRAW.saline = (x, y, t) => { // Salzdom aus Holz, davor wächst der weisse Salzberg
+  const g = grown(t);
+  ellipse(x, y, 60, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#a8743a'; ctx.beginPath(); ctx.ellipse(x - 6, y, 48, 56, 0, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#7a5228'; ctx.lineWidth = 1.5; ctx.beginPath(); for (let i = -3; i <= 3; i++) { ctx.moveTo(x - 6 + i * 14, y); ctx.quadraticCurveTo(x - 6 + i * 6, y - 50, x - 6, y - 56); } ctx.stroke();
+  ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 14, y - 22, 16, 22);
+  ctx.fillStyle = '#f6f6f2'; ctx.beginPath(); ctx.moveTo(x + 22, y); ctx.lineTo(x + 38, y - 6 - g * 22); ctx.lineTo(x + 56, y); ctx.fill();
+  crateOf(t, x - 62, y + 4, '#f6f6f2');
+};
+DRAW.quarzgrube = (x, y, t) => { // Sandgrube, ein kleiner Bagger schaufelt
+  const g = grown(t), a = Math.sin(time * 1.5 + t.id) * 0.3;
+  ellipse(x, y - 8, 62, 18, '#c8a86a'); ellipse(x, y - 6, 48, 12, '#e0c890');
+  for (let i = 0; i < 8; i++) if (i < g * 8) ellipse(x - 30 + i * 8, y - 8 + (i % 2) * 3, 2, 2, '#9ad0f0');
+  ctx.fillStyle = '#f2c21a'; ctx.fillRect(x + 20, y - 26, 24, 14); ctx.fillStyle = '#2a2a2a'; ctx.fillRect(x + 18, y - 12, 28, 6);
+  ctx.save(); ctx.translate(x + 22, y - 22); ctx.rotate(-0.6 + a); ctx.fillStyle = '#e0a810'; ctx.fillRect(-34, -3, 34, 6); ctx.fillStyle = '#5a5f66'; ctx.fillRect(-40, -2, 8, 10); ctx.restore();
+  crateOf(t, x - 60, y + 6, '#9ad0f0');
+};
+DRAW.solarpark = (x, y, t) => { // Reihen schräger Solarzellen, die Sonne blitzt darin
+  const g = grown(t);
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 4; i++) {
+    const px = x - 54 + i * 28 + r * 6, py = y - 26 + r * 22;
+    line('#7a7e84', 2, px + 12, py + 2, px + 12, py + 10);
+    ctx.fillStyle = '#2a4a8a'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 24, py); ctx.lineTo(px + 20, py - 14); ctx.lineTo(px - 4, py - 14); ctx.fill();
+    if (Math.sin(time * 2 + i + r * 2) > 0.85) ellipse(px + 10, py - 8, 6, 2, 'rgba(255,255,255,.7)');
+  }
+  ellipse(x + 50, y - 50, 6 + g * 4, 6 + g * 4, 'rgba(255,214,60,.85)');
+  crateOf(t, x + 70, y + 6, '#f2cf3b');
+};
+DRAW.serverhalle = (x, y, t) => { // Bunker im Fels: Stahltür, daneben blinken die Server-Lämpchen
+  ellipse(x, y, 62, 10, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#7a7468'; ctx.beginPath(); ctx.moveTo(x - 62, y); ctx.quadraticCurveTo(x - 30, y - 80, x + 10, y - 70); ctx.quadraticCurveTo(x + 50, y - 60, x + 62, y); ctx.fill();
+  ellipse(x + 20, y - 62, 14, 5, '#3f8a3a');
+  ctx.fillStyle = '#5a5f66'; ctx.fillRect(x - 40, y - 34, 30, 34); ctx.fillStyle = '#8a9098'; ctx.beginPath(); ctx.arc(x - 25, y - 17, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1e222c'; ctx.fillRect(x, y - 36, 40, 36);
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 6; c++) { const on = Math.sin(time * (3 + c) + r * 7 + c * 3 + t.id) > 0; ellipse(x + 5 + c * 6, y - 31 + r * 7, 1.6, 1.6, on ? (c % 3 ? '#4fe06a' : '#5ad8ff') : '#2a3a2e'); }
+  crateOf(t, x + 54, y + 4, '#5ad8ff');
+};
+Object.assign(HGT, { kraftwerk: 70, bergwerk: 84, goldwaschplatz: 40, rubinofen: 76, bankschalter: 96, gewaechshaus: 72, saline: 60, quarzgrube: 44, solarpark: 50, serverhalle: 76 });
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
@@ -4091,6 +4263,7 @@ function render() {
   ctx.strokeStyle = '#8b6a43'; ctx.lineWidth = 3; ctx.strokeRect(pa.x, pa.y, pa.w, pa.h); ctx.strokeRect(pa.x, pa.y - 8, pa.w, pa.h);
   ctx.fillStyle = '#6b4a2b'; for (let x = pa.x; x <= pa.x + pa.w; x += T) { ctx.fillRect(x - 2, pa.y - 14, 4, 16); ctx.fillRect(x - 2, pa.y + pa.h - 14, 4, 16); }
   ctx.fillStyle = '#4f8ec9'; rrect(pa.x + pa.w - 90, pa.y + pa.h - 40, 60, 22, 6); ctx.fill(); // Wassertrog
+  for (const s of sightsOn()) if (s.hub) drawHub(s); // Pflaster der Geschäftszentren unter die freien Plätze
   // freie Plätze
   ctx.setLineDash([8, 6]); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
   for (const a in AREAS) {
@@ -4099,6 +4272,7 @@ function render() {
       if (used.has(i)) continue;
       const p = slotPos(a, i); if (!vis(p.x, p.y)) continue;
       if (a === 'acker') ctx.strokeRect(p.x - 2.5 * T, p.y - 1.5 * T, 5 * T, 3 * T);
+      else if (AREAS[a].hub) { if (AREAS[a].ground > '#b') ctx.strokeStyle = 'rgba(40,40,40,.4)'; ctx.strokeRect(p.x - 1.3 * T, p.y - 2 * T, 2.6 * T, 2.2 * T); ctx.strokeStyle = 'rgba(255,255,255,.55)'; } // helles Pflaster: dunkel stricheln
       else if (a === 'dorf') ctx.strokeRect(p.x - 1.3 * T, p.y - 2 * T, 2.6 * T, 2.2 * T);
       else { ctx.beginPath(); ctx.ellipse(p.x, p.y, 20, 9, 0, 0, 7); ctx.stroke(); }
     }
@@ -4106,12 +4280,12 @@ function render() {
   ctx.setLineDash([]);
   drawLot(); drawRails(camX, vw);
   const sOn = sightsOn().filter(s => !s.town && (s.x + s.w / 2) * T > camX - 50 && (s.x - s.w / 2) * T < camX + vw + 50 && s.y * T > camY - 60 && (s.y - s.h) * T < camY + vh + 60);
-  for (const s of sOn) if (SIGHTS[s.k].flat) SIGHT_DRAW[s.k](s.x * T, s.y * T, s.w * T, s.h * T); // flach: man läuft darüber
+  for (const s of sOn) if (!s.hub && SIGHTS[s.k].flat) SIGHT_DRAW[s.k](s.x * T, s.y * T, s.w * T, s.h * T); // flach: man läuft darüber
   for (const t of G.things) if (t.type === 'feld' && vis(t.x, t.y)) drawField(t);
   // nach y sortiert zeichnen
   const list = G.things.filter(t => t.type !== 'feld' && vis(pos(t).x, pos(t).y)).map(t => [pos(t).y, t]).concat(FIXED_E.map(f => [f.y, f]), [[G.py, null]],
     G.deco.filter(d => DECOS[d.type].where === 'land' && vis(d.x, d.y)).map(d => [d.y, d]), trucks.filter(k => vis(k.x, k.y)).map(k => [k.y, { truck: k }]), trains.filter(k => vis(trainX(k) + 100, k.y)).map(k => [k.y, { train: k }]), folk.filter(f => f.home && vis(f.x, f.y)).map(f => [f.y, { folk: f }]), evNow && !EVENTS[evNow.k].sky ? [[evNow.y, { ev: evNow }]] : [], townOn().filter(b => vis(b.x * T, b.y * T)).map(b => [b.y * T, { town: b }]),
-    sOn.filter(s => !SIGHTS[s.k].flat).map(s => [s.y * T, { sight: s }]));
+    sOn.filter(s => !s.hub && !SIGHTS[s.k].flat).map(s => [s.y * T, { sight: s }]));
   const gh = G.carry && ghostPos();
   if (gh) list.push([gh.y, { ghost: G.carry, ...gh }]);
   list.sort((a, b) => a[0] - b[0]);
@@ -4142,7 +4316,7 @@ function render() {
   }
   // Namen, Status, Warnungen
   for (const t of FIXED_E) label(t.x, t.y + 18, t.name, 14);
-  for (const s of sOn) label(s.x * T, s.y * T + 18, `${G.pass[s.k] ? '✅' : '📸'} ${SIGHTS[s.k].name}`, 14);
+  for (const s of sOn) s.hub ? label(s.x * T, s.y * T + 22, `${s.hub.icon} ${s.hub.name}`, 18) : label(s.x * T, s.y * T + 18, `${G.pass[s.k] ? '✅' : '📸'} ${SIGHTS[s.k].name}`, 14);
   for (const t of G.things) {
     const p = pos(t); if (!vis(p.x, p.y)) continue;
     const d = THINGS[t.type], top = topOf(t);
