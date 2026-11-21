@@ -857,7 +857,7 @@ function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
   const nb = TOWN.find(b => b.lv === l);
   if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: nb.se ? $t`Es steht in der Neustadt ganz im Südosten!` : $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
   else if (TOWN.some(b => l > b.lv && (l - b.lv) % 40 === 0 && (b.f0 || 1) + (l - b.lv) / 40 <= (b.max || (b.k === 'chalet' ? 3 : 4)))) f.push({ ic: '🏗️', t: $t`Im Städtchen wird ein Haus höher!`, d: $t`Ein Stock mehr – bis zu den Wolken? ☁️` });
-  for (const s of Object.values(SIGHTS)) if (s.lv === l) f.push({ ic: s.icon, t: $t`Neue Sehenswürdigkeit im Südosten: ${s.name}!`, d: $t`Lauf hin und hol dir den Stempel für deinen Reisepass! 📸` });
+  for (const s of Object.values(SIGHTS)) if (s.lv === l) f.push({ ic: s.icon, t: $t`Neue Sehenswürdigkeit am Weg: ${s.name}!`, d: $t`Lauf hin und hol dir den Stempel für deinen Reisepass! 📸` });
   return f;
 }
 const FUN = [$t`Die Kühe rufen: Muuuh-ega! 🐄`, $t`Sogar die Geissen machen einen Freudensprung! 🐐`, $t`Die Hühner gackern vor Stolz! 🐔`, $t`Das Murmeli pfeift dir ein Ständchen! 🎶`, $t`Der Nachbar staunt mit offenem Mund! 😮`, $t`Die Säuli wälzen sich vor Freude im Dreck! 🐖`];
@@ -1652,19 +1652,33 @@ function balcony(x, w, y) {
 }
 // ---- Hof → Städtchen (TOWN) ----
 const townOn = () => TOWN.filter(b => G.land >= b.lv && (!b.se || sightsOn().some(s => s.town === b))); // se: steht nur, wenn die Südost-Ecke Platz hat
-// ---- Südost-Ecke: Sehenswürdigkeiten (SIGHTS) und Neustadt (TOWN mit se) ----
-// Die späten Bänder im Süden bleiben kurz, Dorf und Acker machen die Welt breit → unten rechts ist Wiese frei.
-// Jedes Ding behält seinen Platz (G.spot), bis ein Band hineinwächst – dann zieht es in die Ecke ganz unten rechts.
-// So verteilen sie sich mit der Zeit übers ganze Dreieck. Neu gerechnet nur bei anderem Land/Spieler; Deko gilt als Hindernis.
+// ---- Sehenswürdigkeiten (SIGHTS) an den Wegen, Neustadt (TOWN mit se) und Geschäftszentren in der Südost-Ecke ----
+// Sehenswürdigkeiten stehen gleich neben einem Weg – meist hinter einem Bandende, wo man baut – und halten Abstand zueinander,
+// damit sie über alle Bänder verteilt sind. Neustadt und Geschäftszentren füllen die Ecke ganz unten rechts.
+// Jedes Ding behält seinen Platz (G.spot), bis ein Band hineinwächst – dann sucht es neu. Neu gerechnet nur bei anderem Land/Spieler; Deko gilt als Hindernis.
+// Nächster Punkt auf einem Weg: [Abstand, x, y] (Kacheln)
+function nearPath(x, y) {
+  let best = [1e9];
+  for (const p of paths()) for (let j = 1; j < p.length; j++) {
+    const [ax, ay] = p[j - 1], dx = p[j][0] - ax, dy = p[j][1] - ay, t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1), d = Math.hypot(x - ax - t * dx, y - ay - t * dy);
+    if (d < best[0]) best = [d, ax + t * dx, ay + t * dy];
+  }
+  return best;
+}
 let sightMemo = null;
 function sightsOn() {
   if (sightMemo?.g === G && sightMemo.land === G.land && sightMemo.w === WORLD.w) return sightMemo.list;
-  const busy = []; // [x0, x1, y0, y1] in Kacheln
-  for (const k in AREAS) {
-    const a = AREAS[k]; if (!areaOn(a) || a.hub || a.x < ROAD_X) continue;
-    busy.push([0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), a.y + (areaRows(k) - 1) * a.dy + 0.8]);
-  }
-  if (areaOn(AREAS.terminal)) busy.push([0, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
+  const bandRects = () => { // [x0, x1, y0, y1] in Kacheln
+    const r = [];
+    for (const k in AREAS) {
+      const a = AREAS[k]; if (!areaOn(a) || a.hub || a.x < ROAD_X) continue;
+      r.push([0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), Math.max(a.y + (areaRows(k) - 1) * a.dy + 0.8, ...(a.lane || []).map(l => l + 0.9))]); // Strasse kann unter den Reihen liegen (Acker)
+    }
+    if (areaOn(AREAS.terminal)) r.push([0, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
+    return r;
+  };
+  const busy = bandRects();
+  G.land += 6; const later = bandRects(); G.land -= 6; // so gross sind die Bänder in 6 Land-Stufen: neuer Platz für Sehenswürdigkeiten bleibt eine Weile frei
   for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push([d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
   const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
     .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 })),
@@ -1673,12 +1687,25 @@ function sightsOn() {
   const fits = r => !busy.some(b => r[0] < b[1] && r[1] > b[0] && r[2] < b[3] && r[3] > b[2]) && r[0] > ROAD_X + 1 && r[1] < WORLD.w - 0.5 && r[2] > 4 && r[3] < WORLD.h + 0.3;
   const put = (s, x, y) => { // unten Platz fürs Namensschild
     const r = [x - s.w / 2, x + s.w / 2, y - s.h, y + 0.7]; if (!fits(r)) return false;
-    busy.push([r[0] - 0.5, r[1] + 0.5, r[2] - 0.3, r[3]]); list.push(Object.assign(s, { x, y })); spot[s.k || 't' + s.lv] = [x, y];
+    busy.push([r[0] - 0.5, r[1] + 0.5, r[2] - 0.3, r[3]]); list.push(Object.assign(s, { x, y })); spot[key(s)] = [x, y];
     if (s.town) Object.assign(s.town, { x, y });
     return true;
   };
-  for (const s of todo) s.old = spot[s.k || 't' + s.lv];
+  const key = s => s.town ? 't' + s.lv : s.hub ? s.k : 'w' + s.k; // w: Sehenswürdigkeit am Weg (alte Plätze in der Ecke gelten nicht mehr)
+  for (const s of todo) s.old = spot[key(s)];
   for (const s of todo) if (Array.isArray(s.old) && put(s, +s.old[0], +s.old[1])) s.done = 1; // zuerst alle, die bleiben dürfen
+  // Sehenswürdigkeit: freier Platz nahe einem Wegende, Strafe für Nachbarn unter 16 Kacheln → verteilt über die Bänder
+  const ends = paths().map(p => p.at(-1));
+  for (const s of todo) if (!s.done && !s.town && !s.hub) {
+    let best = null;
+    for (const [ex, ey] of ends) for (let y = Math.round(ey - 1); y <= ey + s.h + 2; y++) for (let x = Math.round(ex - s.w / 2); x <= ex + s.w / 2 + 30; x++) {
+      const r = [x - s.w / 2, x + s.w / 2, y - s.h, y + 0.7];
+      if (!fits(r) || later.some(b => r[0] < b[1] && r[1] > b[0] && r[2] < b[3] && r[3] > b[2])) continue;
+      const v = nearPath(x, y + 0.9)[0] + Math.max(0, 16 - Math.min(16, ...list.filter(o => !o.town && !o.hub).map(o => Math.hypot(o.x - x, o.y - y))));
+      if (!best || v < best[0]) best = [v, x, y];
+    }
+    if (best && put(s, best[1], best[2])) s.done = 1;
+  }
   // ponytail: Rasterscan O(Höhe·Breite·Hindernisse) je Ding, läuft nur beim Landkauf – Freiflächen-Liste, falls es mal ruckelt
   for (const s of todo) if (!s.done) find: for (let y = Math.floor(WORLD.h - 0.5); y - s.h > 4; y--) for (let x = Math.floor(WORLD.w - 1 - s.w / 2); x - s.w / 2 > ROAD_X + 1; x--) if (put(s, x, y)) break find;
   // ponytail: Geschäftszentrum ohne freien Platz steht notfalls ganz unten rechts, auch wenn es etwas überlappt – bei 200 Stufen ist dort immer Wiese
@@ -1701,16 +1728,15 @@ function drawPanorama() {
     else if (v < 0.6) { ellipse(px, py, 34, 14, '#3c7fb8'); ellipse(px - 6, py - 3, 22, 7, 'rgba(255,255,255,.25)'); for (let i = 0; i < 6; i++) line('#5c8a34', 1.6, px + 26 + i * 3, py + 4, px + 27 + i * 3, py - 10); } // Tümpel
     else if (v < 0.64) alpHouse(px, py, 26, 4, 14, 10); // Heustadel
   }
-  if (!list.some(s => !s.town)) return;
-  // Wanderweg: vom nächsten Bandweg-Ende immer zur nächsten Sehenswürdigkeit
-  const todo = list.filter(s => !s.town).map(s => [s.x, s.y + 0.9]), ends = paths().slice(PATHS.length + 1).map(p => p[1]);
-  const dmin = e => Math.min(...todo.map(s => Math.hypot(e[0] - s[0], e[1] - s[1])));
-  let cur = ends.reduce((b, e) => dmin(e) < dmin(b) ? e : b), pts = [cur];
-  while (todo.length) { todo.sort((a, b) => Math.hypot(a[0] - cur[0], a[1] - cur[1]) - Math.hypot(b[0] - cur[0], b[1] - cur[1])); cur = todo.shift(); pts.push(cur); }
+  // Wanderweg: vom nächsten Weg zu jeder Sehenswürdigkeit und jedem Geschäftszentrum, mit gelbem Wegweiser
   ctx.lineCap = ctx.lineJoin = 'round';
-  for (const [w, c] of [[T * 0.6, '#b99a68'], [T * 0.42, '#dcc596']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); pts.forEach(([a, b], i) => i ? ctx.quadraticCurveTo((pts[i - 1][0] + a) / 2 * T + 30, (pts[i - 1][1] + b) / 2 * T - 30, a * T, b * T) : ctx.moveTo(a * T, b * T)); ctx.stroke(); }
-  const [sx, sy] = pts[0]; line('#6b4a2b', 3, sx * T + 20, sy * T - 6, sx * T + 20, sy * T - 40); // gelber Wanderweg-Wegweiser
-  ctx.fillStyle = '#f2c21a'; ctx.beginPath(); ctx.moveTo(sx * T + 20, sy * T - 40); ctx.lineTo(sx * T + 46, sy * T - 40); ctx.lineTo(sx * T + 54, sy * T - 34); ctx.lineTo(sx * T + 46, sy * T - 28); ctx.lineTo(sx * T + 20, sy * T - 28); ctx.fill();
+  for (const s of list) if (!s.town) {
+    const [d, sx, sy] = nearPath(s.x, s.y + 0.9), [ex, ey] = [s.x * T, (s.y + 0.9) * T];
+    if (d < 0.6) continue;
+    for (const [w, c] of [[T * 0.6, '#b99a68'], [T * 0.42, '#dcc596']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(sx * T, sy * T); ctx.quadraticCurveTo((sx * T + ex) / 2 + 20, (sy * T + ey) / 2 - 20, ex, ey); ctx.stroke(); }
+    const px = sx * T, py = sy * T; line('#6b4a2b', 3, px + 20, py - 6, px + 20, py - 40);
+    ctx.fillStyle = '#f2c21a'; ctx.beginPath(); ctx.moveTo(px + 20, py - 40); ctx.lineTo(px + 46, py - 40); ctx.lineTo(px + 54, py - 34); ctx.lineTo(px + 46, py - 28); ctx.lineTo(px + 20, py - 28); ctx.fill();
+  }
 }
 // Reisepass: erster Besuch = Stempel, Taschengeld und „Wusstest du?“
 function visitSights() {
