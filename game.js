@@ -643,14 +643,16 @@ function spedition(dt) {
         const free = idle.map((_, m) => m).filter(m => !idle[m].route.length);
         const n = j < idle.length ? (fil ? free.reduce((b, m) => d(m) < d(b) ? m : b, free[0]) : j) : idle.reduce((b, _, m) => d(m) < d(b) ? m : b, 0);
         if (left[n] <= 0) return; // alle voll
-        idle[n].route.push({ t, x: p.x, y: p.y + 24 }); left[n] -= t[fld(t)]; at[n] = p;
+        idle[n].route.push({ t, x: p.x, y: p.y + 24, hot: stuck(t) }); left[n] -= t[fld(t)]; at[n] = p;
       });
       idle.forEach(o => {
         if (!o.route.length) return;
-        // Halte nach nächstem Nachbarn ordnen: nahe Häuser nacheinander statt Zickzack nach Priorität
+        // Halte nach nächstem Nachbarn ordnen: nahe Häuser nacheinander statt Zickzack nach Priorität –
+        // aber Gebäude mit vollem Lager (hot) zuerst, sonst ist der Wagen voll, bevor er dort ankommt, und lässt sie aus
         // ponytail: greedy nearest neighbour, O(n²) bei wenigen Halten egal
-        const rest = o.route, seq = []; let c = o;
-        while (rest.length) { const i = rest.reduce((b, r, m) => Math.hypot(r.x - c.x, r.y - c.y) < Math.hypot(rest[b].x - c.x, rest[b].y - c.y) ? m : b, 0); c = rest.splice(i, 1)[0]; seq.push(c); }
+        const seq = []; let c = o;
+        for (const rest of [o.route.filter(r => r.hot), o.route.filter(r => !r.hot)])
+          while (rest.length) { const i = rest.reduce((b, r, m) => Math.hypot(r.x - c.x, r.y - c.y) < Math.hypot(rest[b].x - c.x, rest[b].y - c.y) ? m : b, 0); c = rest.splice(i, 1)[0]; seq.push(c); }
         const sell = nearestSell(seq.at(-1), h);
         o.route = seq; o.wait = 0; o.home = sell; o.route.push({ ...parkSpot(o, sell, h), sell }); // verkaufen und dort parken
       });
@@ -669,6 +671,12 @@ function spedition(dt) {
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
       G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
       if (k.load >= lv.cap) { const s = nearestSell(k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
+      else { // unterwegs voll gewordenes verarbeitetes Gebäude (Arbeit steht), das kein Wagen eingeplant hat: nächstes gleich als nächsten Halt einschieben
+        const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
+        const hot = G.things.filter(t => !busy.has(t) && THINGS[t.type].kind !== 'grow' && t.out + THINGS[t.type].n > OUT_CAP && k.load + t.out <= lv.cap && surplus(THINGS[t.type].item));
+        const t = hot.reduce((b, t) => !b || Math.hypot(pos(t).x - k.x, pos(t).y - k.y) < Math.hypot(pos(b).x - k.x, pos(b).y - k.y) ? t : b, null);
+        if (t) { const p = pos(t); k.route.unshift({ t, x: p.x, y: p.y + 24, hot: true }); }
+      }
     } else if (k.sum) { const s = r.sell || h; floater(s.x, s.y - 90, $t`🚚 +${k.sum} Fr.`); AU.sfx('cash'); k.load = k.sum = 0; k.cargo = {}; }
   }
 }
