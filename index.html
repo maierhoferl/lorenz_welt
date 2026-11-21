@@ -126,14 +126,21 @@
   #plan .probs .imp { font-size:12px; font-weight:800; text-align:right; white-space:nowrap; }
   #plan .probs .imp i { display:block; height:6px; margin:0 0 3px auto; border-radius:3px; background:#3d8b2f; }
   .legend { font-size:13px; display:flex; gap:14px; flex-wrap:wrap; margin:6px 0; }
-  /* Handy: Reiter als eine wischbare Reihe kleiner Pillen statt 7 Zeilen grosser Knöpfe */
+  /* Rohstoff-Reiter (Produktions-Plan, Laden/Gebäude): Pillen */
+  .tabs.cats { position:relative; flex:none; gap:6px; padding:8px 12px; border-bottom:1px solid #e6d6b5; }
+  .tabs.cats button { border-radius:999px; padding:5px 11px; font-size:14px; white-space:nowrap; }
+  .tabs.cats button.on { background:var(--ch); color:#fff; }
+  .tabs.cats button .dot { display:inline-block; width:7px; height:7px; margin-left:4px; border-radius:50%; background:#e8452c; vertical-align:top; }
+  .tabs.cats button.on .dot { background:#fff; }
+  #shop .tabs.cats { background:#fff; }
+  /* Handy: jede Reiter-Reihe ist eine einzige wischbare Zeile statt vieler grosser Knopf-Zeilen */
   @media (max-width:600px) {
     .box header { font-size:18px; padding:8px 12px; } .box header button { width:34px; height:34px; font-size:17px; }
-    #plan .tabs { position:relative; flex:none; flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:8px 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid #e6d6b5;
+    #plan .tabs, #shop .tabs { position:relative; flex:none; flex-wrap:nowrap; overflow-x:auto; padding:8px 10px 0; scrollbar-width:none; -webkit-overflow-scrolling:touch;
       -webkit-mask-image:linear-gradient(to right, #000 88%, transparent); mask-image:linear-gradient(to right, #000 88%, transparent); }
-    #plan .tabs::-webkit-scrollbar { display:none; }
-    #plan .tabs button { flex:none; border-radius:999px; padding:5px 11px; font-size:13px; white-space:nowrap; }
-    #plan .tabs button.on { background:var(--ch); color:#fff; }
+    #plan .tabs.cats, #shop .tabs.cats { padding:8px 10px; }
+    #plan .tabs::-webkit-scrollbar, #shop .tabs::-webkit-scrollbar { display:none; }
+    .tabs button { flex:none; font-size:14px; white-space:nowrap; } .tabs.cats button { font-size:13px; }
     #plan .legend { font-size:11px; gap:3px 10px; }
     #plan h3 { font-size:17px; } #plan .body > small { display:block; font-size:12px; }
     #plan .probs li { grid-template-columns:22px 1fr 64px; gap:6px; padding:6px; font-size:14px; line-height:1.3; }

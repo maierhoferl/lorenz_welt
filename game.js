@@ -996,34 +996,31 @@ function showInfo(t) {
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
 
-let shopTab = 0, planCat = null;
+let shopTab = 0, planCat = null, shopCat = null;
 // Gebäude-Reiter: nach Rohstoff gruppiert (Ware → erste Zutat bis zum Rohstoff), innerhalb nach Verarbeitungsstufe
 const maker = it => Object.keys(THINGS).find(k => THINGS[k].item === it);
-const rootOf = it => { const d = THINGS[maker(it)]; return d?.in ? rootOf(Object.keys(d.in)[0]) : it; };
 const depth = it => { const d = THINGS[maker(it)]; return d?.in ? 1 + Math.max(...Object.keys(d.in).map(depth)) : 0; };
-function groupShop(L) {
-  const g = {};
-  for (const it of L) (g[it.root] ||= []).push(it);
-  const roots = Object.keys(ITEMS).filter(r => g[r]); // Reihenfolge wie in ITEMS (Weizen, Milch, Apfel, …)
-  return roots.flatMap(r => [{ head: `${ITEMS[r].icon} ${ITEMS[r].name}` }, ...g[r].sort((a, b) => a.depth - b.depth || a.price - b.price)]);
-}
+// Rohstoff-Reiter (Produktions-Plan und Laden/Gebäude): Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel)
+const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = maker(it); return m ? catOf(m) : it; };
+const catTabs = (cats, on, attr, dot = () => false) => `<div class="tabs cats">${cats.map(c => `<button data-${attr}="${c}" class="${c === on ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}${dot(c) ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>`; // dot: hier gibt es Neues
+function centerTab(el) { for (const tb of el.querySelectorAll('.tabs')) { const on = tb.querySelector('.on'); if (on && tb.scrollWidth > tb.clientWidth) tb.scrollLeft = on.offsetLeft - (tb.clientWidth - on.offsetWidth) / 2; } } // aktiver Reiter sichtbar (Handy: wischbare Reihe)
 function shopList() {
   const tabs = [[], [], [], [], []];
   for (const [k, d] of Object.entries(THINGS)) {
     if (!avail(k)) continue;
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
-      root: rootOf(d.item), depth: depth(d.item), icon: d.icon, name: d.name, price: d.price, info: d.info, neu: !G.things.some(t => t.type === k),
+      cat: catOf(k), depth: depth(d.item), icon: d.icon, name: d.name, price: d.price, info: d.info, neu: !G.things.some(t => t.type === k),
       desc: d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
       note: free ? $t`kommt auf: ${AREAS[d.area].name}` : $t`⚠️ Kein Platz – kauf mehr Land!`, can: free,
       buy: () => {
         const t = addThing(k); if (t && d.area === 'terminal') trains.push({ t, age: 0, y: trainLaneY(), first: true }); toast($t`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
         const u = checkUnlock(k);
-        if (u) { toast($t`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
+        if (u) { shopCat = catOf(u[0]); toast($t`🎉 Neues Rezept freigeschaltet: ${u.map(f => THINGS[f].icon + ' ' + THINGS[f].name).join(' → ')} – schau im Laden bei 🏭 Gebäude!`); AU.sfx('grow'); }
       },
     });
   }
-  if (G.land >= 20) tabs[1].push({ root: 'weizen', depth: 9, icon: '💩', name: $t`Gülle-Verteiler`, price: 3000, can: !G.guelle, neu: !G.guelle,
+  if (G.land >= 20) tabs[1].push({ cat: 'weizen', depth: 9, icon: '💩', name: $t`Gülle-Verteiler`, price: 3000, can: !G.guelle, neu: !G.guelle,
     desc: $t`Doppelte Ernte auf allen Weizenfeldern`, note: G.guelle ? $t`✅ Schon gekauft` : $t`braucht Tiere, die Dung machen (Kühe, Säuli, Hühner)`,
     info: $t`Kuhfladen und Mist werden in einer grossen Grube gesammelt und mit Wasser zu Gülle verrührt. Der Bauer fährt sie mit dem Güllefass aufs Feld. Darin stecken Stickstoff, Phosphor und Kalium – Futter für die Pflanzen! So wächst der Weizen viel kräftiger. Es stinkt zwar, aber nur ein paar Tage.`,
     buy: () => { G.guelle = 1; toast(guelleOn() ? $t`💩 Deine Felder werden gedüngt – jetzt doppelte Weizen-Ernte!` : $t`💩 Gülle-Verteiler steht – kauf Tiere, damit es Dung gibt!`); AU.sfx('grow'); } });
@@ -1076,14 +1073,21 @@ function shopList() {
 }
 function openShop() {
   const tabs = shopList(), names = [$t`🌱 Tiere & Pflanzen`, $t`🏭 Gebäude`, $t`🔧 Werkzeuge`, $t`🗺️ Land`, $t`🏔️ Deko`];
-  const L = tabs[shopTab];
-  const head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
-  const body = `<div class="cards">${L.map((it, i) => it.head ? `<h3 class="grp">${it.head}</h3>` : `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
+  let L = tabs[shopTab], head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (shopTab === 1) { // Gebäude: ein Reiter pro Rohstoff wie im Produktions-Plan, innerhalb nach Verarbeitungsstufe
+    const cats = Object.keys(ITEMS).filter(c => L.some(it => it.cat === c));
+    if (!cats.includes(shopCat)) shopCat = cats.includes(planCat) ? planCat : cats.find(c => L.some(it => it.cat === c && it.neu)) || cats[0];
+    head += catTabs(cats, shopCat, 'cat', c => L.some(it => it.cat === c && it.neu));
+    L = L.filter(it => it.cat === shopCat).sort((a, b) => a.depth - b.depth || a.price - b.price);
+  }
+  const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
     <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
   modal($('#shop'), `${$t`🛒 Laden`} <small style="font-weight:600;font-size:16px">${$t`– du hast ${G.money} Fr.`}</small>`, body, head);
   const el = $('#shop');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = +b.dataset.tab; openShop(); });
+  el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { shopCat = b.dataset.cat; openShop(); });
+  centerTab(el);
   el.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const m = b.closest('.card').querySelector('.more'); m.hidden = !m.hidden; });
   el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = L[+b.dataset.buy];
@@ -1104,7 +1108,6 @@ function openPlan() {
   const cap = {}; // volle Kapazität je Ware (alle Gebäude laufen ohne Wartezeit)
   for (const k of types) { const d = THINGS[k]; cap[d.item] = (cap[d.item] || 0) + cnt[k] * d.n / d.time * 60; }
   // Ein Reiter pro Rohstoff. Kategorie = Rohstoff, aus dem am meisten drinsteckt (Kuchen: 3 Äpfel > 1 Mehl → Äpfel).
-  const catOf = k => { const d = THINGS[k]; if (d.kind === 'grow') return d.item; const it = Object.entries(d.in).sort((a, b) => b[1] - a[1])[0][0], m = Object.keys(THINGS).find(f => THINGS[f].item === it); return m ? catOf(m) : it; };
   const cats = [...new Set(types.map(catOf))];
   if (!cats.includes(planCat)) planCat = cats.map(c => [c, types.filter(k => catOf(k) === c).reduce((a, k) => a + cnt[k], 0)]).sort((a, b) => b[1] - a[1])[0][0];
   const vis = types.filter(k => catOf(k) === planCat), used = [...new Set(vis.map(k => depth[k]))].sort((a, b) => a - b);
@@ -1234,12 +1237,12 @@ function openPlan() {
     if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${rateTxt(d.item)}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
   }
   const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
-  const head = `<div class="tabs">${cats.map(c => `<button data-cat="${c}" class="${c === planCat ? 'on' : ''}">${ITEMS[c].icon} ${ITEMS[c].name}</button>`).join('')}</div>`;
+  const head = catTabs(cats, planCat, 'cat');
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`verkauft`} (🎒 ${$t`du`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">⇢▢ ${$t`von anderem Reiter`}</span><span style="color:#3e7bc4">▢⇢ ${$t`zu anderem Reiter`}</span><span style="opacity:.5">▢ ${$t`nicht gebaut`}</span></div>`;
   modal($('#plan'), $t`📊 Dein Produktions-Plan`, `${legend}<div style="overflow:auto">${svg}</div><h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small><small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`, head);
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
-  { const tb = el.querySelector('.tabs'), on = tb?.querySelector('.on'); if (on && tb.scrollWidth > tb.clientWidth) tb.scrollLeft = on.offsetLeft - (tb.clientWidth - on.offsetWidth) / 2; } // aktiver Reiter sichtbar (Handy: wischbare Reihe)
+  centerTab(el);
   let focus = null; // Antippen: Zulieferer und Abnehmer bleiben hell, der Rest wird blass
   el.querySelectorAll('[data-k]').forEach(g => g.onclick = e => {
     const k = g.dataset.k;
