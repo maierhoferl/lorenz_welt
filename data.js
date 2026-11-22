@@ -876,12 +876,13 @@ const AREAS = {
   bergquelle:  { name: 'Bergquelle',    x: 72.6, y: 73.7, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 100, lane: [71.5] },
   // Geschäftszentren (hub): kein Band, sondern ein Platz in der freien Südost-Ecke wie die Sehenswürdigkeiten (game.js → sightsOn).
   // cols Plätze nebeneinander, Reihen wachsen nach oben; base + per*Landstufe Plätze, höchstens max. ground = Pflaster-Farbe.
-  industrie:   { name: 'Industriequartier', icon: '🏭', hub: 1, from: 105, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#a39d94' },
-  uhrental:    { name: 'Uhrental',          icon: '⌚', hub: 1, from: 125, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#c9bfa8' },
-  bankenplatz: { name: 'Bankenplatz',       icon: '🏦', hub: 1, from: 145, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#bdb6aa' },
-  pharma:      { name: 'Pharma-Campus',     icon: '💊', hub: 1, from: 155, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#cfd6cf' },
-  technopark:  { name: 'Innovationspark',   icon: '💻', hub: 1, from: 175, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#b4c0ca' },
-  kicampus:    { name: 'KI-Campus',         icon: '🤖', hub: 1, from: 190, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#8f97a6' },
+  // per ≈ Landpreis ÷ Gebäudepreis bei from (Land ~200–380k, Gebäude 35–190k): sonst bremst das Land, nicht das Geld. Voll (max) → zweiter Platz.
+  industrie:   { name: 'Industriequartier', icon: '🏭', hub: 1, from: 105, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 4, max: 30, ground: '#a39d94' },
+  uhrental:    { name: 'Uhrental',          icon: '⌚', hub: 1, from: 125, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 4, max: 30, ground: '#c9bfa8' },
+  bankenplatz: { name: 'Bankenplatz',       icon: '🏦', hub: 1, from: 145, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 3, max: 30, ground: '#bdb6aa' },
+  pharma:      { name: 'Pharma-Campus',     icon: '💊', hub: 1, from: 155, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 3, max: 30, ground: '#cfd6cf' },
+  technopark:  { name: 'Innovationspark',   icon: '💻', hub: 1, from: 175, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 2, max: 30, ground: '#b4c0ca' },
+  kicampus:    { name: 'KI-Campus',         icon: '🤖', hub: 1, from: 190, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 2, max: 30, ground: '#8f97a6' },
 };
 // Bauernhof wird ausgebaut: ab diesen Land-Stufen kommt je ein Stück dazu
 const HOF_LV = [2, 5, 10, 15, 20];
