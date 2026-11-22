@@ -306,7 +306,7 @@ const segOf = (k, i) => segs(k).findLast(s => i >= s.off);
 const segsN = k => { const n = slotsAvail(k); return segs(k).map(s => ({ ...s, n: clamp(n - s.off, 0, s.cap) })); }; // n = offene Plätze im Band
 function slotsAvail(area) { // base + per*Landstufe, höchstens so viele, wie die offenen Bänder fassen
   const s = segs(area).at(-1);
-  return Math.max(Math.min(s.off + s.cap, nLand(AREAS[area])), ...G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot + 1));
+  return Math.min(s.off + s.cap, nLand(AREAS[area])); // Plätze über dem Deckel (alte Stände) bekommen beim Laden ein Zusatzband – kein Scan über G.things, das lief pro Bild hundertfach
 }
 function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
   const g = segOf(area, i), a = g.a; i -= g.off;
@@ -342,10 +342,14 @@ function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun w
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 // paths(): dazu die Zufahrten der Zweigstellen (werden automatisch gebaut); basePaths(): nur das feste Strassennetz
 const paths = () => basePaths().concat(branches().map(b => spur(b).pts.map(q => [q.x / T, q.y / T])));
+let bpMemo = null;
 function basePaths() { // Spalte 2: Querwege ab der Oststrasse, die oben über y 10.2 an die Hauptstrasse anschliesst
+  const key = [G.land, G.ext?.length].join(); // hängt nur an Landstufe und Zusatzbändern; snap() ruft das sehr oft
+  if (bpMemo?.g === G && bpMemo.key === key) return bpMemo.v;
   const L = bandSegs().flatMap(s => (s.a.lane || []).filter((_, j) => s.n > j).map(y => [y, segEnd(s) + 1.8, s.a.x > ROAD_X2 ? ROAD_X2 : ROAD_X])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
   const end = x0 => Math.max(...L.filter(l => l[2] === x0).map(l => l[0])), east = L.some(l => l[2] === ROAD_X2) ? [[[ROAD_X, 10.2], [ROAD_X2, 10.2], [ROAD_X2, end(ROAD_X2)]]] : [];
-  return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, end(ROAD_X)]]], east, L.map(([y, x, x0]) => [[x0, y], [x, y]]));
+  bpMemo = { g: G, key, v: PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, end(ROAD_X)]]], east, L.map(([y, x, x0]) => [[x0, y], [x, y]])) };
+  return bpMemo.v;
 }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
@@ -730,7 +734,7 @@ function spedition(dt) {
     if (k.load < lv.cap * 1.5 && (k.pk = (k.pk || 0) + dt) > 0.25) { // an vollem Lager vorbei: anhalten, leeren, dann weiter auf der Route
       k.pk = 0; // ponytail: Suche über alle Gebäude 4×/s je Wagen, Raster falls es ruckelt; bis 1.5× Ladung (Wagen auf dem Heimweg halten auch)
       // nah = am Haus oder an der Stelle, wo seine Zufahrt auf die Strasse trifft (Wagen auf der Strasse sind oft >2 Kacheln vom Haus)
-      const near = t => { const p = { x: pos(t).x, y: pos(t).y + 24 }, s = snap(p); return Math.hypot(p.x - k.x, p.y - k.y) < 2 * T || s && Math.hypot(s.x - k.x, s.y - k.y) < 1.5 * T; };
+      const near = t => { const p = { x: pos(t).x, y: pos(t).y + 24 }; if (Math.abs(p.x - k.x) > 8 * T || Math.abs(p.y - k.y) > 8 * T) return false; const s = snap(p); return Math.hypot(p.x - k.x, p.y - k.y) < 2 * T || s && Math.hypot(s.x - k.x, s.y - k.y) < 1.5 * T; };
       const head = new Set(trucks.map(o => o.route[0]?.t)); // schon direkt angefahren: dem anderen lassen
       const t = G.things.find(t => stuck(t) && !head.has(t) && near(t) && surplus(THINGS[t.type].item));
       if (t) { // anderen Wagen, die es erst später eingeplant haben, wegnehmen – wer vorbeifährt, holt ab
