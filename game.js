@@ -1262,7 +1262,8 @@ function openPlan() {
     if (!out.length || said.has(THINGS[k].item)) continue;
     said.add(THINGS[k].item);
     const it = THINGS[k].item, top = Math.min(...out.map(e => e.y1)), c = out.find(e => e.color !== '#bbb')?.color || '#bbb';
-    labels += `<text x="${posn[k].x + NW + 6}" y="${top - 6}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${rateTxt(it)}→${r(dem[it] || 0)}/min` : ITEMS[it].icon}</text>`;
+    const x = posn[k].x + NW + 6; // zweizeilig: Produktion / → Abnahme, sonst ragt es unter das nächste Kästchen
+    labels += `<text x="${x}" y="${top - (cnt[k] ? 20 : 6)}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${rateTxt(it)}<tspan x="${x}" dy="14">→ ${r(dem[it] || 0)}/min</tspan>` : ITEMS[it].icon}</text>`;
   }
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
@@ -1327,7 +1328,7 @@ function openPlan() {
     const sy = p.y + NH - 12, stub = (x1, x2, ic, tx) => `<g opacity="${on ? 1 : 0.45}"><path d="M${x1},${sy} L${x2},${sy}" stroke="#3e7bc4" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#ab)"/><text x="${tx}" y="${sy - 5}" font-size="12">${ic}</text></g>`; // Pfeil-Stummel: von/zu anderem Reiter
     if (extra) nodes += stub(p.x - 40, p.x, extra, p.x - 40);
     // Rate (Summe aller Abnehmer, auch anderer Reiter) steht nur 1×: am obersten Pfeil, sonst am Stummel
-    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${rateTxt(d.item)}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
+    if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? `<tspan x="${p.x + NW + 4}" dy="-28">${rateTxt(d.item)}</tspan><tspan x="${p.x + NW + 4}" dy="14">→ ${r(dem[d.item])}/min</tspan>` : ''}`, p.x + NW + 4);
   }
   const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
   const views = `<div class="tabs">${[['cockpit', $t`📈 Cockpit`], ['ketten', $t`🔗 Ketten`]].map(([v, n]) => `<button data-view="${v}" class="${v === planView ? 'on' : ''}">${n}</button>`).join('')}</div>`;
