@@ -282,8 +282,8 @@ function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
 const areaOn = a => G.land >= (a.from || 0);
 const hubH = a => 3.4 + (Math.ceil(a.max / a.cols) - 1) * a.dy; // Geschäftszentrum gleich in voller Grösse: wächst nicht, zieht also nicht um
 const bands = () => Object.keys(AREAS).filter(k => areaOn(AREAS[k]) && !AREAS[k].hub); // Geschäftszentren sind keine Bänder
-const areaEnd = k => { const a = AREAS[k], n = slotsAvail(k); return a.x + Math.max(0, (a.cols ? Math.min(a.cols, n) : Math.ceil(n / a.rows)) - 1) * a.dx; }; // x der letzten Spalte
-const areaRows = k => { const a = AREAS[k]; return a.cols ? Math.max(1, Math.ceil(slotsAvail(k) / a.cols)) : a.rows; };
+const areaEnd = k => { const a = AREAS[k], n = SHOWN[k] ?? slotsAvail(k); return a.x + Math.max(0, (a.cols ? Math.min(a.cols, n) : Math.ceil(n / a.rows)) - 1) * a.dx; }; // x der letzten Spalte
+const areaRows = k => { const a = AREAS[k]; return a.cols ? Math.max(1, Math.ceil((SHOWN[k] ?? slotsAvail(k)) / a.cols)) : a.rows; };
 // Gülle-Verteiler (ab Land-Stufe 20): sammelt Dung von den Tieren und düngt die Weizenfelder → doppelte Ernte
 const FELD_N = THINGS.feld.n, MIST = ['kuh', 'schwein', 'huhn', 'masthuhn'];
 const guelleOn = () => !!G.guelle && G.things.some(t => MIST.includes(t.type));
@@ -293,19 +293,36 @@ function relayout() { // Plätze neu setzen (alte Spielstände hatten ein andere
     if (t.type === 'kuh' && dist(t.cx, t.cy, p.x, p.y) > 6 * T) Object.assign(t, { cx: p.x, cy: p.y, tx: p.x, ty: p.y });
   }
 }
+// Bänder zeigen nur belegte Plätze + einen freien (Reihen-Bänder: eine freie Spalte) – Strassen und Welt wachsen mit dem Bauen,
+// nicht mit dem gekauften Land (das ist nur die Obergrenze). Dorf: neue Strassenreihe statt endlos nach Osten, Bänder darunter rutschen nach Süden.
+const SHOWN = {}; let LAYOUT = '';
 function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun wächst mit
+  const top = {};
+  for (const t of G.things) { const k = THINGS[t.type].area; if (!(t.slot <= top[k])) top[k] = t.slot; }
+  for (const k in AREAS) {
+    const a = AREAS[k], n = slotsAvail(k), st = a.cols ? 1 : a.rows;
+    SHOWN[k] = a.hub || a.x < ROAD_X ? n : Math.min(n, Math.max(a.base, Math.ceil(((top[k] ?? -1) + 2) / st) * st));
+  }
+  const D = AREAS.dorf, dr = areaRows('dorf'), sh = Math.max(0, dr - 3) * D.dy;
+  D.lane = Array.from({ length: dr }, (_, r) => D.y + r * D.dy + 0.9);
+  for (const a of [...Object.values(AREAS), PASTURE]) if (!a.hub && a.x > ROAD_X && a.y > D.y) {
+    a.orig ||= { y: a.y, lane: a.lane, hill: a.hill };
+    a.y = a.orig.y + sh; if (a.lane) a.lane = a.orig.lane.map(v => v + sh); if (a.hill) a.hill = a.orig.hill.map(v => v + sh);
+  }
   const on = bands();
   PASTURE.w = Math.max(10, areaEnd('weide') - PASTURE.x + 1.6);
   WORLD.w = Math.max(48, ...on.map(k => Math.ceil(areaEnd(k) + 3)));
   const bh = k => { const a = AREAS[k]; return Math.max(a.y + (areaRows(k) - 1) * a.dy + 1.4, ...(a.lane || []).map(l => l + 0.9)); };
   const hubs = Object.values(AREAS).filter(a => a.hub && areaOn(a)), hh = Math.max(0, ...hubs.map(hubH)); // Geschäftsviertel: eigener Streifen unter den Bändern, da wächst kein Band hinein
   WORLD.h = Math.max(...on.map(bh), hubs.length ? Math.max(...on.filter(k => AREAS[k].x > ROAD_X).map(bh)) + hh + 2 : 0);
+  const sig = Object.values(SHOWN).join() + '|' + sh + '|' + WORLD.w + '|' + WORLD.h;
+  if (sig !== LAYOUT) { LAYOUT = sig; relayout(); fixDeco(); } // ponytail: fixDeco/sightsOn-Rasterscan bei jeder neuen Spalte – erst optimieren, wenn's beim Kaufen ruckelt
 }
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 // paths(): dazu die Zufahrten der Zweigstellen (werden automatisch gebaut); basePaths(): nur das feste Strassennetz
 const paths = () => basePaths().concat(branches().map(b => spur(b).pts.map(q => [q.x / T, q.y / T])));
 function basePaths() {
-  const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
+  const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).map(y => [y, areaEnd(k) + 1.8]));
   return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, Math.max(...L.map(l => l[0]))]]], L.map(([y, x]) => [[ROAD_X, y], [x, y]]));
 }
 function freeSlot(area) {
@@ -816,7 +833,7 @@ function decoSpotOk(x, y, k = G.carry) {
   if (k !== 'plot') for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko (plot: Zweigstelle darf auf leere Plätze)
     if (k === 'weide') continue;
     const a = AREAS[k];
-    for (let i = 0; i < slotsAvail(k); i++) {
+    for (let i = 0; i < SHOWN[k]; i++) {
       const p = slotPos(k, i);
       if (k === 'acker' ? Math.abs(x - p.x) < 2.8 * T && Math.abs(y - p.y) < 1.9 * T : Math.abs(x - p.x) < a.dx / 2 * T && y > p.y - (k === 'dorf' || a.hub ? 2.6 : 1.4) * T && y < p.y + 0.6 * T) return false;
     }
@@ -1849,7 +1866,7 @@ function nearPath(x, y) {
 }
 let sightMemo = null;
 function sightsOn() {
-  if (sightMemo?.g === G && sightMemo.land === G.land && sightMemo.w === WORLD.w) return sightMemo.list;
+  if (sightMemo?.g === G && sightMemo.land === G.land && sightMemo.sig === LAYOUT && sightMemo.w === WORLD.w) return sightMemo.list;
   const bandRects = () => { // [x0, x1, y0, y1] in Kacheln
     const r = [];
     for (const k in AREAS) {
@@ -1860,7 +1877,7 @@ function sightsOn() {
     return r;
   };
   const busy = bandRects();
-  G.land += 6; const later = bandRects(); G.land -= 6; // so gross sind die Bänder in 6 Land-Stufen: neuer Platz für Sehenswürdigkeiten bleibt eine Weile frei
+  G.land += 6; const later = bandRects().map(b => [b[0], b[1] + 8, b[2], b[3]]); G.land -= 6; // neue Bänder in 6 Land-Stufen, 8 Kacheln Wachstum nach Osten: Platz für Sehenswürdigkeiten bleibt eine Weile frei
   for (const d of G.deco) if (DECOS[d.type].where === 'land') busy.push(DECOS[d.type].sell ? filRect(d).map(v => v / T) : [d.x / T - 1, d.x / T + 1, d.y / T - 2, d.y / T + 0.6]);
   const todo = Object.entries(SIGHTS).filter(([, s]) => G.land >= s.lv).map(([k, s]) => ({ k, lv: s.lv, w: s.w, h: s.h }))
     .concat(TOWN.filter(b => b.se && G.land >= b.lv).map(b => ({ town: b, lv: b.lv, w: 2.2, h: 3.8 })),
@@ -1892,7 +1909,7 @@ function sightsOn() {
   for (const s of todo) if (!s.done) find: for (let y = Math.floor(WORLD.h - 0.5); y - s.h > 4; y--) for (let x = Math.floor(WORLD.w - 1 - s.w / 2); x - s.w / 2 > ROAD_X + 1; x--) if (put(s, x, y)) break find;
   // ponytail: Geschäftszentrum ohne freien Platz steht notfalls ganz unten rechts, auch wenn es etwas überlappt – bei 200 Stufen ist dort immer Wiese
   for (const s of todo) if (s.hub && !list.includes(s)) list.push(Object.assign(s, { x: WORLD.w - s.w / 2 - 1, y: WORLD.h - 0.8 }));
-  sightMemo = { g: G, land: G.land, w: WORLD.w, list, busy, gen: (sightMemo?.gen || 0) + 1 };
+  sightMemo = { g: G, land: G.land, sig: LAYOUT, w: WORLD.w, list, busy, gen: (sightMemo?.gen || 0) + 1 };
   return list;
 }
 // Freie Südost-Wiese (Hintergrund-Cache): Wäldchen, Felsbrocken, Blumen, Tümpel und Heustadel – fest je Zelle –
@@ -3520,7 +3537,7 @@ function drawSky(camX, vw) {
 // Neu gezeichnet bei Zoom, Landkauf (G.land bestimmt Bänder, Wege, Sumpf) oder wenn die Kamera aus dem Rand läuft.
 const bg = { c: document.createElement('canvas'), key: '' };
 function drawBg(camX, camY, vw, vh) {
-  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, sightsOn() && sightMemo.gen, branches().map(b => [b.x | 0, b.y | 0, b.s]).join('/'), SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
+  const s = ZOOM * DPR, key = [s, WORLD.w, WORLD.h, G.land, LAYOUT, sightsOn() && sightMemo.gen, branches().map(b => [b.x | 0, b.y | 0, b.s]).join('/'), SW.map(w => Math.round(w * 8))].join(); // Saison in 8 Stufen: beim Überblenden ~8 Neuzeichnungen
   if (key !== bg.key || camX < bg.x || camY < bg.y || camX + vw > bg.x + bg.w || camY + vh > bg.y + bg.h) {
     const m = Math.max(vw, vh) * 0.35, main = ctx;
     Object.assign(bg, { key, x: camX - m, y: camY - m, w: vw + 2 * m, h: vh + 2 * m });
@@ -4504,7 +4521,7 @@ function render() {
   ctx.setLineDash([8, 6]); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
   for (const a in AREAS) {
     const used = new Set(G.things.filter(t => THINGS[t.type].area === a).map(t => t.slot));
-    for (let i = 0; i < slotsAvail(a); i++) {
+    for (let i = 0; i < SHOWN[a]; i++) {
       if (used.has(i)) continue;
       const p = slotPos(a, i); if (!vis(p.x, p.y)) continue;
       if (a === 'acker') ctx.strokeRect(p.x - 2.5 * T, p.y - 1.5 * T, 5 * T, 3 * T);
