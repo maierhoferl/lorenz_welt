@@ -650,6 +650,7 @@ function parkSpot(k, s, h) { // freies Parkfeld bei Händler (eigenes Feld auf d
   const sc = s.s || 1; return { x: s.x + FIL_BAY[k.bay] * sc * T, y: s.y + FIL_PY * sc * T };
 }
 function spedition(dt) {
+  const stuck = t => { const d = THINGS[t.type]; return d.kind === 'grow' ? t.store >= storeCap(d) : t.out + d.n > OUT_CAP; }; // volles Lager: Arbeit steht
   const h = FIXED_E.find(f => f.type === 'haendler'), lv = toolLv('spedition');
   while (trucks.length < truckCount()) { // neue Wagen auf Händler und Zweigstellen verteilen: dorthin, wo am wenigsten stehen
     const i = trucks.length, home = [h, ...branches()].reduce((a, b) => homed(b) < homed(a) ? b : a), k = { h: lotOn() ? Math.PI / 2 : Math.PI, wait: i * 4, route: [], load: 0, sum: 0, home };
@@ -665,7 +666,6 @@ function spedition(dt) {
       const { sup, dem } = rates(), over = t => { const it = THINGS[t.type].item; return !dem[it] || sup[it] > dem[it] * 1.1; };
       const sp = {}, sur = it => sp[it] ??= surplus(it); // surplus() ist O(Gebäude) – je Ware nur einmal
       // ganz zuerst: Gebäude mit vollem Lager (dort steht die Arbeit), wertvollste zuerst
-      const stuck = t => { const d = THINGS[t.type]; return d.kind === 'grow' ? t.store >= storeCap(d) : t.out + d.n > OUT_CAP; };
       // Rohprodukte (kind 'grow') ganz hinten: nur mit Platz, der nach allen verarbeiteten Waren noch frei ist
       const raw = t => THINGS[t.type].kind === 'grow';
       const todo = G.things.filter(t => t[fld(t)] > 0 && !busy.has(t) && sur(THINGS[t.type].item)).sort((a, b) => raw(a) - raw(b) || stuck(b) - stuck(a) || (stuck(a) ? 0 : over(b) - over(a)) || val(b) - val(a));
@@ -697,6 +697,12 @@ function spedition(dt) {
       continue;
     }
     k.wait += dt;
+    if (k.load < lv.cap && (k.pk = (k.pk || 0) + dt) > 0.25) { // an vollem Lager vorbei (nicht voll): anhalten, leeren, dann weiter auf der Route
+      k.pk = 0; // ponytail: Suche über alle Gebäude 4×/s je Wagen, Raster falls es ruckelt
+      const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
+      const t = G.things.find(t => !busy.has(t) && stuck(t) && surplus(THINGS[t.type].item) && Math.hypot(pos(t).x - k.x, pos(t).y + 24 - k.y) < 2 * T);
+      if (t) { const p = pos(t); k.route.unshift({ t, x: p.x, y: p.y + 24, hot: true }); k.path = null; }
+    }
     const r = k.route[0];
     if (!k.path?.length) k.path = road(k, r);
     const w = k.path[0], dx = w.x - k.x, dy = w.y - k.y, l = Math.hypot(dx, dy), v = T * (lv.v || 7) * dt;
@@ -708,7 +714,7 @@ function spedition(dt) {
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? r.t[f] : 0; // immer den ganzen Vorrat mitnehmen, auch wenn es über die Ladung geht
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
       earn(n * ITEMS[it].price); // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
-      if (k.load >= lv.cap) { const s = parkSell(k, k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
+      if (k.load >= lv.cap) { const s = [h, ...branches()].reduce((a, b) => roadLen(k, b) < roadLen(k, a) ? b : a); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, immer zum nächsten Händler (nicht verteilen)
       else { // unterwegs voll gewordenes verarbeitetes Gebäude (Arbeit steht), das kein Wagen eingeplant hat: nächstes gleich als nächsten Halt einschieben
         const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
         const hot = G.things.filter(t => !busy.has(t) && THINGS[t.type].kind !== 'grow' && t.out + THINGS[t.type].n > OUT_CAP && k.load + t.out <= lv.cap && surplus(THINGS[t.type].item));
