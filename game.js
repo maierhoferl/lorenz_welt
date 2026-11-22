@@ -3241,8 +3241,8 @@ function gearFront(D) {
 // Vorderachse hält Abstand zur Kupplung, Hinterachse zur Vorderachse.
 const hasCart = () => G.tools.tragen === 3 || onTractor();
 const follow = (x, y, tx, ty, d) => { const l = Math.hypot(tx - x, ty - y) || 1; return [tx - (tx - x) / l * d, ty - (ty - y) / l * d]; };
-const trK = () => 1 + (G.tools.tragen - 4) * 0.25; // Traktor wächst mit der Stufe: 1 / 1.25 / 1.5
-function cartDims(s) { const t = onTractor(), k = (t ? 18 * trK() : 6) * s; if (t) s *= trK(); return { k, rope: (t ? 10 : 14) * s, L: (t ? 40 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
+const trK = () => 1 + Math.min(G.tools.tragen - 4, 2) * 0.25; // Traktor wächst mit der Stufe: 1 / 1.25 / 1.5, danach wächst nur der Anhänger
+function cartDims(s) { const t = onTractor(), k = (t ? 18 * trK() : 6) * s; if (t) s *= trK(); return { k, rope: (t ? 10 : 14) * s, L: (t ? 40 + clamp(G.tools.tragen - 6, 0, 3) * 22 : 28) * s, w: (t ? 13 : 9) * s, h: (t ? 9 : 6) * s, wall: (t ? 10 : 8) * s, r: (t ? 7 : 5) * s, t }; }
 function trailCart() {
   if (!hasCart()) { cart.on = false; return; }
   const c = cartDims(0.85 + G.stage * 0.09), ux = Math.cos(trH), uy = Math.sin(trH);
@@ -3349,9 +3349,9 @@ function drawCargoBike(k, P, s) {
   if (k.load) pile((u, v, z) => P(12 + 22 * u, v * 9, 18 + z / s), k.cargo, toolLv('spedition').cap, 2, 11);
 }
 // Traktor: liefert Teile mit Tiefe y, damit sie mit der sitzenden Figur richtig überdecken.
-const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782']]; // Stufe 4/5/6: grün, rot, blau
+const TR_COL = [['#38a35b', '#2f8f4e', '#26794a'], ['#c8352b', '#a32a22', '#87221b'], ['#2f6fc4', '#2559a0', '#1d4782'], ['#e8b923', '#c99a14', '#a67c0c'], ['#e9eef2', '#b9c3cc', '#8c98a3'], ['#e8732a', '#c45e1f', '#9c4a17'], ['#1fa39a', '#167a73', '#0f5a55']]; // Stufe 4–10: grün, rot, blau, gelb, weiss (Elektro), orange (Roboter), türkis (Wasserstoff)
 function tractorParts(x, y, s) {
-  const lv = clamp(G.tools.tragen - 4, 0, 2), [c1, c2, c3] = TR_COL[lv];
+  const [c1, c2, c3] = TR_COL[clamp(G.tools.tragen - 4, 0, 6)], lv = clamp(G.tools.tragen - 4, 0, 2), ev = G.tools.tragen >= 8; // ab Stufe 7 Bauform wie Riesentraktor
   const P = proj(x, y, s * trK()), { ux, uy } = P, box = (...a) => box3(P, ...a), S = s * trK();
   const part = (a, b, d) => ({ y: P(a, b)[1], d });
   const whl = (a, b, r) => part(a, b, () => { const [cx, cy] = P(a, b, r); wheelE(cx, cy, r * S, ux, uy, { w: (r > 10 ? 4 : 3) * S, rim: lv ? '#e8c33a' : '#d8d8d8', lug: true }); }); // ab Kipper: gelbe Felgen
@@ -3365,6 +3365,8 @@ function tractorParts(x, y, s) {
   const roof = () => {
     if (lv) box(-10, 8, 11, 15, 43, 'rgba(170,215,240,.18)', 'rgba(170,215,240,.28)'); // geschlossene Glaskabine
     box(-10, 8, 11, 58, 3, c1, c3);
+    if (ev) box(-9, 7, 10, 61, 1, '#24406b', '#1a2f50'); // Solarpanel auf dem Dach
+    if (G.tools.tragen >= 9) { const [lx, ly] = P(2, 0, 66); ellipse(lx, ly + 2 * S, 3.5 * S, 2 * S, '#222'); ellipse(lx, ly, 3.5 * S, 2 * S, Math.sin(time * 20) > 0 ? '#5ad1ff' : '#333'); } // Lidar dreht sich
     if (!lv) return;
     const on = Math.sin(time * 9) > 0; // orange Rundumleuchte blinkt
     const [bx, by] = P(-6, 6, 63); ellipse(bx, by, 3 * S, 3 * S, on ? '#ffb02e' : '#b8641a'); if (on) ellipse(bx, by, 6 * S, 6 * S, 'rgba(255,176,46,.3)');
@@ -3378,6 +3380,8 @@ function tractorParts(x, y, s) {
     part(21, 0, () => {
       box(6, hood, 6 + lv, 8, hh, c1, c2); // Motorhaube
       if (lv) box(hood, hood + 4, 7, 6, 8, '#3c3c3c', '#2a2a2a'); // Frontgewicht
+      if (G.tools.tragen >= 10) { const [wx, wy] = P(hood - 6, 0, 10 + hh); puffs(wx, wy, true, '235,245,255', 0.5); } // Wasserstoff: nur Wasserdampf
+      if (ev) return; // Elektro: kein Auspuff
       const ex = P(hood - 6, 0, 8 + hh), et = P(hood - 6, 0, 18 + hh + lv * 6 + Math.abs(Math.sin(time * 12)) * 2);
       line('#333', (2.5 + lv) * S, ...ex, ...et); if (lv) puffs(et[0], et[1], true, lv === 2 ? '90,90,90' : '200,200,200', 0.4 + lv * 0.2); // Auspuff qualmt
     }),

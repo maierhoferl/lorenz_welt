@@ -316,6 +316,10 @@ var TR = {
       ['Tractor with trailer', 'A diesel engine: fuel burns in the cylinder and pushes a piston. The crankshaft turns that into rotation, which drives the huge wheels through the gearbox.'],
       ['Big tractor with tipper', 'A tipper has a hydraulic cylinder under its bed. It pushes the bin up at an angle – and the whole load slides out at once.'],
       ['Giant four-wheel-drive tractor', 'Four-wheel drive: the engine drives all four wheels, not just the rear ones. So the heavy tractor does not slip even in mud. With GPS it almost steers straight on its own.'],
+      ['Tractor with long trailer', 'A tandem trailer has two axles close behind each other. The weight is spread over more wheels, so the full trailer presses the ground together less.'],
+      ['Electric tractor', 'A big battery instead of diesel: electric motors have full power right from the start, are quiet and do not stink. When braking, the motor even charges the battery again.'],
+      ['Robot tractor', 'Cameras, radar and lasers (lidar) see all around. A computer recognises obstacles and brakes by itself. Satellite GPS finds the track to within two centimetres.'],
+      ['Hydrogen tractor', 'In a fuel cell, hydrogen reacts with oxygen from the air. This makes electricity for the motor – and the only exhaust is water vapour.'],
     ]],
     reben: ['Grape harvest', [
       ['Hands', 'Pulling grapes off by hand – lots of berries burst.'],

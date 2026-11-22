@@ -316,6 +316,10 @@ var TR = {
       ['Tracteur avec remorque', 'Un moteur diesel : le carburant brûle dans le cylindre et pousse un piston. Le vilebrequin en fait une rotation qui, par la boîte de vitesses, fait tourner les énormes roues.'],
       ['Gros tracteur avec benne', 'Une benne a un vérin hydraulique sous son plateau. Il pousse la benne vers le haut en biais – et tout le chargement glisse dehors d’un coup.'],
       ['Tracteur géant à quatre roues motrices', 'Quatre roues motrices : le moteur entraîne les quatre roues, pas seulement celles de derrière. Ainsi le lourd tracteur ne patine pas, même dans la boue. Avec le GPS, il roule presque tout seul en ligne droite.'],
+      ['Tracteur avec longue remorque', 'Une remorque tandem a deux essieux tout près l’un de l’autre. Le poids se répartit sur plus de roues, donc la remorque pleine tasse moins le sol.'],
+      ['Tracteur électrique', 'Une grosse batterie au lieu du diesel : les moteurs électriques ont toute leur force dès le démarrage, sont silencieux et ne sentent pas mauvais. En freinant, le moteur recharge même la batterie.'],
+      ['Tracteur robot', 'Des caméras, un radar et des lasers (lidar) voient tout autour. Un ordinateur reconnaît les obstacles et freine tout seul. Le GPS par satellite trouve la trace à deux centimètres près.'],
+      ['Tracteur à hydrogène', 'Dans une pile à combustible, l’hydrogène réagit avec l’oxygène de l’air. Cela produit de l’électricité pour le moteur – et comme gaz d’échappement seulement de la vapeur d’eau.'],
     ]],
     reben: ['Vendanges', [
       ['Mains', 'Arracher les grappes à la main – beaucoup de grains éclatent.'],

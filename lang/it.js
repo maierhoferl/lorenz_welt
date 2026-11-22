@@ -316,6 +316,10 @@ var TR = {
       ['Trattore con rimorchio', 'Un motore diesel: il carburante brucia nel cilindro e spinge un pistone. L’albero motore lo trasforma in rotazione, che col cambio fa girare le enormi ruote.'],
       ['Grande trattore con ribaltabile', 'Un ribaltabile ha un cilindro idraulico sotto il cassone. Spinge il cassone in alto in obliquo – e tutto il carico scivola fuori in un colpo.'],
       ['Trattore gigante a quattro ruote motrici', 'Trazione integrale: il motore muove tutte e quattro le ruote, non solo quelle dietro. Così il trattore pesante non slitta nemmeno nel fango. Col GPS va dritto quasi da solo.'],
+      ['Trattore con rimorchio lungo', 'Un rimorchio tandem ha due assi vicini uno dietro l’altro. Il peso si distribuisce su più ruote, così il rimorchio pieno schiaccia meno il terreno.'],
+      ['Trattore elettrico', 'Una grande batteria invece del diesel: i motori elettrici hanno tutta la forza già alla partenza, sono silenziosi e non puzzano. Frenando, il motore ricarica perfino la batteria.'],
+      ['Trattore robot', 'Telecamere, radar e laser (lidar) vedono tutto intorno. Un computer riconosce gli ostacoli e frena da solo. Il GPS satellitare trova la traccia con due centimetri di precisione.'],
+      ['Trattore a idrogeno', 'In una cella a combustibile l’idrogeno reagisce con l’ossigeno dell’aria. Così nasce corrente per il motore – e come gas di scarico solo vapore acqueo.'],
     ]],
     reben: ['Vendemmia', [
       ['Mani', 'Staccare i grappoli a mano – molti acini scoppiano.'],

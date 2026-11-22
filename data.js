@@ -635,6 +635,10 @@ const TOOLS = {
     { name: 'Traktor mit Anhänger', cap: 240, price: 800, info: 'Ein Dieselmotor: Kraftstoff verbrennt im Zylinder und drückt einen Kolben. Die Kurbelwelle macht daraus eine Drehung, die über das Getriebe die riesigen Räder antreibt.' },
     { name: 'Grosser Traktor mit Kipper', cap: 500, price: 3000, info: 'Ein Kipper hat unter der Ladefläche einen Hydraulikzylinder. Er drückt die Mulde schräg nach oben – und die ganze Ladung rutscht auf einmal hinaus.' },
     { name: 'Riesentraktor mit Allrad', cap: 1000, price: 10000, info: 'Allradantrieb: Der Motor treibt alle vier Räder an, nicht nur die hinteren. So rutscht der schwere Traktor auch im Schlamm nicht. Mit GPS lenkt er sogar fast von selbst geradeaus.' },
+    { name: 'Traktor mit Langanhänger', cap: 2500, price: 35000, info: 'Ein Tandemanhänger hat zwei Achsen dicht hintereinander. Das Gewicht verteilt sich auf mehr Räder, darum drückt der volle Anhänger den Boden weniger fest zusammen.' },
+    { name: 'Elektro-Traktor', cap: 6000, price: 120000, info: 'Statt Diesel ein grosser Akku: Elektromotoren haben schon beim Anfahren die volle Kraft, sind leise und stinken nicht. Beim Bremsen lädt der Motor den Akku sogar wieder auf.' },
+    { name: 'Roboter-Traktor', cap: 15000, price: 300000, info: 'Kameras, Radar und Laser (Lidar) sehen rundherum. Ein Computer erkennt Hindernisse und bremst von selbst. Satelliten-GPS findet die Spur auf zwei Zentimeter genau.' },
+    { name: 'Wasserstoff-Traktor', cap: 40000, price: 700000, info: 'In einer Brennstoffzelle reagiert Wasserstoff mit Sauerstoff aus der Luft. Dabei entsteht Strom für den Motor – und als Abgas nur Wasserdampf.' },
   ]},
   reben: { name: 'Trauben-Ernte', icon: '🍇', land: 10, levels: [
     { name: 'Hände', speed: 1, price: 0, info: 'Trauben mit der Hand abreissen – dabei platzen viele Beeren.' },
