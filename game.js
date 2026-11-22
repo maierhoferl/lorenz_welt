@@ -241,7 +241,9 @@ function logMinute() {
 // Herstellung/Bedarf pro Minute je Ware (auch für den Produktions-Plan).
 // Fehlt einem Gebäude eine Zutat, läuft es langsamer (u < 1) – das zieht durch die ganze Kette.
 // sup = was wirklich herauskommt; dem = was die Abnehmer nehmen würden, wenn genau diese Ware reichen würde.
-function rates() {
+let ratesMemo = null;
+function rates() { // ponytail: Ergebnis hängt nur an der Anzahl je Typ, Dinge kommen nur dazu → Cache bis G.things wächst/ersetzt wird
+  if (ratesMemo?.a === G.things && ratesMemo.n === G.things.length) return ratesMemo.v;
   const cnt = {}, u = {}, bind = {};
   for (const t of G.things) cnt[t.type] = (cnt[t.type] || 0) + 1;
   const ks = Object.keys(cnt), pm = (k, v) => cnt[k] * v / THINGS[k].time * 60;
@@ -257,7 +259,8 @@ function rates() {
   }
   const dem = {}; // ponytail: Abnehmer, die an dieser Ware hängen, zählen voll – auch wenn noch eine zweite Zutat knapp wäre
   for (const k of ks) for (const i in THINGS[k].in) dem[i] = (dem[i] || 0) + pm(k, THINGS[k].in[i]) * (u[k] === 1 || bind[k].includes(i) ? 1 : u[k]);
-  return { sup, dem, u, cnt };
+  ratesMemo = { a: G.things, n: G.things.length, v: { sup, dem, u, cnt } };
+  return ratesMemo.v;
 }
 const pos = t => t.type === 'kuh' ? { x: t.cx, y: t.cy } : { x: t.x, y: t.y };
 const age = () => P.age + STAGES[G.stage].add;
@@ -314,7 +317,7 @@ function basePaths() { // Spalte 2: Querwege ab der Oststrasse, die oben über y
 }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
-  for (let i = 0; i < slotsAvail(area); i++) if (!used.has(i) && !underBranch(area, slotPos(area, i))) return i; // Zweigstelle steht auf dem Platz
+  for (let i = 0, n = slotsAvail(area); i < n; i++) if (!used.has(i) && !underBranch(area, slotPos(area, i))) return i; // Zweigstelle steht auf dem Platz
   return -1;
 }
 function addThing(type) {
@@ -834,7 +837,7 @@ function decoSpotOk(x, y, k = G.carry) {
   if (k !== 'plot') for (const k in AREAS) { // ganze Bänder sind Bauland – auch leere Plätze, sonst baut man später auf die Deko (plot: Zweigstelle darf auf leere Plätze)
     if (k === 'weide') continue;
     const a = AREAS[k];
-    for (let i = 0; i < slotsAvail(k); i++) {
+    for (let i = 0, n = slotsAvail(k); i < n; i++) {
       const p = slotPos(k, i);
       if (k === 'acker' ? Math.abs(x - p.x) < 2.8 * T && Math.abs(y - p.y) < 1.9 * T : Math.abs(x - p.x) < a.dx / 2 * T && y > p.y - (k === 'dorf' || a.hub ? 2.6 : 1.4) * T && y < p.y + 0.6 * T) return false;
     }
@@ -1151,7 +1154,7 @@ function chart(title, pts, col, fmt, bar, max) { // pts: [{ h: Verlaufspunkt, v:
   if (pts.length < 2) return `<div class="chart"><b>${title}</b><p class="nodata">${$t`Noch zu wenig Daten – spiel ein paar Minuten weiter.`}</p></div>`;
   const W = 320, Hh = 110, top = 18, bot = 16, n = pts.length, mx = max ?? Math.max(1, ...pts.map(p => p.v)) * 1.1, cw = (W - 8) / n;
   const x = i => 4 + cw * (i + 0.5), y = v => top + (Hh - top - bot) * (1 - Math.max(0, v) / mx);
-  const when = h => new Date(h.t * 6e4).toLocaleString(LANG, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  const df = new Intl.DateTimeFormat(LANG, { weekday: 'short', hour: '2-digit', minute: '2-digit' }), when = h => df.format(h.t * 6e4); // toLocaleString baut pro Aufruf einen Formatter – bei 240 Punkten sekundenlang auf Tablets
   const marks = bar ? pts.map((p, i) => `<rect x="${(x(i) - cw * 0.4).toFixed(1)}" y="${y(p.v).toFixed(1)}" width="${Math.max(1, cw * 0.8).toFixed(1)}" height="${(Hh - bot - y(p.v)).toFixed(1)}" rx="${Math.min(3, cw * 0.3).toFixed(1)}" fill="${col}"/>`).join('')
     : `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(p.v).toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(n - 1)}" cy="${y(pts.at(-1).v)}" r="4" fill="${col}" stroke="#fff" stroke-width="2"/>`;
   const hits = pts.map((p, i) => `<rect class="hit" x="${(4 + cw * i).toFixed(1)}" y="0" width="${cw.toFixed(1)}" height="${Hh}" data-v="${when(p.h)}: ${fmt(p.v)}"><title>${when(p.h)}: ${fmt(p.v)}</title></rect>`).join('');
@@ -4548,7 +4551,7 @@ function render() {
   ctx.setLineDash([8, 6]); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
   for (const a in AREAS) {
     const used = new Set(G.things.filter(t => THINGS[t.type].area === a).map(t => t.slot));
-    for (let i = 0; i < slotsAvail(a); i++) {
+    for (let i = 0, n = slotsAvail(a); i < n; i++) {
       if (used.has(i)) continue;
       const p = slotPos(a, i); if (!vis(p.x, p.y)) continue;
       if (a === 'acker') ctx.strokeRect(p.x - 2.5 * T, p.y - 1.5 * T, 5 * T, 3 * T);
