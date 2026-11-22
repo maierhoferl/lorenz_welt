@@ -1102,7 +1102,7 @@ function shopList() {
     const free = freeSlot(d.area) >= 0;
     tabs[d.kind === 'grow' ? 0 : 1].push({
       cat: catOf(k), depth: depth(d.item), icon: d.icon, name: d.name, price: d.price, info: d.info, neu: !G.things.some(t => t.type === k),
-      desc: d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d),
+      desc: (d.kind === 'grow' ? $t`Gibt ${d.n} ${ITEMS[d.item].icon} alle ${d.time} s` : recipe(d)) + ` · 1 ${ITEMS[d.item].icon} = ${ITEMS[d.item].price} ${$t`Fr.`}`, // Wert der Ware beim Händler
       note: free ? $t`kommt auf: ${AREAS[d.area].name}` : $t`⚠️ Kein Platz – kauf mehr Land!`, can: free,
       buy: () => {
         const t = addThing(k); if (t && d.area === 'terminal') trains.push({ t, age: 0, y: trainLaneY(t), first: true }); toast($t`${d.name} steht jetzt auf: ${AREAS[d.area].name}`); if (!G.seen[k]) { G.seen[k] = 1; showInfo(t); }
@@ -1366,7 +1366,7 @@ function openPlan() {
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
       <text x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
       <text x="${p.x + 10}" y="${p.y + 43}" font-size="12" fill="#555">${rate}</text>
-      <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${sell}</text>
+      <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${sell}${sell ? ' ' : ''}<tspan fill="#a8743f">1 ${ITEMS[d.item].icon} = ${ITEMS[d.item].price} ${$t`Fr.`}</tspan></text>
       <text data-info="${k}" x="${p.x + NW - 18}" y="${p.y + NH - 8}" font-size="16">ℹ️</text>
       ${warn ? `<circle cx="${p.x + NW - 4}" cy="${p.y + 4}" r="11" fill="#d23b2b"/><text x="${p.x + NW - 4}" y="${p.y + 9}" text-anchor="middle" fill="#fff" font-weight="900" font-size="15">!</text>` : ''}</g>`;
     const sy = p.y + NH - 12, stub = (x1, x2, ic, tx) => `<g opacity="${on ? 1 : 0.45}"><path d="M${x1},${sy} L${x2},${sy}" stroke="#3e7bc4" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#ab)"/><text x="${tx}" y="${sy - 5}" font-size="12">${ic}</text></g>`; // Pfeil-Stummel: von/zu anderem Reiter
