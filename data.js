@@ -850,7 +850,7 @@ const AREAS = {
   obst:  { name: 'Obstgarten', x: 20.4, y: 4.8,  rows: 3, dx: 1.6, dy: 2.1, base: 4, per: 3, lane: [10.2] },
   acker: { name: 'Acker',      x: 21.6, y: 36.6, rows: 5, dx: 5.3, dy: 3.3, base: 2, per: 2, lane: [52.1] },
   weide: { name: 'Weide',      x: 20.6, y: 29.5, rows: 3, dx: 2.2, dy: 2,   base: 2, per: 3 },
-  dorf:  { name: 'Dorf',       x: 20.6, y: 15.2, cols: 16, dx: 3.3, dy: 5.1, base: 2, per: 2, lane: [16.1] }, // Reihe für Reihe, lane: game.js → fitWorld
+  dorf:  { name: 'Dorf',       x: 20.6, y: 15.2, rows: 3, dx: 3.3, dy: 5.1, base: 2, per: 2, lane: [16.1, 21.2, 26.3] },
   weinberg:  { name: 'Weinberg',    x: 20.4, y: 54.4, rows: 4, dx: 3.2, dy: 1.6, base: 3, per: 2, from: 10, lane: [52.1], hill: [53, 60] },
   fischerei: { name: 'Fischteiche', x: 4, y: 34.4, cols: 4, dx: 3.5, dy: 1.7, base: 2, per: 2, from: 20 }, // südlich vom See, wächst nach Süden
   tierhof:   { name: 'Tierhof',     x: 20.6, y: 62.6, rows: 2, dx: 3.4, dy: 1.8, base: 3, per: 2, from: 30, lane: [60.3] },
