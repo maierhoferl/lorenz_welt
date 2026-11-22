@@ -3477,37 +3477,57 @@ function flagPole(x, y, h, s, ph = 0) {
 }
 
 // ---- Alpen-Panorama (Kulisse nördlich der Welt, y < 0) ----
+// Bergformen: horn = steile hohle Flanken (Eiger), dom = runde Firnkuppe (Mönch), zacken = Grat mit Zähnen (Dents du Midi),
+// stock = Kalkklotz mit Felswänden und schiefem Dach (Säntis), matter = das grosse Horn mit Schulter rechts (Hörnligrat)
+const mtH = (p, d) => {
+  const u = Math.abs(d) / (d < 0 ? p.wl : p.wr); if (u >= 1) return 0;
+  switch (p.kind) {
+    case 'horn': return p.h * (1 - u) ** 1.8;
+    case 'dom': return p.h * (1 - u ** 1.7) ** 1.6;
+    case 'zacken': return p.h * (1 - u) * (0.8 + 0.2 * (1 - Math.abs(Math.sin(d / 17 + p.ph))));
+    case 'stock': return p.h * Math.min(1, (1 - u) * 2.6) ** 1.2 * (1 - 0.1 * Math.sign(d) * u); // Dach fällt nach rechts
+    case 'matter': return d < 0 ? p.h * (1 - u) ** 1.25 : p.h * ((1 - u) ** 2.6 * 0.78 + 0.22 * (1 - u)) + p.h * 0.1 * Math.exp(-(((u - 0.42) / 0.1) ** 2));
+  }
+};
 const makeAlps = () => {
-  const Wp = WORLD.w * T, r = seeded(42), step = 12;
-  const peaks = (n, hMin, hMax, wMin, wMax) => Array.from({ length: n }, (_, i) => ({ x: (i + 0.15 + r() * 0.7) / n * Wp, h: hMin + r() * (hMax - hMin), wl: wMin + r() * (wMax - wMin), wr: wMin + r() * (wMax - wMin) }));
+  const Wp = WORLD.w * T, r = seeded(42), step = 12, KINDS = ['horn', 'dom', 'zacken', 'stock', 'horn', 'zacken'];
+  const peaks = (n, hMin, hMax, wMin, wMax) => Array.from({ length: n }, (_, i) => ({ x: (i + 0.15 + r() * 0.7) / n * Wp, h: hMin + r() * (hMax - hMin), wl: wMin + r() * (wMax - wMin), wr: wMin + r() * (wMax - wMin), kind: KINDS[r() * KINDS.length | 0], ph: r() * 9 }));
   const ridge = (pk, base, rough) => {
     const pts = [];
     for (let x = -step; x <= Wp + step; x += step) {
-      let h = 0; for (const p of pk) h = Math.max(h, p.h - Math.abs(x - p.x) * p.h / (x < p.x ? p.wl : p.wr));
-      pts.push([x, base - h + (r() - 0.5) * rough * Math.min(1, h / 60)]);
+      let h = 0; for (const p of pk) h = Math.max(h, mtH(p, x - p.x));
+      const crest = Math.sin(x * 0.043) * 0.6 + Math.sin(x * 0.11 + 1) * 0.4; // ruhiger Grat statt Rauschen
+      pts.push([x, base - h + (crest + (r() - 0.5) * 0.5) * rough * Math.min(1, h / 60)]);
     }
     return pts;
   };
   const far = peaks(15, 150, 250, 150, 240), near = peaks(7, 110, 200, 200, 300);
-  near.push({ x: Wp * 0.64, h: 300, wl: 120, wr: 210, horn: true }); // das grosse Horn
+  const horn = { x: Wp * 0.64, h: 300, wl: 120, wr: 230, kind: 'matter', ph: 0, horn: true }; near.push(horn); // das grosse Horn
   const firs = Array.from({ length: 70 }, () => [r() * Wp, r(), 0.5 + r() * 0.45]);
-  return { Wp, far, near, farR: ridge(far, -40, 10), nearR: ridge(near, -6, 14), firs, horn: near.at(-1) };
+  return { Wp, far, near, farR: ridge(far, -40, 10), nearR: ridge(near, -6, 14), firs, horn };
 };
 let alps = makeAlps();
 const hillY = x => -34 + 14 * Math.sin(x * 0.0035 + 1) + 8 * Math.sin(x * 0.011 + 2);
 function ridgeAt(R, x) { const i = clamp(Math.round((x + 12) / 12), 0, R.length - 1); return R[i][1]; }
 function mountainRange(R, pk, base, c1, c2, snowY) {
   const path = () => { ctx.beginPath(); ctx.moveTo(R[0][0], 10); for (const [x, y] of R) ctx.lineTo(x, y); ctx.lineTo(R.at(-1)[0], 10); ctx.closePath(); };
+  const grat = p => Array.from({ length: 9 }, (_, i) => { const t = i / 8; return [p.x + p.wr * 0.18 * t + Math.sin(t * 7 + p.ph) * 9 * t, base - p.h * (1 - t)]; }); // Grat vom Gipfel hinunter, leicht gewunden
+  const shadow = p => { // Schattenseite folgt der Bergform (Licht von links)
+    ctx.beginPath(); for (let d = 0; d <= p.wr; d += 10) ctx.lineTo(p.x + d, base - mtH(p, d));
+    ctx.lineTo(p.x + p.wr, base + 20); for (const [x, y] of grat(p).reverse()) ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
+  };
   const g = ctx.createLinearGradient(0, -ALPS * T, 0, 0); g.addColorStop(0, c1); g.addColorStop(1, c2);
   path(); ctx.fillStyle = g; ctx.fill();
   ctx.save(); path(); ctx.clip();
-  ctx.fillStyle = 'rgba(20,30,50,.16)'; // Schattenseite (Licht von links)
-  for (const p of pk) { ctx.beginPath(); ctx.moveTo(p.x, base - p.h); ctx.lineTo(p.x + p.wr, base); ctx.lineTo(p.x + p.wr * 0.15, base); ctx.closePath(); ctx.fill(); }
-  ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(-20, -ALPS * T - 10); // Schnee oberhalb der Schneegrenze
-  for (let x = -20; x <= alps.Wp + 20; x += 16) ctx.lineTo(x, snowY + Math.sin(x * 0.05) * 9 + Math.sin(x * 0.13) * 6);
+  ctx.strokeStyle = 'rgba(30,35,50,.13)'; ctx.lineWidth = 2; // Felsbänder am Kalkklotz
+  for (const p of pk) if (p.kind === 'stock') for (let k = 1; k < 5; k++) { const y = base - p.h * (1 - k * 0.17); ctx.beginPath(); ctx.moveTo(p.x - p.wl, y + 6); ctx.lineTo(p.x + p.wr, y - 6); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(20,30,50,.16)'; for (const p of pk) shadow(p);
+  ctx.fillStyle = '#f7fbff'; ctx.beginPath(); ctx.moveTo(-20, -ALPS * T - 10); // Schnee oberhalb der Schneegrenze, in Rinnen weit hinunter
+  for (let x = -20; x <= alps.Wp + 20; x += 6) ctx.lineTo(x, snowY + Math.sin(x * 0.05) * 9 + Math.sin(x * 0.13) * 6 + Math.max(0, Math.sin(x * 0.083 + 2)) ** 8 * 38 + Math.max(0, Math.sin(x * 0.19)) ** 10 * 18);
   ctx.lineTo(alps.Wp + 20, -ALPS * T - 10); ctx.fill();
-  ctx.fillStyle = 'rgba(120,150,190,.28)';
-  for (const p of pk) { ctx.beginPath(); ctx.moveTo(p.x, base - p.h); ctx.lineTo(p.x + p.wr, base); ctx.lineTo(p.x + p.wr * 0.15, base); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle = 'rgba(120,150,190,.28)'; for (const p of pk) shadow(p);
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5; // Licht auf der Gratkante
+  for (const p of pk) { ctx.beginPath(); for (const [x, y] of grat(p)) ctx.lineTo(x, y); ctx.stroke(); }
   ctx.restore();
 }
 // Himmel und Wolken (bewegt) liegen hinter dem Hintergrund-Cache, die Berge darin decken sie unten ab
