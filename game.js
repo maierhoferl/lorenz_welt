@@ -229,6 +229,15 @@ const isAuto = t => { const d = THINGS[t.type]; return d.kind === 'grow' && !!to
 const storeCap = d => d.n * 3;
 const hasConsumer = item => G.things.some(t => THINGS[t.type].in?.[item]);
 const surplus = item => !G.things.some(c => { const n = THINGS[c.type].in?.[item]; return n && (c.inS[item] || 0) < n * 4; }); // kein Abnehmer hat mehr Platz
+// Analyse-Cockpit: Einnahmen aus Verkäufen zählen und den Verlauf je Spielminute mitschreiben
+const earn = v => { G.money += v; G.earn += v; };
+const busy = t => THINGS[t.type].kind === 'grow' ? !t.ripe : !!t.working; // reif und nicht geerntet / Lager voll / Zutat fehlt = steht
+const busyShare = (L = G.things) => L.length ? L.filter(busy).length / L.length : 0;
+function logMinute() {
+  G.pmin++; G.hist.push({ p: G.pmin, t: Math.round(Date.now() / 6e4), m: G.money, e: G.earn, a: Math.round(acc.sa / acc.sn * 100), n: G.things.length });
+  acc.sa = acc.sn = 0;
+  if (G.hist.length > 240) G.hist.splice(0, 120, ...G.hist.slice(0, 120).filter((_, i) => i % 2)); // ponytail: ältere Hälfte ausdünnen – max. 240 Punkte, alte Punkte stehen dann für mehrere Minuten (Rate = Δe/Δp stimmt trotzdem)
+}
 // Herstellung/Bedarf pro Minute je Ware (auch für den Produktions-Plan).
 // Fehlt einem Gebäude eine Zutat, läuft es langsamer (u < 1) – das zieht durch die ganze Kette.
 // sup = was wirklich herauskommt; dem = was die Abnehmer nehmen würden, wenn genau diese Ware reichen würde.
@@ -314,7 +323,7 @@ function addThing(type) {
   return t;
 }
 function newGame() {
-  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 14 * T, py: 10.2 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null, pass: {}, spot: {} };
+  G = { v: 1, nid: 1, money: 0, inv: {}, tools: {}, land: 0, things: [], px: 14 * T, py: 10.2 * T, seen: {}, stage: 0, unlocks: 0, fin: {}, deco: [], carry: null, pass: {}, spot: {}, earn: 0, pmin: 0, hist: [] };
   for (const k in TOOLS) G.tools[k] = 0;
   trucks.length = 0; // anderer Spieler: Fahrzeuge neu aufstellen
   addThing('feld').ripe = true;
@@ -331,7 +340,8 @@ function loadGame(server) {
     Object.assign(G, s);
     G.tools = Object.assign(tools, s.tools);
     // Spielstand kommt von aussen (Server/localStorage) und landet teils in innerHTML: Zahlen erzwingen
-    for (const k of ['money', 'land', 'lkw', 'unlocks', 'stage', 'nid', 'rev']) G[k] = Math.max(0, Math.floor(+G[k] || 0));
+    for (const k of ['money', 'land', 'lkw', 'unlocks', 'stage', 'nid', 'rev', 'earn', 'pmin']) G[k] = Math.max(0, Math.floor(+G[k] || 0));
+    G.hist = (Array.isArray(G.hist) ? G.hist : []).map(h => Object.fromEntries(['p', 't', 'm', 'e', 'a', 'n'].map(k => [k, Math.floor(+h?.[k] || 0)])));
     G.rev = Math.max(rv(server), rv(local)); // gewählter Stand darf hochladen, auch wenn er (alt, ohne rev) vom Gerät kommt
     G.nid ||= 1; G.stage = Math.min(G.stage, STAGES.length - 1); G.unlocks = Math.min(G.unlocks, UNLOCKS.length);
     for (const k in G.tools) G.tools[k] = TOOLS[k] ? clamp(G.tools[k] | 0, 0, TOOLS[k].levels.length - 1) : 0;
@@ -449,7 +459,7 @@ let near = null, lastNear = null, harvest = null, shopDismiss = false, moving = 
 const cart = { on: false }; // gezogener Wagen: Vorder-/Hinterachse in Weltkoordinaten
 let trH = 0; // Blickrichtung von Figur und Traktor (Bogenmass, 0 = rechts)
 const packages = [], floaters = [], particles = [], trucks = [];
-let acc = { tr: 0, w: 0, save: 0, hud: 0 };
+let acc = { tr: 0, w: 0, save: 0, hud: 0, st: 0, sa: 0, sn: 0 };
 
 function update(dt) {
   time += dt;
@@ -494,6 +504,7 @@ function update(dt) {
   if ((acc.tr += dt) > 0.35) { acc.tr = 0; transfers(); }
   spedition(dt);
   if ((acc.w += dt) > 0.5) { acc.w = 0; warnings(); checkStage(); }
+  if ((acc.st += dt) > 1) { acc.st = 0; acc.sa += busyShare(); if (++acc.sn >= 60) logMinute(); } // Cockpit: Auslastung 1×/s messen, jede Spielminute ein Punkt im Verlauf
   interact(dt);
   if ((acc.hud += dt) > 0.25) { acc.hud = 0; hud(); seasonTick(); }
   folkTick(dt); evTick(dt);
@@ -679,7 +690,7 @@ function spedition(dt) {
     if (r.t) { // beim Gebäude einladen
       const it = THINGS[r.t.type].item, f = fld(r.t), n = surplus(it) ? r.t[f] : 0; // immer den ganzen Vorrat mitnehmen, auch wenn es über die Ladung geht
       r.t[f] -= n; k.load += n; k.sum += n * ITEMS[it].price; k.cargo = k.cargo || {}; if (n) k.cargo[it] = (k.cargo[it] || 0) + n;
-      G.money += n * ITEMS[it].price; // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
+      earn(n * ITEMS[it].price); // gleich gutschreiben: Fahrzeuge werden nicht gespeichert, sonst wäre die Ladung beim Verlassen weg
       if (k.load >= lv.cap) { const s = parkSell(k, k, h); k.home = s; k.route = [{ ...parkSpot(k, s, h), sell: s }]; } // voll: restliche Halte auslassen, direkt zum nächsten Händler
       else { // unterwegs voll gewordenes verarbeitetes Gebäude (Arbeit steht), das kein Wagen eingeplant hat: nächstes gleich als nächsten Halt einschieben
         const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
@@ -883,7 +894,7 @@ function interact(dt) {
   }
   if ((near?.type === 'haendler' || DECOS[near?.type]?.sell) && bagCount() > 0) {
     let sum = 0; for (const k in G.inv) sum += G.inv[k] * ITEMS[k].price;
-    G.inv = {}; G.money += sum; AU.sfx('cash'); floater(near.x, near.y - 90, `+${sum} Fr. 💰`);
+    G.inv = {}; earn(sum); AU.sfx('cash'); floater(near.x, near.y - 90, `+${sum} Fr. 💰`);
   }
   nearDeco = null; let dd = 1.1 * T;
   if (!near) for (const o of G.deco) if (DECOS[o.type].where === 'land' && !DECOS[o.type].sell) { const k = dist(G.px, G.py, o.x, o.y); if (k < dd) { dd = k; nearDeco = o; } }
@@ -1014,7 +1025,7 @@ function showInfo(t) {
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
 
-let shopTab = 0, planCat = null, shopCat = null;
+let shopTab = 0, planCat = null, shopCat = null, planView = 'cockpit';
 // Gebäude-Reiter: nach Rohstoff gruppiert (Ware → erste Zutat bis zum Rohstoff), innerhalb nach Verarbeitungsstufe
 const maker = it => Object.keys(THINGS).find(k => THINGS[k].item === it);
 const depth = it => { const d = THINGS[maker(it)]; return d?.in ? 1 + Math.max(...Object.keys(d.in).map(depth)) : 0; };
@@ -1115,6 +1126,52 @@ function openShop() {
   });
 }
 
+// Cockpit: Kennzahlen jetzt, Verlauf über die Spielminuten, Auslastung je Rohstoff-Reiter
+const pct = v => `${Math.round(v * 100)}%`, fr = v => `${Math.round(v)} ${$t`Fr.`}`;
+const statusCol = v => v >= 0.8 ? '#3d8b2f' : v >= 0.5 ? '#e39b1c' : '#d23b2b';
+function chart(title, pts, col, fmt, bar, max) { // pts: [{ h: Verlaufspunkt, v: Wert }], eine Reihe pro Diagramm
+  if (pts.length < 2) return `<div class="chart"><b>${title}</b><p class="nodata">${$t`Noch zu wenig Daten – spiel ein paar Minuten weiter.`}</p></div>`;
+  const W = 320, Hh = 110, top = 18, bot = 16, n = pts.length, mx = max ?? Math.max(1, ...pts.map(p => p.v)) * 1.1, cw = (W - 8) / n;
+  const x = i => 4 + cw * (i + 0.5), y = v => top + (Hh - top - bot) * (1 - Math.max(0, v) / mx);
+  const when = h => new Date(h.t * 6e4).toLocaleString(LANG, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  const marks = bar ? pts.map((p, i) => `<rect x="${(x(i) - cw * 0.4).toFixed(1)}" y="${y(p.v).toFixed(1)}" width="${Math.max(1, cw * 0.8).toFixed(1)}" height="${(Hh - bot - y(p.v)).toFixed(1)}" rx="${Math.min(3, cw * 0.3).toFixed(1)}" fill="${col}"/>`).join('')
+    : `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(p.v).toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(n - 1)}" cy="${y(pts.at(-1).v)}" r="4" fill="${col}" stroke="#fff" stroke-width="2"/>`;
+  const hits = pts.map((p, i) => `<rect class="hit" x="${(4 + cw * i).toFixed(1)}" y="0" width="${cw.toFixed(1)}" height="${Hh}" data-v="${when(p.h)}: ${fmt(p.v)}"><title>${when(p.h)}: ${fmt(p.v)}</title></rect>`).join('');
+  const span = pts.at(-1).h.p - pts[0].h.p;
+  return `<div class="chart"><b>${title}</b> <span class="val">${fmt(pts.at(-1).v)}</span><svg viewBox="0 0 ${W} ${Hh}"><line x1="4" x2="${W - 4}" y1="${top}" y2="${top}" stroke="#e6d6b5" stroke-dasharray="3 3"/><line x1="4" x2="${W - 4}" y1="${Hh - bot}" y2="${Hh - bot}" stroke="#c9b48a"/>
+    <text x="4" y="12" font-size="11" fill="#777">${fmt(mx)}</text><text x="4" y="${Hh - 3}" font-size="11" fill="#777">${$t`vor ${span} Spielmin.`}</text><text x="${W - 4}" y="${Hh - 3}" font-size="11" fill="#777" text-anchor="end">${$t`jetzt`}</text>${marks}${hits}</svg></div>`;
+}
+function cockpit(types, cats, cnt, sup, dem, u) {
+  const H = G.hist, last = H.at(-1);
+  const at = dp => [...H].reverse().find(h => h.p <= last.p - dp) || H[0]; // Verlaufspunkt vor dp Spielminuten
+  const rate = (a, b) => a && b && a.p > b.p ? (a.e - b.e) / (a.p - b.p) : null; // Einnahmen Fr./min zwischen zwei Punkten
+  const inc = last && rate(last, at(10)), prev = last && rate(at(10), at(20));
+  const poss = Object.keys(sup).reduce((a, it) => a + Math.max(0, sup[it] - (dem[it] || 0)) * ITEMS[it].price, 0); // was der Plan zum Verkaufen hergibt
+  const val = k => cnt[k] * THINGS[k].n / THINGS[k].time * 60 * ITEMS[THINGS[k].item].price;
+  const flow = ks => { const f = ks.filter(k => cnt[k] && THINGS[k].in), all = f.reduce((a, k) => a + val(k), 0); return all ? f.reduce((a, k) => a + val(k) * (u[k] ?? 1), 0) / all : null; };
+  const now = busyShare(), a10 = H.filter(h => h.p > (last?.p ?? 0) - 10), avgA = a10.length ? a10.reduce((s, h) => s + h.a, 0) / a10.length / 100 : null, fl = flow(types);
+  const trend = inc != null && prev ? (inc >= prev ? `<span style="color:#3d8b2f">▲ +${pct(inc / prev - 1)}</span>` : `<span style="color:#d23b2b">▼ −${pct(1 - inc / prev)}</span>`) + ' ' + $t`zu vorher` : '';
+  const kpi = (ic, name, v, sub, bar) => `<div class="kpi"><small>${ic} ${name}</small><b>${v}</b>${bar != null ? `<i style="--w:${Math.min(100, bar * 100)}%;--c:${statusCol(bar)}"></i>` : ''}<span>${sub}</span></div>`;
+  const kpis = `<div class="kpis">${[
+    kpi('💰', $t`Einnahmen`, inc != null ? `${fr(inc)}/min` : '–', inc != null ? `${$t`letzte 10 Spielmin.`} ${trend}` : $t`misst ab jetzt jede Spielminute`),
+    kpi('🎯', $t`Ausbeute`, inc != null && poss ? pct(inc / poss) : '–', $t`von möglich ${fr(poss)}/min`, inc != null && poss ? inc / poss : null),
+    kpi('⚙️', $t`Auslastung`, pct(now), avgA != null ? $t`Ø 10 Min.: ${pct(avgA)} · ${G.things.filter(busy).length} von ${G.things.length} arbeiten` : $t`${G.things.filter(busy).length} von ${G.things.length} arbeiten`, now),
+    kpi('🔗', $t`Ketten-Fluss`, fl != null ? pct(fl) : '–', $t`so schnell laufen die Gebäude mit den Zutaten, die da sind`, fl),
+  ].join('')}</div>`;
+  const incPts = H.slice(1).map((h, i) => ({ h, v: rate(h, H[i]) }));
+  const charts = `<div class="charts">${[
+    chart($t`💰 Einnahmen pro Minute`, incPts, '#3d8b2f', v => `${fr(v)}/min`, true),
+    chart($t`⚙️ Auslastung`, H.map(h => ({ h, v: h.a / 100 })), '#3e7bc4', pct, false, 1),
+    chart($t`🏦 Kontostand`, H.map(h => ({ h, v: h.m })), '#a8743f', fr),
+    chart($t`🏗️ Gebäude, Tiere & Pflanzen`, H.map(h => ({ h, v: h.n })), '#7a5a9e', v => `${Math.round(v)}`),
+  ].join('')}</div>`;
+  const rows = cats.map(c => {
+    const ks = types.filter(k => catOf(k) === c && cnt[k]); if (!ks.length) return '';
+    const b = busyShare(G.things.filter(t => ks.includes(t.type))), f = flow(ks), stuck = G.things.filter(t => ks.includes(t.type) && !busy(t)).length;
+    return `<button class="crow" data-go="${c}"><span>${ITEMS[c].icon} ${ITEMS[c].name}</span><i style="--w:${b * 100}%;--c:${statusCol(b)}"></i><b>${pct(b)}</b><small>${[f != null && $t`Fluss ${pct(f)}`, stuck && $t`${stuck} stehen`].filter(Boolean).join(' · ')}</small></button>`;
+  }).join('');
+  return `${kpis}<h3>${$t`Entwicklung`}</h3>${charts}<h3>${$t`Auslastung je Rohstoff`}</h3><div class="crows">${rows}</div><small>${$t`Tippe auf einen Rohstoff, um seine Kette zu sehen. Auslastung = Anteil, der gerade arbeitet (nicht: reif und ungeerntet, Lager voll oder Zutat fehlt).`}</small>`;
+}
 // Produktions-Diagramm: alle möglichen Ketten, Besessenes farbig, Probleme rot/gelb
 function openPlan() {
   const types = Object.keys(THINGS).filter(avail), depth = {};
@@ -1255,10 +1312,17 @@ function openPlan() {
     if (away) nodes += stub(p.x + NW, p.x + NW + 40, `${away}${on && !E.some(e => e.a === k) ? ` ${rateTxt(d.item)}→${r(dem[d.item])}/min` : ''}`, p.x + NW + 4);
   }
   const svg = `<svg width="${Wd}" height="${Hd}" style="max-width:100%;height:auto" viewBox="0 0 ${Wd} ${Hd}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777"/></marker><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3e7bc4"/></marker></defs>${edges}${nodes}</svg>`;
-  const head = catTabs(cats, planCat, 'cat');
+  const views = `<div class="tabs">${[['cockpit', $t`📈 Cockpit`], ['ketten', $t`🔗 Ketten`]].map(([v, n]) => `<button data-view="${v}" class="${v === planView ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  const head = views + (planView === 'ketten' ? catTabs(cats, planCat, 'cat') : '');
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`verkauft`} (🎒 ${$t`du`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">⇢▢ ${$t`von anderem Reiter`}</span><span style="color:#3e7bc4">▢⇢ ${$t`zu anderem Reiter`}</span><span style="opacity:.5">▢ ${$t`nicht gebaut`}</span></div>`;
-  modal($('#plan'), $t`📊 Dein Produktions-Plan`, `${legend}<div style="overflow:auto">${svg}</div><h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small><small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`, head);
+  const tipsHtml = `<h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small>`;
+  const body = planView === 'cockpit' ? cockpit(types, cats, cnt, sup, dem, u) + tipsHtml
+    : `${legend}<div style="overflow:auto">${svg}</div>${tipsHtml}<small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`;
+  modal($('#plan'), $t`📊 Dein Analyse-Cockpit`, body, head);
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
+  el.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { planView = b.dataset.view; openPlan(); });
+  el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { planView = 'ketten'; planCat = b.dataset.go; openPlan(); });
+  el.querySelectorAll('.chart').forEach(c => c.querySelectorAll('.hit').forEach(r => r.onpointerenter = r.onclick = () => { c.querySelector('.val').textContent = r.dataset.v; })); // Antippen/Hovern: Wert oben anzeigen
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
   centerTab(el);
   let focus = null; // Antippen: Zulieferer und Abnehmer bleiben hell, der Rest wird blass
