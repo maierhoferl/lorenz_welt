@@ -860,7 +860,7 @@ const AREAS = {
   weinberg:  { name: 'Weinberg',    x: 20.4, y: 54.4, rows: 4, dx: 3.2, dy: 1.6, base: 3, per: 2, from: 10, lane: [52.1], hill: [53, 60] },
   fischerei: { name: 'Fischteiche', x: 4, y: 34.4, cols: 4, max: 24, dx: 3.5, dy: 1.7, base: 2, per: 2, from: 20 }, // südlich vom See, wächst nach Süden
   tierhof:   { name: 'Tierhof',     x: 20.6, y: 62.6, rows: 2, dx: 3.4, dy: 1.8, base: 3, per: 2, from: 30, lane: [60.3] },
-  terminal:  { name: 'Import-Terminal', x: 72.7, y: 12.4, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, lane: [10.2] },
+  terminal:  { name: 'Import-Terminal', x: 72.7, y: 12.4, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, max: 40, lane: [10.2] }, // max: eigener Deckel, Band wird länger als BAND_LEN (bis x ~144)
   imkerei:   { name: 'Imkerei',         x: 20.6, y: 67.7, rows: 2, dx: 3.4, dy: 1.6, base: 2, per: 2, from: 40, lane: [65.5] },
   kartoffelacker: { name: 'Kartoffelacker', x: 21, y: 72.8, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 45, lane: [70.7] },
   selve:     { name: 'Kastanienhain',   x: 20.8, y: 78.5, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 50, lane: [75.7] },
