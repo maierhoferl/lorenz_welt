@@ -1087,7 +1087,7 @@ function showInfo(t) {
 }
 const recipe = d => Object.entries(d.in).map(([k, v]) => `${v} ${ITEMS[k].icon} ${ITEMS[k].name}`).join(' + ') + ` → ${d.n} ${ITEMS[d.item].icon} ${ITEMS[d.item].name}`;
 
-let shopTab = 0, planCat = null, shopCat = null, planView = 'cockpit';
+let shopTab = 0, planCat = null, shopCat = null, planView = 'ketten';
 // Gebäude-Reiter: nach Rohstoff gruppiert (Ware → erste Zutat bis zum Rohstoff), innerhalb nach Verarbeitungsstufe
 const maker = it => Object.keys(THINGS).find(k => THINGS[k].item === it);
 const depth = it => { const d = THINGS[maker(it)]; return d?.in ? 1 + Math.max(...Object.keys(d.in).map(depth)) : 0; };
