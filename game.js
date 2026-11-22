@@ -697,11 +697,16 @@ function spedition(dt) {
       continue;
     }
     k.wait += dt;
-    if (k.load < lv.cap && (k.pk = (k.pk || 0) + dt) > 0.25) { // an vollem Lager vorbei (nicht voll): anhalten, leeren, dann weiter auf der Route
-      k.pk = 0; // ponytail: Suche über alle Gebäude 4×/s je Wagen, Raster falls es ruckelt
-      const busy = new Set(trucks.flatMap(o => o.route.map(q => q.t)));
-      const t = G.things.find(t => !busy.has(t) && stuck(t) && surplus(THINGS[t.type].item) && Math.hypot(pos(t).x - k.x, pos(t).y + 24 - k.y) < 2 * T);
-      if (t) { const p = pos(t); k.route.unshift({ t, x: p.x, y: p.y + 24, hot: true }); k.path = null; }
+    if (k.load < lv.cap * 1.5 && (k.pk = (k.pk || 0) + dt) > 0.25) { // an vollem Lager vorbei: anhalten, leeren, dann weiter auf der Route
+      k.pk = 0; // ponytail: Suche über alle Gebäude 4×/s je Wagen, Raster falls es ruckelt; bis 1.5× Ladung (Wagen auf dem Heimweg halten auch)
+      // nah = am Haus oder an der Stelle, wo seine Zufahrt auf die Strasse trifft (Wagen auf der Strasse sind oft >2 Kacheln vom Haus)
+      const near = t => { const p = { x: pos(t).x, y: pos(t).y + 24 }, s = snap(p); return Math.hypot(p.x - k.x, p.y - k.y) < 2 * T || s && Math.hypot(s.x - k.x, s.y - k.y) < 1.5 * T; };
+      const head = new Set(trucks.map(o => o.route[0]?.t)); // schon direkt angefahren: dem anderen lassen
+      const t = G.things.find(t => stuck(t) && !head.has(t) && near(t) && surplus(THINGS[t.type].item));
+      if (t) { // anderen Wagen, die es erst später eingeplant haben, wegnehmen – wer vorbeifährt, holt ab
+        for (const o of trucks) o.route = o.route.filter(q => q.t !== t);
+        const p = pos(t); k.route.unshift({ t, x: p.x, y: p.y + 24, hot: true }); k.path = null;
+      }
     }
     const r = k.route[0];
     if (!k.path?.length) k.path = road(k, r);
