@@ -841,33 +841,35 @@ const DECOS = {
 const LAND_PRICES = [120, 300, 700, 1500, 3000];
 
 // Bereiche = Bänder (Kacheln). Westlich der Hauptstrasse (x = ROAD_X) liegt der Hof mit Laden, Händler und See.
-// Jedes Band füllt sich spaltenweise (rows Plätze untereinander) und wächst mit jedem Land nach Osten.
+// Jedes Band füllt sich spaltenweise (rows Plätze untereinander) und wächst mit jedem Land nach Osten, bis BAND_LEN.
 // Bereiche mit from kommen erst ab dieser Land-Stufe dazu – als neues Band im Süden. base + per*Landstufe = freie Plätze.
 // cols = Band füllt zeilenweise (cols Plätze nebeneinander) und wächst nach Süden statt nach Osten.
 // lane = Weg-Zeile(n) des Bandes (vom Hauptweg bis ans Bandende). hill = Hügel-Landschaft darunter.
-const ROAD_X = 18;
+// Bänder werden höchstens BAND_LEN Kacheln lang (max = Deckel für die Plätze). Ab dem Import-Terminal liegen sie in einer
+// zweiten Spalte östlich an der Oststrasse (x = ROAD_X2), die im Norden über die Obstgarten-Strasse (y 10.2) anschliesst.
+const ROAD_X = 18, ROAD_X2 = 70, BAND_LEN = 36;
 const AREAS = {
   obst:  { name: 'Obstgarten', x: 20.4, y: 4.8,  rows: 3, dx: 1.6, dy: 2.1, base: 4, per: 3, lane: [10.2] },
   acker: { name: 'Acker',      x: 21.6, y: 36.6, rows: 5, dx: 5.3, dy: 3.3, base: 2, per: 2, lane: [52.1] },
   weide: { name: 'Weide',      x: 20.6, y: 29.5, rows: 3, dx: 2.2, dy: 2,   base: 2, per: 3 },
   dorf:  { name: 'Dorf',       x: 20.6, y: 15.2, rows: 3, dx: 3.3, dy: 5.1, base: 2, per: 2, lane: [16.1, 21.2, 26.3] },
   weinberg:  { name: 'Weinberg',    x: 20.4, y: 54.4, rows: 4, dx: 3.2, dy: 1.6, base: 3, per: 2, from: 10, lane: [52.1], hill: [53, 60] },
-  fischerei: { name: 'Fischteiche', x: 4, y: 34.4, cols: 4, dx: 3.5, dy: 1.7, base: 2, per: 2, from: 20 }, // südlich vom See, wächst nach Süden
+  fischerei: { name: 'Fischteiche', x: 4, y: 34.4, cols: 4, max: 24, dx: 3.5, dy: 1.7, base: 2, per: 2, from: 20 }, // südlich vom See, wächst nach Süden
   tierhof:   { name: 'Tierhof',     x: 20.6, y: 62.6, rows: 2, dx: 3.4, dy: 1.8, base: 3, per: 2, from: 30, lane: [60.3] },
-  terminal:  { name: 'Import-Terminal', x: 20.7, y: 67.7, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, lane: [65.5] },
-  imkerei:   { name: 'Imkerei',         x: 20.6, y: 72.8, rows: 2, dx: 3.4, dy: 1.6, base: 2, per: 2, from: 40, lane: [70.6] },
-  kartoffelacker: { name: 'Kartoffelacker', x: 21, y: 77.9, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 45, lane: [75.8] },
-  selve:     { name: 'Kastanienhain',   x: 20.8, y: 83.6, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 50, lane: [80.8] },
-  geissenalp:  { name: 'Geissen-Alp',     x: 20.6, y: 90.6, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 55, lane: [88.4] },
-  ruebenacker: { name: 'Zuckerrüben-Acker', x: 21, y: 96.6, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 60, lane: [94.5] },
-  chriesigarten: { name: 'Chriesi-Garten', x: 20.8, y: 102.9, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 65, lane: [100.1] },
-  erdbeerfeld: { name: 'Erdbeerfeld',   x: 21, y: 109.7, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 70, lane: [107.6] },
-  schafweide:  { name: 'Schafweide',    x: 20.6, y: 115.4, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 75, lane: [113.2] },
-  maisfeld:    { name: 'Maisfeld',      x: 21, y: 121.8, rows: 2, dx: 3.6, dy: 1.6, base: 2, per: 2, from: 80, lane: [119.3] },
-  kraeutergarten: { name: 'Chrütergarten', x: 21, y: 128, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 85, lane: [125.9] },
-  bergwald:    { name: 'Bergwald',      x: 20.8, y: 134.3, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 90, lane: [131.5] },
-  kuerbisacker: { name: 'Kürbisacker',  x: 21, y: 141.1, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 95, lane: [139] },
-  bergquelle:  { name: 'Bergquelle',    x: 20.6, y: 146.8, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 100, lane: [144.6] },
+  terminal:  { name: 'Import-Terminal', x: 72.7, y: 12.4, rows: 2, dx: 3.6, dy: 1.5, base: 2, per: 2, from: 35, lane: [10.2] },
+  imkerei:   { name: 'Imkerei',         x: 20.6, y: 67.7, rows: 2, dx: 3.4, dy: 1.6, base: 2, per: 2, from: 40, lane: [65.5] },
+  kartoffelacker: { name: 'Kartoffelacker', x: 21, y: 72.8, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 45, lane: [70.7] },
+  selve:     { name: 'Kastanienhain',   x: 20.8, y: 78.5, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 50, lane: [75.7] },
+  geissenalp:  { name: 'Geissen-Alp',     x: 72.6, y: 17.5, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 55, lane: [15.3] },
+  ruebenacker: { name: 'Zuckerrüben-Acker', x: 73, y: 23.5, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 60, lane: [21.4] },
+  chriesigarten: { name: 'Chriesi-Garten', x: 72.8, y: 29.8, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 65, lane: [27] },
+  erdbeerfeld: { name: 'Erdbeerfeld',   x: 73, y: 36.6, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 70, lane: [34.5] },
+  schafweide:  { name: 'Schafweide',    x: 72.6, y: 42.3, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 75, lane: [40.1] },
+  maisfeld:    { name: 'Maisfeld',      x: 73, y: 48.7, rows: 2, dx: 3.6, dy: 1.6, base: 2, per: 2, from: 80, lane: [46.2] },
+  kraeutergarten: { name: 'Chrütergarten', x: 73, y: 54.9, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 85, lane: [52.8] },
+  bergwald:    { name: 'Bergwald',      x: 72.8, y: 61.2, rows: 2, dx: 2.6, dy: 2.5, base: 2, per: 2, from: 90, lane: [58.4] },
+  kuerbisacker: { name: 'Kürbisacker',  x: 73, y: 68, rows: 2, dx: 3.6, dy: 1.3, base: 2, per: 2, from: 95, lane: [65.9] },
+  bergquelle:  { name: 'Bergquelle',    x: 72.6, y: 73.7, rows: 2, dx: 3.4, dy: 1.7, base: 2, per: 2, from: 100, lane: [71.5] },
   // Geschäftszentren (hub): kein Band, sondern ein Platz in der freien Südost-Ecke wie die Sehenswürdigkeiten (game.js → sightsOn).
   // cols Plätze nebeneinander, Reihen wachsen nach oben; base + per*Landstufe Plätze, höchstens max. ground = Pflaster-Farbe.
   industrie:   { name: 'Industriequartier', icon: '🏭', hub: 1, from: 105, cols: 5, dx: 3.4, dy: 4.2, base: 6, per: 1, max: 30, ground: '#a39d94' },

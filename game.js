@@ -272,7 +272,10 @@ function checkUnlock(k) {
   return G.unlocks < UNLOCKS.length ? UNLOCKS[G.unlocks++] : null;
 }
 
-function slotsAvail(area) { const a = AREAS[area], f = a.from || 0, n = G.land < f ? 0 : a.base + a.per * (G.land - f); return a.hub ? Math.min(a.max, n) : n; }
+function slotsAvail(area) { // base + per*Landstufe, höchstens max (Band: BAND_LEN Kacheln lang); alte Spielstände: belegte Plätze über dem Deckel bleiben
+  const a = AREAS[area], f = a.from || 0, n = G.land < f ? 0 : a.base + a.per * (G.land - f), cap = a.max ?? a.rows * (Math.floor(BAND_LEN / a.dx) + 1);
+  return Math.max(Math.min(cap, n), ...G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot + 1));
+}
 function slotPos(area, i) { // spaltenweise füllen: das Band wächst nach Osten
   const a = AREAS[area];
   if (a.hub) { const s = sightsOn().find(s => s.k === area); return { x: (s.x - s.w / 2 + 0.4 + (i % a.cols + 0.5) * a.dx) * T, y: (s.y - 0.5 - Math.floor(i / a.cols) * a.dy) * T }; } // Geschäftszentrum: Reihe 0 unten
@@ -304,9 +307,10 @@ function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun w
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 // paths(): dazu die Zufahrten der Zweigstellen (werden automatisch gebaut); basePaths(): nur das feste Strassennetz
 const paths = () => basePaths().concat(branches().map(b => spur(b).pts.map(q => [q.x / T, q.y / T])));
-function basePaths() {
-  const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
-  return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, Math.max(...L.map(l => l[0]))]]], L.map(([y, x]) => [[ROAD_X, y], [x, y]]));
+function basePaths() { // Spalte 2: Querwege ab der Oststrasse, die oben über y 10.2 an die Hauptstrasse anschliesst
+  const on = bands(), L = on.flatMap(k => (AREAS[k].lane || []).filter((_, j) => slotsAvail(k) > j).map(y => [y, areaEnd(k) + 1.8, AREAS[k].x > ROAD_X2 ? ROAD_X2 : ROAD_X])); // Dorf: Strasse erst, wenn ihre Reihe Plätze hat
+  const end = x0 => Math.max(...L.filter(l => l[2] === x0).map(l => l[0])), east = L.some(l => l[2] === ROAD_X2) ? [[[ROAD_X, 10.2], [ROAD_X2, 10.2], [ROAD_X2, end(ROAD_X2)]]] : [];
+  return PATHS.concat([[[ROAD_X, 10.2], [ROAD_X, end(ROAD_X)]]], east, L.map(([y, x, x0]) => [[x0, y], [x, y]]));
 }
 function freeSlot(area) {
   const used = new Set(G.things.filter(t => THINGS[t.type].area === area).map(t => t.slot));
@@ -560,7 +564,7 @@ function snap(p) { // nächster Strassenpunkt (Pixel); main = auf der Hauptstras
   let best = null, bd = Infinity;
   for (const pl of basePaths()) for (let j = 1; j < pl.length; j++) {
     const [ax, ay] = pl[j - 1], [bx, by] = pl[j], main = ax === bx;
-    if (main && ax !== ROAD_X) continue; // Hof-Stummel
+    if (main && ax !== ROAD_X && ax !== ROAD_X2) continue; // Hof-Stummel
     const q = { x: clamp(p.x, Math.min(ax, bx) * T, Math.max(ax, bx) * T), y: clamp(p.y, Math.min(ay, by) * T, Math.max(ay, by) * T), main }, d = Math.hypot(q.x - p.x, q.y - p.y);
     if (d < bd && !wet(p, q)) { bd = d; best = q; }
   }
@@ -574,7 +578,10 @@ function road(a, b) { // Wegpunkte von a nach b: Zufahrt → Querweg → Hauptst
   const sa = pa ? pa.end : snap(a), sb = pb ? pb.end : snap(b), R = ROAD_X * T;
   if (!sa || !sb) return [b];
   const head = pa ? pa.pts.slice(1, -1) : [], tail = pb ? pb.pts.slice(1, -1).reverse() : [];
-  const mid = !sa.main && !sb.main && sa.y === sb.y ? [sa, sb] : [sa, { x: R, y: sa.y }, { x: R, y: sb.y }, sb]; // gleicher Querweg?
+  const R2 = ROAD_X2 * T, Y0 = 10.2 * T, c2 = p => p.x > R2 - 1; // c2: Spalte 2 (an der Oststrasse)
+  const up = p => c2(p) ? [p, { x: R2, y: p.y }, { x: R2, y: Y0 }, { x: R, y: Y0 }] : [p, { x: R, y: p.y }]; // bis auf die Hauptstrasse
+  const mid = !sa.main && !sb.main && sa.y === sb.y && (c2(sa) === c2(sb) || sa.y === Y0) ? [sa, sb] // gleicher Querweg?
+    : c2(sa) && c2(sb) ? [sa, { x: R2, y: sa.y }, { x: R2, y: sb.y }, sb] : [...up(sa), ...up(sb).reverse()];
   return [...head, ...mid, ...tail, b];
 }
 // Zufahrt einer Zweigstelle: vom Parkplatz zur nächsten Strasse, nur gerade Stücke. Liegt die Strasse hinter dem Haus (Norden),
@@ -1865,9 +1872,10 @@ function sightsOn() {
     const r = [];
     for (const k in AREAS) {
       const a = AREAS[k]; if (!areaOn(a) || a.hub || a.x < ROAD_X) continue;
-      r.push([0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), Math.max(a.y + (areaRows(k) - 1) * a.dy + 0.8, ...(a.lane || []).map(l => l + 0.9))]); // Strasse kann unter den Reihen liegen (Acker)
+      r.push([a.x > ROAD_X2 ? ROAD_X2 - 1.5 : 0, Math.max(areaEnd(k) + 3, a.hill ? ROAD_X + 17 : 0), Math.min(a.y - 2.8, ...(a.lane || []).map(l => l - 1)), Math.max(a.y + (areaRows(k) - 1) * a.dy + 0.8, ...(a.lane || []).map(l => l + 0.9))]); // Strasse kann unter den Reihen liegen (Acker)
     }
-    if (areaOn(AREAS.terminal)) r.push([0, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
+    if (areaOn(AREAS.terminal)) r.push([ROAD_X2, 1e4, AREAS.terminal.lane[0] - 1.6, AREAS.terminal.lane[0] + 0.6]); // Gleis bis an den Weltrand
+    for (const p of basePaths()) for (let j = 1; j < p.length; j++) { const [ax, ay] = p[j - 1], [bx, by] = p[j]; r.push([Math.min(ax, bx) - 1, Math.max(ax, bx) + 1, Math.min(ay, by) - 1, Math.max(ay, by) + 0.9]); } // Oststrasse und Verbindung
     return r;
   };
   const busy = bandRects();
@@ -3653,7 +3661,7 @@ function brooks() {
   return (brookMemo = { key, L, srcs, rocks });
 }
 function drawVoralp() {
-  const a = AREAS.obst, x0 = (ROAD_X + 0.9) * T, x1 = WORLD.w * T, lane = a.lane[0] * T;
+  const a = AREAS.obst, x0 = (ROAD_X + 0.9) * T, x1 = Math.min(WORLD.w, ROAD_X2 - 1.5) * T, lane = a.lane[0] * T; // nur Spalte 1
   for (let r = -1; r < a.rows; r++) {
     const yb = (a.y + r * a.dy) * T + 14, top = yb - 1.6 * T;
     const crest = x => yb - (yb - (top + 14 * Math.sin(x / 190 + r * 2) + 8 * Math.sin(x / 67 + r))) * Math.sqrt(1 - (1 - Math.min(1, (x - x0) / (2.5 * T))) ** 2); // rundes Westende
