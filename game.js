@@ -1,10 +1,9 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const cv = $('#cv'); let ctx = cv.getContext('2d'); // let: Avatar-Vorschau zeichnet kurz auf eigene Canvas
-let W = 0, H = 0, DPR = 1, ZOOM = 1, eco = false; // eco: Stromsparen (30 fps, DPR 1, kein Rauch)
-try { eco = localStorage.getItem('lw_eco') === 'true'; } catch (e) {}
+const cv = $('#cv'); let ctx = cv.getContext('2d', { alpha: false }); // let: Avatar-Vorschau zeichnet kurz auf eigene Canvas; alpha:false spart das Mischen mit der Seite
+let W = 0, H = 0, DPR = 1, ZOOM = 1; // Akku schonen: immer DPR 1, max. 30 fps, wenig Partikel
 function resize() {
-  DPR = Math.min(eco ? 1 : 1.5, devicePixelRatio || 1); W = innerWidth; H = innerHeight; // DPR 1.5 statt 2: halb so viele Pixel, kaum sichtbar
+  W = innerWidth; H = innerHeight; // ponytail: DPR 1 auch auf Retina – ¼ der Pixel, Grafik ist weich gezeichnet
   cv.width = W * DPR | 0; cv.height = H * DPR | 0;
 }
 // Zoom: Grundzoom passt sich dem Bildschirm an, der Spieler kann rein-/rauszoomen (bis die ganze Welt sichtbar ist)
@@ -457,14 +456,6 @@ $('#bexit').onclick = () => { save(true); G = null; KEY = null; closeModals(); r
 $('#bsound').onclick = e => { e.currentTarget.textContent = AU.toggle() ? '🔊' : '🔇'; };
 $('#bplan').onclick = () => openPlan();
 $('#bmusic').onclick = e => { AU.init(); e.currentTarget.style.opacity = AU.music() ? 1 : 0.5; };
-function ecoUi() { $('#beco').style.opacity = eco ? 1 : 0.5; resize(); }
-$('#beco').onclick = () => { eco = !eco; store.set('lw_eco', eco); ecoUi(); toast(eco ? $t`🔋 Stromsparen an` : $t`🔋 Stromsparen aus`); };
-ecoUi();
-// Akku unter 20 % und nicht am Laden: einmal pro Sitzung automatisch sparen (nicht gespeichert). Nur Chrome/Android, Safari kennt getBattery nicht.
-navigator.getBattery?.().then(b => {
-  const chk = () => { if (eco || b.charging || b.level >= 0.2) return; b.onlevelchange = b.onchargingchange = null; eco = true; ecoUi(); if (G) toast($t`🔋 Stromsparen an`); };
-  b.onlevelchange = b.onchargingchange = chk; chk();
-}).catch(() => {});
 $('#bzin').onclick = () => setZoom(1.25);
 $('#bzout').onclick = () => setZoom(0.8);
 cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(Math.exp(-e.deltaY * 0.002)); }, { passive: false });
@@ -543,7 +534,6 @@ function update(dt) {
         t.wait = 0; t.prog += dt / d.time;
         if (t.prog >= 1) { t.prog = 0; for (const k in d.in) t.inS[k] -= d.in[k]; t.out += d.n; }
       } else t.wait += dt;
-      if (!eco && t.working && t.type === 'baeckerei' && Math.random() < dt * 3) particles.push({ x: t.x + 34, y: t.y - 100, vx: rndf(-5, 5), vy: -18, life: 2.5, r: 6 });
       t.ang = (t.ang || 0) + dt * (t.working ? 2.2 : t.type === 'muehle' ? 0.25 : 0); // Animation: steht still, wenn nichts zu tun
     }
   }
@@ -1773,8 +1763,6 @@ function trainTick(dt) {
     const a0 = k.age, X = trainX(k), near = Math.hypot(G.px - k.t.x, G.py - k.y) < 1000;
     k.age += dt;
     if (a0 < TR_IN - 2.5 && k.age >= TR_IN - 2.5 && near) AU.sfx('horn');
-    if (!eco && k.age > TR_IN - 1.6 && k.age < TR_IN) for (const wx of [14, 62, 86, 126, 152, 192]) if (Math.random() < dt * 14) // Bremsfunken
-      particles.push({ x: X + wx, y: k.y - 2, vx: rndf(20, 90), vy: rndf(-60, -15), life: 0.35, r: 1.2, c: '255,200,70' });
     if (a0 < TR_IN && k.age >= TR_IN) { // abladen: Säcke fliegen vom Wagen in den Container
       const d = THINGS[k.t.type];
       for (let i = 0; i < d.n; i++) packages.push({ x0: X + 106 + (i % 2) * 66, y0: k.y - 40, x1: k.t.x - 14, y1: k.t.y - 30, icon: ITEMS[d.item].icon, t: 0, dur: 0.5 + i * 0.15 });
@@ -4055,7 +4043,7 @@ function seasonGround() { // Szenen auf dem See und der Weide (flach am Boden)
   ctx.globalAlpha = 1;
 }
 function seasonFx(camX, camY, vw, vh) { // Schnee, Blüten, Schmetterlinge, Laub – weltfest, laufen am Bildrand rundum
-  const [wi, fr, so, he] = SW, n = eco ? 40 : 110, mod = (a, b) => ((a % b) + b) % b;
+  const [wi, fr, so, he] = SW, n = 40, mod = (a, b) => ((a % b) + b) % b;
   for (let i = 0; i < n; i++) {
     const q = i / n, r1 = (i * 0.6180339) % 1, r2 = (i * 0.7548776) % 1, sp = 0.6 + r2;
     const kind = q < wi ? 0 : q < wi + he * 0.6 ? 3 : q < wi + he * 0.6 + fr * 0.4 ? 1 : q < wi + he * 0.6 + fr * 0.4 + so * 0.08 ? 2 : -1;
@@ -4314,7 +4302,7 @@ function evSky(e, u) { // Ereignisse am Himmel – über allem, an der Kamera au
     });
   }
   else if (e.k === 'gugge') { // Konfetti regnet übers ganze Bild
-    const n = eco ? 40 : 90;
+    const n = 40;
     for (let i = 0; i < n; i++) {
       const r1 = (i * 0.6180339) % 1, r2 = (i * 0.7548776) % 1, x = view.x + r1 * view.w + Math.sin(u * 3 + i) * 12, y = view.y + ((r2 * view.h + u * (60 + r1 * 60)) % view.h);
       ctx.fillStyle = ['#e8303a', '#ffd34d', '#2f9fd6', '#3d8b2f', '#f5a3c7', '#fff'][i % 6];
@@ -4699,9 +4687,13 @@ let last = 0;
 function loop(t) {
   if (!G || $('#game').hidden) { loopOn = false; AU.pause(); return; } // ausserhalb des Spiels steht alles still, show('game') startet neu
   requestAnimationFrame(loop);
-  // ponytail: 60 fps nur beim Laufen, sonst 30 (Tiere, Mühlen, Wolken sehen gleich aus); 120-Hz-Displays nie voll. -4 ms Toleranz fürs Frame-Raster
-  if (t - last < (!eco && (moving || joy) ? 1000 / 60 : 1000 / 30) - 4) return;
-  const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
-  update(dt); render(); tickTime(dt);
+  // Akku: 30 fps beim Spielen, 10 hinter offenem Laden/Cockpit, 15 nach 10 s ohne Eingabe. -4 ms Toleranz fürs Frame-Raster
+  const fps = !$('#shop').hidden || !$('#plan').hidden || !$('#info').hidden ? 10 : moving || joy || t - lastInput < 10000 ? 30 : 15;
+  if (t - last < 1000 / fps - 4) return;
+  let el = Math.min(0.25, (t - last) / 1000 || 0); last = t;
+  while (el > 0) { const dt = Math.min(0.05, el); el -= dt; update(dt); tickTime(dt); } // Teilschritte: tiefe fps verlangsamen das Spiel nicht
+  render();
 }
+let lastInput = 0;
+for (const ev of ['pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => { lastInput = performance.now(); }, { passive: true, capture: true });
 renderSelect();
