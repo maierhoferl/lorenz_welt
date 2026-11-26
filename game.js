@@ -1162,6 +1162,14 @@ function shopList() {
   }
   return tabs;
 }
+const moneyTag = () => `<small class="money" style="font-weight:600;font-size:16px">${$t`– du hast ${G.money} Fr.`}</small>`;
+setInterval(() => { // Laden/Cockpit offen: Kontostand und Kaufen-Knöpfe 1×/s nachführen, ohne neu zu zeichnen (Scroll, ℹ️ bleiben)
+  if (!G) return;
+  for (const el of [$('#shop'), $('#plan')]) if (!el.hidden) {
+    el.querySelectorAll('.money').forEach(s => s.outerHTML = moneyTag());
+    el.querySelectorAll('[data-buy]').forEach(b => b.disabled = !('can' in b.dataset) || G.money < +b.dataset.price);
+  }
+}, 1000);
 function openShop() {
   const tabs = shopList(), names = [$t`🌱 Tiere & Pflanzen`, $t`🏭 Gebäude`, $t`🔧 Werkzeuge`, $t`🗺️ Land`, $t`🏔️ Deko`];
   let L = tabs[shopTab], head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
@@ -1173,8 +1181,8 @@ function openShop() {
   }
   const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
-    <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
-  modal($('#shop'), `${$t`🛒 Laden`} <small style="font-weight:600;font-size:16px">${$t`– du hast ${G.money} Fr.`}</small>`, body, head);
+    <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" data-price="${it.price}" ${it.can ? 'data-can' : ''} ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
+  modal($('#shop'), `${$t`🛒 Laden`} ${moneyTag()}`, body, head);
   const el = $('#shop');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = +b.dataset.tab; openShop(); });
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { shopCat = b.dataset.cat; openShop(); });
@@ -1381,7 +1389,7 @@ function openPlan() {
   const tipsHtml = `<h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small>`;
   const body = planView === 'cockpit' ? cockpit(types, cats, cnt, sup, dem, u) + tipsHtml
     : `${legend}<div style="overflow:auto">${svg}</div>${tipsHtml}<small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`;
-  modal($('#plan'), $t`📊 Dein Analyse-Cockpit`, body, head);
+  modal($('#plan'), `${$t`📊 Dein Analyse-Cockpit`} ${moneyTag()}`, body, head);
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
   el.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { planView = b.dataset.view; openPlan(); });
   el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { planView = 'ketten'; planCat = b.dataset.go; openPlan(); });
