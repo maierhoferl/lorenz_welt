@@ -576,3 +576,85 @@ Object.assign(TR.tools, {
     ["Assistente IA", "Un assistente IA smista i dati da solo e li manda dove servono. Tu controlli comunque che sia tutto giusto! LAVORA AUTOMATICAMENTE!"],
   ]],
 });
+
+// Nuovi centri d'affari (livelli di terreno 210–300)
+Object.assign(TR.ui, {
+  "🔒 ab Land-Stufe {}": "🔒 dal livello di terreno {}",
+  "Neu im Laden: {}": "Novità nel negozio: {}",
+  "Holt {} Waren auf einmal – unter 🔧 Werkzeuge 🚚": "Prende {} merci in una volta – sotto 🔧 Attrezzi 🚚",
+  "Jetzt bis {} Händler-Zweigstellen!": "Ora fino a {} filiali!",
+  "Noch kürzere Wege für deine Lastwagen 🚛": "Tragitti ancora più corti per i tuoi camion 🚛",
+  "Bahnhof": "Stazione", "Universität": "Università", "Eisstadion": "Pista di ghiaccio", "Hallenbad": "Piscina coperta", "Konzerthaus": "Sala da concerto", "Aussichtsturm": "Torre panoramica",
+});
+Object.assign(TR.areas, { skiort: 'Stazione sciistica', raumfahrt: 'Centro spaziale', forschung: 'Centro di ricerca', kreislauf: 'Parco del riciclaggio', festplatz: 'Piazza della festa' });
+Object.assign(TR.items, {
+  schnee: 'Neve artificiale', ski: 'Sci', iglu: 'Notte in igloo', schlitten: 'Slitta di Davos', winterferien: 'Vacanze invernali',
+  sternfoto: 'Foto di stelle', wasserstoff: 'Idrogeno', satellit: 'Satellite', rakete: 'Razzo', mondbasis: 'Stazione lunare',
+  protonen: 'Protoni', magnet: 'Supermagnete', teilchen: 'Scoperta di particelle', webseite: 'Sito web', formel: 'Formula di Einstein',
+  altglas: 'Vetro usato', altmetall: 'Rottami', flaschen: 'Bottiglie di vetro', velo: 'Bicicletta', ebike: 'Bici elettrica', glaskunst: 'Arte del vetro',
+  musik: 'Musica', zirkus: 'Spettacolo del circo', film: 'Film', feuerwerk: 'Fuochi d\'artificio', fest300: 'Festa dei trecento',
+});
+Object.assign(TR.things, {
+  schneekanone: ["Cannone da neve", "Un cannone da neve soffia minuscole goccioline d'acqua nell'aria fredda. Se fa più freddo di circa meno 3 °C, gelano in volo e diventano palline di ghiaccio: neve artificiale! È più dura della neve vera e quindi dura di più sulla pista. Molte stazioni innevano le piste così si può sciare anche quando nevica poco."],
+  skifabrik: ["Fabbrica di sci", "Uno sci è come un panino: dentro un'anima di legno, intorno strati di fibra di vetro, sotto una soletta liscia e ai lati lamine d'acciaio affilate – così curvi anche sul ghiaccio. A Malters, nel Canton Lucerna, Stöckli costruisce sci a mano da oltre 80 anni, e con questi si vincono perfino gare di Coppa del mondo."],
+  iglubau: ["Villaggio di igloo", "In alcune stazioni, per esempio a Zermatt o a Davos, d'inverno si può dormire in un igloo! Le pareti sono di neve compatta, e la neve trattiene bene il calore: fuori magari ci sono meno 20 °C, dentro solo circa 0 °C. Si dorme su pelli in un sacco a pelo bello spesso."],
+  schlittenbau: ["Laboratorio di slitte", "La slitta di Davos è di legno di frassino, con pattini d'acciaio. Nel 1883 a Davos si svolse la prima gara internazionale di slitta del mondo – da Davos fino a Klosters. Si sterza con i piedi: per andare a sinistra freni un po' nella neve con la scarpa sinistra."],
+  grandhotel: ["Grand hotel nella neve", "Un tempo gli ospiti venivano in montagna solo d'estate. Nel 1864 l'albergatore Johannes Badrutt di St. Moritz fece una scommessa con ospiti inglesi: tornate d'inverno – se non vi piace, vi pago il viaggio! Vennero, si sedettero al sole sopra la neve e rimasero fino a Pasqua. Così cominciarono le vacanze invernali nelle Alpi."],
+  sternwarte: ["Osservatorio", "Sullo Jungfraujoch, a 3571 metri, si trova l'osservatorio Sphinx. Così in alto l'aria è sottile, secca e limpida – perciò le stelle si vedono molto più nitide che a valle. Un telescopio raccoglie la luce debolissima con un grande specchio, e una fotocamera ne fa foto di stelle e galassie."],
+  wasserstoffwerk: ["Impianto a idrogeno", "L'acqua è fatta di idrogeno e ossigeno (H₂O). Se fai passare corrente nell'acqua, si separa: a un filo fa bolle l'idrogeno, all'altro l'ossigeno. Si chiama elettrolisi. L'idrogeno è il gas più leggero del mondo. Freddissimo e liquido, insieme all'ossigeno, è il carburante dei grandi razzi."],
+  satellitenwerk: ["Fabbrica di satelliti", "Un satellite gira intorno alla Terra senza cadere: vola di lato così veloce che continua a cadere accanto alla Terra. Il satellite CHEOPS è stato costruito sotto la guida dell'Università di Berna e vola nello spazio dal 2019. Cerca pianeti intorno ad altre stelle: quando uno passa davanti alla sua stella, lì diventa un pochino più buio."],
+  raketenwerft: ["Cantiere dei razzi", "Un razzo spinge fuori gas caldo dal basso – e questo lo spinge in su, come un palloncino che lasci andare. Molti razzi usano idrogeno e ossigeno liquidi come carburante. La punta dei razzi europei Ariane, che protegge il satellite al decollo, si costruisce a Emmen vicino a Lucerna."],
+  mondstation: ["Stazione lunare", "Quando nel 1969 i primi uomini atterrarono sulla Luna, il primissimo esperimento che montarono fu una vela di carta d'alluminio – ancora prima della bandiera americana! Veniva dall'Università di Berna e catturava minuscole particelle del Sole. Oggi i ricercatori progettano stazioni sulla Luna dove aiutano dei robot. Claude Nicollier è stato il primo svizzero nello spazio."],
+  protonenquelle: ["Sorgente di protoni", "Al CERN vicino a Ginevra, la più grande macchina di ricerca del mondo comincia con una piccola bombola rossa piena di idrogeno! Una corrente strappa a ogni atomo di idrogeno il suo elettrone. Resta il minuscolo nucleo, un protone. I protoni sono così piccoli che milioni starebbero sulla capocchia di uno spillo – uno accanto all'altro, non uno sopra l'altro."],
+  magnetwerk: ["Fabbrica di supermagneti", "I magneti del CERN sono superconduttori: raffreddati a meno 271 °C – più freddo dello spazio! – la corrente scorre senza alcuna resistenza. Allora diventano così forti da costringere i protoni velocissimi sulla loro orbita circolare. Oltre 1200 di questi magneti giganti sono messi in fila nel tunnel."],
+  beschleuniger: ["Acceleratore di particelle", "Il grande anello del CERN è lungo 27 chilometri e si trova 100 metri sotto terra, metà in Svizzera, metà in Francia. Dentro, i protoni sfrecciano quasi alla velocità della luce – oltre 11 000 giri al secondo! Poi si scontrano, e fotocamere enormi guardano cosa ne esce. Così nel 2012 si è trovato il bosone di Higgs."],
+  webbuero: ["Ufficio degli inventori del Web", "Il World Wide Web è stato inventato al CERN nel 1989! Il ricercatore Tim Berners-Lee voleva che gli scienziati di tutto il mondo potessero condividere facilmente i loro risultati. Inventò le pagine web con i link da cliccare. Nel 1991 andò online il primissimo sito web – e il CERN regalò l'invenzione al mondo intero."],
+  einsteinhaus: ["Casa di Einstein", "Albert Einstein lavorava all'ufficio brevetti di Berna e abitava nella Kramgasse, proprio vicino alla Zytglogge. Lì pensava alla luce, al tempo e agli orologi. Nel 1905 scrisse la sua famosa formula E = mc²: in pochissima massa c'è tantissima energia. Grazie a lei oggi capiamo perché il Sole splende."],
+  glassammel: ["Punto di raccolta del vetro", "In Svizzera si portano bottiglie e vasetti vuoti al punto di raccolta e si buttano divisi per colore: bianco, verde e marrone. Quasi tutto il vetro viene raccolto così. Il vetro si può fondere ancora e ancora senza peggiorare – una vecchia bottiglia diventa una nuova."],
+  alteisen: ["Benna dei rottami", "Vecchie biciclette, pentole, scatolette e lattine di alluminio finiscono nella benna del metallo. Una potente calamita tira fuori il ferro, l'alluminio viene separato. Fondere l'alluminio richiede molta meno corrente che produrlo nuovo dalla roccia. Per questo la Svizzera raccoglie quasi tutte le lattine di alluminio."],
+  glashuette: ["Vetreria", "In vetreria i cocci vengono lavati e fusi a circa 1500 °C, finché brillano come miele di fuoco. Una goccia di vetro liquido cade in uno stampo, e l'aria la gonfia fino a farne una bottiglia. Con i vecchi cocci il forno ha bisogno di meno energia che con sabbia nuova."],
+  velowerk: ["Fabbrica di biciclette", "In Svizzera tedesca la bici si chiama «Velo», dal francese «vélocipède» – piede veloce! Il telaio è saldato con dei tubi, e la catena passa su ruote dentate: grande davanti e piccola dietro vuol dire veloce, ma faticoso. Una bici non ha bisogno di carburante, solo delle tue gambe – e non fa rumore."],
+  ebikewerk: ["Fabbrica di bici elettriche", "Una bici elettrica ha un piccolo motore elettrico e una batteria. Il motore aiuta solo quando pedali anche tu – così sali anche salite ripide senza sudare tutto. A Huttwil, nel Canton Berna, l'azienda Flyer costruiva bici elettriche già nel 1995, quando quasi nessuno ne aveva mai sentito parlare."],
+  glasi: ["Soffieria del vetro", "Alla Glasi Hergiswil sul Lago dei Quattro Cantoni puoi guardare come si soffia il vetro. Il soffiatore prende dal forno una palla incandescente con una lunga canna e ci soffia dentro come in un palloncino. Gira sempre la canna, così niente penzola. Così nascono vasi, sfere e bicchieri."],
+  buehne: ["Palco dei concerti", "Dal 1967 musiciste e musicisti famosi di tutto il mondo suonano ogni estate al Montreux Jazz Festival sul Lago Lemano. Sul palco il suono viene catturato dai microfoni e amplificato da enormi altoparlanti. Il suono è in realtà aria che vibra velocissima avanti e indietro – a volte lo senti nella pancia!"],
+  zirkuszelt: ["Tendone del circo", "Il Circo Knie è il circo nazionale svizzero e dal 1919 viaggia ogni estate di città in città con il suo grande tendone. Il tendone si monta in un giorno: pali, corde, telo e gradinate per oltre 2000 persone. Nella pista acrobati, clown e cavalli mostrano i loro numeri."],
+  filmfestival: ["Festival del film", "Ogni agosto la Piazza Grande di Locarno diventa il più grande cinema all'aperto d'Europa: uno schermo gigante, e oltre 8000 persone guardano film sotto il cielo stellato. Un film è in realtà una serie di foto – 24 al secondo. È così veloce che il tuo occhio lo vede come movimento."],
+  feuerwerkfabrik: ["Fabbrica di fuochi d'artificio", "I colori dei fuochi d'artificio vengono da sali metallici: lo stronzio brilla rosso, il rame blu, il bario verde – e il comune sale da cucina giallo! In ogni razzo c'è polvere nera che lo spara in alto, e lassù scoppiano le stelle. I fuochi d'artificio si accendono solo con gli adulti, e il 1° agosto tutto il cielo è colorato."],
+  bundesfeier: ["Festa dei trecento", "Trecento livelli di terreno – si festeggia come il 1° agosto! Per la festa nazionale la Svizzera ricorda il patto del 1291 sul prato del Grütli. Sulle montagne ardono i falò, i bambini portano i lampioncini e la sera scoppiano i fuochi d'artificio. Alla tua festa c'è tutto: vacanze invernali, stazione lunare, formula di Einstein, bici elettrica, film – e fuochi d'artificio!"],
+});
+Object.assign(TR.tools, {
+  piste: ["Attrezzi da pista", [
+    ["Mani", "Raccogliere la neve con le mani? Brrr – dopo due palle di neve hai le dita gelate!"],
+    ["Pala da neve", "Una pala larga di alluminio leggero. Sposti tanta neve in una volta – ma solleva sempre con le gambe, non con la schiena!"],
+    ["Gatto delle nevi", "Il gatto delle nevi va su larghi cingoli per non sprofondare nella neve. Davanti spinge la neve con una lama, dietro una fresa liscia la pista in sottili solchi – sembra velluto a coste."],
+    ["Impianto d'innevamento", "Un computer misura temperatura e umidità e accende da solo i cannoni da neve quando fa abbastanza freddo. La neve viene soffiata direttamente sulle piste. INNEVA AUTOMATICAMENTE!"],
+  ]],
+  sterne: ["Attrezzatura per le stelle", [
+    ["Mani", "Contare le stelle a mano? Arrivi a 100 e non sai più da dove hai cominciato!"],
+    ["Binocolo", "Un binocolo ha due piccoli cannocchiali. Con questo vedi già i crateri della Luna e le quattro lune più grandi di Giove."],
+    ["Telescopio a specchio", "Un grande specchio curvo raccoglie la debole luce delle stelle e la manda nella fotocamera. Più grande è lo specchio, più cose vedi."],
+    ["Telescopio spaziale", "Un telescopio nello spazio, sopra l'aria: niente nuvole, niente tremolio. Fotografa giorno e notte e manda le immagini alla Terra. FOTOGRAFA AUTOMATICAMENTE!"],
+  ]],
+  forscher: ["Attrezzatura da ricercatore", [
+    ["Mani", "I protoni non si possono toccare – sono troppo piccoli! Allora aspetti che la bombola sibili da sola …"],
+    ["Occhiali e casco", "Nel tunnel tutti portano casco e occhiali protettivi. E c'è sempre anche una piccola maschera d'ossigeno per le emergenze."],
+    ["Rivelatore di particelle", "Un rivelatore è una fotocamera gigante, grande come una casa. Scatta 40 milioni di immagini al secondo e capisce dove vola ogni particella."],
+    ["Sala di controllo", "Nella sala di controllo ricercatrici e ricercatori guardano tanti schermi. I computer guidano da soli i protoni nell'anello. FUNZIONA AUTOMATICAMENTE!"],
+  ]],
+  recycling: ["Attrezzi per il riciclaggio", [
+    ["Mani", "Portare vetro e lattine a mano? Attenzione ai cocci – meglio di no!"],
+    ["Borsa di raccolta", "Una borsa robusta con tre scomparti: vetro bianco, verde e marrone. Così è già tutto diviso prima di arrivare al punto di raccolta."],
+    ["Camion della spazzatura", "Il camion della spazzatura solleva le grandi benne con un braccio e le svuota dietro. Una pressa schiaccia tutto per fare più posto."],
+    ["Impianto di smistamento", "Nastri trasportatori, calamite e telecamere smistano vetro e metallo in un lampo. Un soffio d'aria manda ogni pezzo nel contenitore giusto. SMISTA AUTOMATICAMENTE!"],
+  ]],
+  fest: ["Tecnica per feste", [
+    ["Mani", "Battere le mani e cantare è bello – ma in fondo al pubblico nessuno ti sente."],
+    ["Megafono", "Un megafono è un imbuto con un amplificatore: ci parli dentro e la tua voce diventa molto più forte."],
+    ["Mixer", "Sul mixer ogni microfono ha il suo cursore. Il tecnico del suono alza il canto o abbassa la batteria finché tutto suona bene insieme."],
+    ["Computer per lo spettacolo di luci", "Un computer comanda luci, suono e schermo a tempo di musica – centinaia di fari insieme. FUNZIONA AUTOMATICAMENTE!"],
+  ]],
+});
+TR.tools.spedition[1].push(
+  ['Camion a idrogeno', 'Questo camion fa il pieno di idrogeno. In una cella a combustibile l\'idrogeno si unisce all\'ossigeno dell\'aria – così nasce corrente per il motore, e dallo scarico esce solo vapore acqueo! La Svizzera è stata uno dei primi paesi ad avere un\'intera flotta di questi camion.'],
+  ['Camion a guida autonoma', 'Telecamere, radar e laser guardano tutto intorno, un computer sterza, frena e accelera. Non si stanca mai e tiene sempre abbastanza distanza. Per sicurezza però a bordo c\'è ancora una persona che può intervenire in ogni momento.'],
+);

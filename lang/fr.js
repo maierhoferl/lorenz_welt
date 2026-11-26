@@ -576,3 +576,85 @@ Object.assign(TR.tools, {
     ["Assistant IA", "Un assistant IA trie les données tout seul et les envoie là où on en a besoin. Tu vérifies quand même que tout est juste ! TRAVAILLE AUTOMATIQUEMENT !"],
   ]],
 });
+
+// Nouveaux centres d'affaires (niveaux de terrain 210–300)
+Object.assign(TR.ui, {
+  "🔒 ab Land-Stufe {}": "🔒 dès le niveau de terrain {}",
+  "Neu im Laden: {}": "Nouveau au magasin : {}",
+  "Holt {} Waren auf einmal – unter 🔧 Werkzeuge 🚚": "Prend {} marchandises d'un coup – sous 🔧 Outils 🚚",
+  "Jetzt bis {} Händler-Zweigstellen!": "Maintenant jusqu'à {} succursales !",
+  "Noch kürzere Wege für deine Lastwagen 🚛": "Des trajets encore plus courts pour tes camions 🚛",
+  "Bahnhof": "Gare", "Universität": "Université", "Eisstadion": "Patinoire", "Hallenbad": "Piscine couverte", "Konzerthaus": "Salle de concert", "Aussichtsturm": "Tour panoramique",
+});
+Object.assign(TR.areas, { skiort: 'Station de sports d\'hiver', raumfahrt: 'Centre spatial', forschung: 'Centre de recherche', kreislauf: 'Parc du recyclage', festplatz: 'Place de fête' });
+Object.assign(TR.items, {
+  schnee: 'Neige artificielle', ski: 'Skis', iglu: 'Nuit en igloo', schlitten: 'Luge de Davos', winterferien: 'Vacances d\'hiver',
+  sternfoto: 'Photos d\'étoiles', wasserstoff: 'Hydrogène', satellit: 'Satellite', rakete: 'Fusée', mondbasis: 'Station lunaire',
+  protonen: 'Protons', magnet: 'Super-aimant', teilchen: 'Découverte de particules', webseite: 'Site web', formel: 'Formule d\'Einstein',
+  altglas: 'Verre usagé', altmetall: 'Ferraille', flaschen: 'Bouteilles en verre', velo: 'Vélo', ebike: 'Vélo électrique', glaskunst: 'Art du verre',
+  musik: 'Musique', zirkus: 'Spectacle de cirque', film: 'Film', feuerwerk: 'Feu d\'artifice', fest300: 'Fête des trois cents',
+});
+Object.assign(TR.things, {
+  schneekanone: ["Canon à neige", "Un canon à neige souffle de fines gouttelettes d'eau dans l'air froid. S'il fait plus froid qu'environ moins 3 °C, elles gèlent en vol et deviennent de petites billes de glace : de la neige artificielle ! Elle est plus dure que la vraie neige et tient donc plus longtemps sur la piste. Beaucoup de stations enneigent leurs pistes pour qu'on puisse skier même quand il neige peu."],
+  skifabrik: ["Fabrique de skis", "Un ski, c'est comme un sandwich : à l'intérieur un noyau en bois, autour des couches de fibre de verre, dessous une semelle lisse et sur les bords des carres en acier tranchantes – grâce à elles, tu tournes même sur la glace. À Malters, dans le canton de Lucerne, Stöckli fabrique des skis à la main depuis plus de 80 ans, et on gagne même des courses de Coupe du monde avec."],
+  iglubau: ["Village d'igloos", "Dans certaines stations, par exemple à Zermatt ou à Davos, on peut passer la nuit dans un igloo en hiver ! Les murs sont en neige tassée, et la neige garde bien la chaleur : dehors il fait peut-être moins 20 °C, dedans seulement environ 0 °C. On dort sur des peaux dans un gros sac de couchage."],
+  schlittenbau: ["Atelier de luges", "La luge de Davos est en bois de frêne, avec des patins en acier. En 1883, la toute première course de luge internationale du monde a eu lieu à Davos – de Davos jusqu'à Klosters. On dirige avec les pieds : pour aller à gauche, tu freines un peu dans la neige avec la chaussure gauche."],
+  grandhotel: ["Grand hôtel dans la neige", "Autrefois, les touristes ne venaient à la montagne qu'en été. En 1864, l'hôtelier Johannes Badrutt de St-Moritz a fait un pari avec des clients anglais : revenez en hiver – si ça ne vous plaît pas, je vous paie le voyage ! Ils sont venus, se sont assis au soleil au-dessus de la neige et sont restés jusqu'à Pâques. Ainsi ont commencé les vacances d'hiver dans les Alpes."],
+  sternwarte: ["Observatoire", "Au Jungfraujoch, à 3571 mètres, se trouve l'observatoire du Sphinx. Si haut, l'air est mince, sec et clair – on voit donc les étoiles bien plus nettement que dans la vallée. Un télescope recueille une lumière très faible avec un grand miroir, et une caméra en fait des photos d'étoiles et de galaxies."],
+  wasserstoffwerk: ["Usine à hydrogène", "L'eau est faite d'hydrogène et d'oxygène (H₂O). Si on fait passer du courant dans l'eau, elle se sépare : à un fil, il y a des bulles d'hydrogène, à l'autre de l'oxygène. Ça s'appelle l'électrolyse. L'hydrogène est le gaz le plus léger du monde. Très froid et liquide, avec de l'oxygène, c'est le carburant des grandes fusées."],
+  satellitenwerk: ["Usine de satellites", "Un satellite tourne autour de la Terre sans tomber : il vole si vite sur le côté qu'il tombe toujours à côté de la Terre. Le satellite CHEOPS a été construit sous la direction de l'Université de Berne et vole dans l'espace depuis 2019. Il cherche des planètes autour d'autres étoiles : quand l'une passe devant son étoile, il fait un tout petit peu plus sombre."],
+  raketenwerft: ["Chantier de fusées", "Une fusée rejette du gaz chaud par en bas – ça la pousse vers le haut, comme un ballon que tu lâches. Beaucoup de fusées utilisent de l'hydrogène et de l'oxygène liquides comme carburant. La coiffe des fusées européennes Ariane, qui protège le satellite au décollage, est fabriquée à Emmen près de Lucerne."],
+  mondstation: ["Station lunaire", "Quand les premiers humains se sont posés sur la Lune en 1969, la toute première expérience qu'ils ont installée était une voile en papier d'aluminium – avant même le drapeau américain ! Elle venait de l'Université de Berne et attrapait de minuscules particules venant du Soleil. Aujourd'hui, des chercheurs prévoient des stations sur la Lune où des robots aident. Claude Nicollier a été le premier Suisse dans l'espace."],
+  protonenquelle: ["Source de protons", "Au CERN près de Genève, la plus grande machine de recherche du monde commence par une petite bouteille de gaz rouge pleine d'hydrogène ! Un courant arrache son électron à chaque atome d'hydrogène. Il reste le minuscule noyau, un proton. Les protons sont si petits que des millions tiendraient sur une tête d'épingle – côte à côte, pas les uns sur les autres."],
+  magnetwerk: ["Usine de super-aimants", "Les aimants du CERN sont supraconducteurs : refroidis à moins 271 °C – plus froid que l'espace ! –, le courant y circule sans aucune résistance. Ils deviennent alors si puissants qu'ils forcent les protons rapides à suivre leur cercle. Plus de 1200 de ces aimants géants sont alignés dans le tunnel."],
+  beschleuniger: ["Accélérateur de particules", "Le grand anneau du CERN mesure 27 kilomètres et se trouve à 100 mètres sous terre, moitié en Suisse, moitié en France. Les protons y foncent presque à la vitesse de la lumière – plus de 11 000 tours par seconde ! Puis ils se percutent, et d'énormes caméras regardent ce qui en sort. C'est ainsi qu'on a trouvé le boson de Higgs en 2012."],
+  webbuero: ["Bureau des inventeurs du Web", "Le World Wide Web a été inventé au CERN en 1989 ! Le chercheur Tim Berners-Lee voulait que les scientifiques du monde entier puissent partager facilement leurs résultats. Il a inventé les pages web avec des liens sur lesquels on clique. En 1991, le tout premier site web a été mis en ligne – et le CERN a offert l'invention au monde entier."],
+  einsteinhaus: ["Maison d'Einstein", "Albert Einstein travaillait à l'office des brevets à Berne et habitait à la Kramgasse, tout près de la Zytglogge. Il y réfléchissait à la lumière, au temps et aux horloges. En 1905, il a écrit sa célèbre formule E = mc² : dans très peu de masse se cache énormément d'énergie. Grâce à elle, on comprend aujourd'hui pourquoi le Soleil brille."],
+  glassammel: ["Point de collecte du verre", "En Suisse, on apporte les bouteilles et bocaux vides au point de collecte et on les trie par couleur : blanc, vert et brun. Presque tout le verre est ainsi récupéré. On peut refondre le verre encore et encore sans qu'il s'abîme – une vieille bouteille en devient une nouvelle."],
+  alteisen: ["Benne à ferraille", "Vieux vélos, casseroles, boîtes de conserve et canettes en alu vont dans la benne à métal. Un puissant aimant en retire le fer, l'alu est trié à part. Refondre l'alu demande beaucoup moins d'électricité que d'en fabriquer du neuf à partir de roche. C'est pourquoi la Suisse récupère presque toutes les canettes en alu."],
+  glashuette: ["Verrerie", "À la verrerie, les tessons sont lavés puis fondus à environ 1500 °C, jusqu'à briller comme du miel de feu. Une goutte de verre liquide tombe dans un moule, et de l'air la gonfle en bouteille. Avec de vieux tessons, le four a besoin de moins d'énergie qu'avec du sable neuf."],
+  velowerk: ["Usine de vélos", "Le mot vélo vient de « vélocipède » – pied rapide ! Le cadre est soudé à partir de tubes, et la chaîne passe sur des roues dentées : grande devant et petite derrière, c'est rapide mais dur. Un vélo n'a pas besoin de carburant, seulement de tes jambes – et il ne fait pas de bruit."],
+  ebikewerk: ["Usine de vélos électriques", "Un vélo électrique a un petit moteur électrique et une batterie. Le moteur n'aide que si tu pédales toi-même – ainsi tu montes même des côtes raides sans être en nage. À Huttwil, dans le canton de Berne, l'entreprise Flyer fabriquait déjà des vélos électriques en 1995, quand presque personne n'en avait entendu parler."],
+  glasi: ["Atelier de soufflage de verre", "À la Glasi Hergiswil, au bord du lac des Quatre-Cantons, on peut regarder souffler le verre. Le souffleur prend une boule incandescente dans le four avec une longue canne et souffle dedans comme dans un ballon. Il tourne sans arrêt la canne pour que rien ne pende. Ainsi naissent vases, boules et verres."],
+  buehne: ["Scène de concert", "Depuis 1967, des musiciennes et musiciens célèbres du monde entier jouent chaque été au Montreux Jazz Festival, au bord du lac Léman. Sur scène, le son est capté par des micros et amplifié par d'énormes haut-parleurs. Le son, c'est en fait de l'air qui vibre très vite – parfois tu le sens dans ton ventre !"],
+  zirkuszelt: ["Chapiteau", "Le Cirque Knie est le cirque national suisse et voyage chaque été de ville en ville avec son grand chapiteau depuis 1919. Le chapiteau se monte en un jour : mâts, cordes, toile et gradins pour plus de 2000 personnes. Sur la piste, acrobates, clowns et chevaux montrent leurs numéros."],
+  filmfestival: ["Festival du film", "Chaque mois d'août, la Piazza Grande de Locarno devient le plus grand cinéma en plein air d'Europe : un écran géant, et plus de 8000 personnes regardent des films sous les étoiles. Un film, c'est en fait une suite de photos – 24 par seconde. C'est si rapide que ton œil y voit du mouvement."],
+  feuerwerkfabrik: ["Fabrique de feux d'artifice", "Les couleurs des feux d'artifice viennent de sels métalliques : le strontium brille en rouge, le cuivre en bleu, le baryum en vert – et le simple sel de cuisine en jaune ! Chaque fusée contient de la poudre noire qui la propulse, et en haut les étoiles éclatent. On n'allume des feux d'artifice qu'avec des adultes, et le 1er août tout le ciel est coloré."],
+  bundesfeier: ["Fête des trois cents", "Trois cents niveaux de terrain – ça se fête comme le 1er août ! Pour la fête nationale, la Suisse se souvient de l'alliance de 1291 sur la prairie du Grütli. Des feux brûlent sur les montagnes, les enfants portent des lampions et le soir les feux d'artifice éclatent. À ta fête, il y a tout : vacances d'hiver, station lunaire, formule d'Einstein, vélo électrique, film – et feu d'artifice !"],
+});
+Object.assign(TR.tools, {
+  piste: ["Matériel de piste", [
+    ["Mains", "Ramasser la neige avec les mains ? Brrr – après deux boules de neige, tes doigts sont gelés !"],
+    ["Pelle à neige", "Une large pelle en alu léger. Tu déplaces beaucoup de neige d'un coup – mais soulève toujours avec les jambes, pas avec le dos !"],
+    ["Dameuse", "Une dameuse roule sur de larges chenilles pour ne pas s'enfoncer dans la neige. Devant, elle pousse la neige avec une lame, derrière une fraise lisse la piste en fines rainures – on dirait du velours côtelé."],
+    ["Installation d'enneigement", "Un ordinateur mesure la température et l'humidité et allume tout seul les canons à neige quand il fait assez froid. La neige est soufflée directement sur les pistes. ENNEIGE AUTOMATIQUEMENT !"],
+  ]],
+  sterne: ["Matériel d'astronomie", [
+    ["Mains", "Compter les étoiles à la main ? Tu arrives à 100 et tu ne sais plus où tu as commencé !"],
+    ["Jumelles", "Des jumelles, ce sont deux petites lunettes. Avec elles, tu vois déjà les cratères de la Lune et les quatre plus grandes lunes de Jupiter."],
+    ["Télescope à miroir", "Un grand miroir courbé recueille la faible lumière des étoiles et la dirige vers la caméra. Plus le miroir est grand, plus tu vois de choses."],
+    ["Télescope spatial", "Un télescope dans l'espace, bien au-dessus de l'air : pas de nuages, pas de scintillement. Il photographie jour et nuit et envoie les images à la Terre. PHOTOGRAPHIE AUTOMATIQUEMENT !"],
+  ]],
+  forscher: ["Matériel de chercheur", [
+    ["Mains", "On ne peut pas toucher les protons – ils sont bien trop petits ! Alors tu attends que la bouteille siffle toute seule …"],
+    ["Lunettes et casque", "Dans le tunnel, tout le monde porte un casque et des lunettes de protection. Et un petit masque à oxygène pour les urgences est toujours là aussi."],
+    ["Détecteur de particules", "Un détecteur est une caméra géante, grande comme une maison. Il prend 40 millions d'images par seconde et repère où vole chaque particule."],
+    ["Salle de contrôle", "Dans la salle de contrôle, les chercheuses et chercheurs regardent beaucoup d'écrans. Des ordinateurs guident tout seuls les protons dans l'anneau. FONCTIONNE AUTOMATIQUEMENT !"],
+  ]],
+  recycling: ["Matériel de recyclage", [
+    ["Mains", "Porter le verre et les canettes à la main ? Attention aux tessons – mieux vaut pas !"],
+    ["Sac de collecte", "Un sac solide à trois compartiments : verre blanc, vert et brun. Ainsi tout est déjà trié avant d'arriver au point de collecte."],
+    ["Camion-poubelle", "Le camion-poubelle soulève les grandes bennes avec un bras et les vide à l'arrière. Une presse tasse tout pour faire de la place."],
+    ["Centre de tri", "Tapis roulants, aimants et caméras trient le verre et le métal en un éclair. Un jet d'air souffle chaque morceau dans le bon conteneur. TRIE AUTOMATIQUEMENT !"],
+  ]],
+  fest: ["Technique de fête", [
+    ["Mains", "Applaudir et chanter, c'est bien – mais au fond du public, personne ne t'entend."],
+    ["Mégaphone", "Un mégaphone est un entonnoir avec un amplificateur : tu parles dedans et ta voix devient beaucoup plus forte."],
+    ["Table de mixage", "Sur la table de mixage, chaque micro a son propre curseur. L'ingénieur du son monte le chant ou baisse la batterie jusqu'à ce que tout sonne bien ensemble."],
+    ["Ordinateur de spectacle lumineux", "Un ordinateur commande la lumière, le son et l'écran au rythme de la musique – des centaines de projecteurs à la fois. FONCTIONNE AUTOMATIQUEMENT !"],
+  ]],
+});
+TR.tools.spedition[1].push(
+  ['Camion à hydrogène', 'Ce camion fait le plein d\'hydrogène. Dans une pile à combustible, l\'hydrogène se combine avec l\'oxygène de l\'air – cela produit du courant pour le moteur, et seule de la vapeur d\'eau sort du pot d\'échappement ! La Suisse a été l\'un des premiers pays à avoir toute une flotte de ces camions.'],
+  ['Camion autonome', 'Caméras, radar et lasers regardent tout autour, un ordinateur dirige, freine et accélère. Il n\'est jamais fatigué et garde toujours assez de distance. Pourtant, par sécurité, une personne est à bord et peut intervenir à tout moment.'],
+);

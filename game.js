@@ -335,8 +335,9 @@ function fitWorld() { // Welt = Hof-Bereich + alle offenen Bänder; Weide-Zaun w
   PASTURE.w = Math.max(10, areaEnd('weide') - PASTURE.x + 1.6);
   WORLD.w = Math.max(48, ...on.map(s => Math.ceil(segEnd(s) + 3)));
   const bh = s => Math.max(s.a.y + (segRows(s) - 1) * s.a.dy + 1.4, ...(s.a.lane || []).map(l => l + 0.9));
-  const hubs = Object.values(AREAS).filter(a => a.hub && areaOn(a)), hh = Math.max(0, ...hubs.map(hubH)); // Geschäftsviertel: eigener Streifen unter den Bändern, da wächst kein Band hinein
-  WORLD.h = Math.max(...on.map(bh), hubs.length ? Math.max(...on.filter(s => s.a.x > ROAD_X).map(bh)) + hh + 2 : 0);
+  const hubs = Object.keys(AREAS).filter(k => AREAS[k].hub && areaOn(AREAS[k])), hh = Math.max(0, ...hubs.map(k => hubH(AREAS[k]))); // Geschäftsviertel: eigener Streifen unter den Bändern, da wächst kein Band hinein
+  const nHub = hubs.reduce((n, k) => n + segs(k).length, 0), perRow = Math.max(1, Math.floor((WORLD.w - ROAD_X - 2) / 18.8)); // ponytail: Reihe voll → nächste Reihe; Neustadt-Häuser drängen sich dazwischen, sonst fehlen sie (townOn)
+  WORLD.h = Math.max(...on.map(bh), nHub ? Math.max(...on.filter(s => s.a.x > ROAD_X).map(bh)) + Math.ceil(nHub / perRow) * (hh + 1.5) + 0.5 : 0); // voll → nächste Reihe darunter
 }
 // Wege: Hof-Wege, Hauptstrasse (Nord–Süd) und je Band eine Strasse bis ans Bandende
 // paths(): dazu die Zufahrten der Zweigstellen (werden automatisch gebaut); basePaths(): nur das feste Strassennetz
@@ -637,6 +638,7 @@ function spur(b) {
 }
 const fld = t => THINGS[t.type].kind === 'grow' ? 'store' : 'out'; // Lagerfeld: Ernte vs. fertige Ware
 const truckCount = () => G.tools.spedition ? 1 + (G.lkw || 0) : 0;
+const filMax = () => DECOS.filiale.max + 2 * DECOS.filiale.more.filter(l => G.land >= l).length; // ab Land 240 und 280 je 2 Zweigstellen mehr
 // LKW-Parkplatz südlich vom Grosshandel (zwischen Händler und See): ab Lastwagen, 2 Reihen, wächst mit den Fahrzeugen
 const LOT = { x: 10.3, y: 19.75, bay: 1.15, rows: [21.15, 23], cols: 6 }; // Kacheln
 const lotOn = () => G.tools.spedition >= 3;
@@ -1022,6 +1024,9 @@ function landFeats(l) { // was kommt bei Land-Stufe l dazu? [{ic, t, d}]
   if (i >= 0) f.push({ ic: '🏡', t: $t`Dein Bauernhof bekommt ${HOF_ADD[i]}!`, d: $t`Lauf hin und schau ihn dir an!` });
   if (SHOP_LV.includes(l) || i === 1 || i === 3) f.push({ ic: '🏪', t: $t`Laden und Händler ziehen in grössere Häuser!`, d: $t`Mehr Regale, mehr Kundschaft, mehr Geld 💰` });
   if (l === 20) f.push({ ic: '⛪', t: $t`Neu im Laden: Kirche und Gülle-Verteiler`, d: $t`Die Gülle stinkt – aber dein Weizen wächst doppelt! 💩` });
+  const sp = TOOLS.spedition.levels.find(v => v.land === l);
+  if (sp) f.push({ ic: '🚛', t: $t`Neu im Laden: ${sp.name}`, d: $t`Holt ${sp.cap} Waren auf einmal – unter 🔧 Werkzeuge 🚚` });
+  if (DECOS.filiale.more.includes(l)) f.push({ ic: '🏪', t: $t`Jetzt bis ${DECOS.filiale.max + 2 * (DECOS.filiale.more.indexOf(l) + 1)} Händler-Zweigstellen!`, d: $t`Noch kürzere Wege für deine Lastwagen 🚛` });
   if (l === DECOS.filiale.land) f.push({ ic: '🏪', t: $t`Neu im Laden: Händler-Zweigstelle`, d: $t`Deine Lastwagen verkaufen beim nächsten Händler – kürzere Wege! 🚛` });
   const nb = TOWN.find(b => b.lv === l);
   if (nb) f.push({ ic: nb.icon || (nb.k === 'chalet' ? '🛖' : '🏠'), t: $t`Dein Hof wächst zum Städtchen: ${nb.name ? $t([nb.name]) : $t`ein neues Haus`}!`, d: nb.se ? $t`Es steht in der Neustadt ganz im Südosten!` : $t`Neue Nachbarn ziehen ein – sie finden dein Dorf toll!` });
@@ -1113,6 +1118,7 @@ function shopList() {
       desc: $t`${line.name} · du hast ${truckCount()} Fahrzeuge`, note: $t`fährt zusätzlich und holt noch mehr Waren ab`,
       buy: () => { G.lkw = (G.lkw || 0) + 1; toast($t`🚛 Du hast jetzt ${truckCount()} Fahrzeuge!`); } });
     if (!next) { tabs[2].push({ icon: line.icon, name: `${line.name}: ${line.levels[lv].name}`, desc: $t`Beste Stufe erreicht! 🏆`, info: line.levels[lv].info, can: false, price: 0 }); continue; }
+    if (next.land > G.land) { tabs[2].push({ icon: line.icon, name: next.name, price: next.price, info: next.info, can: false, desc: $t`${line.name} · jetzt: ${line.levels[lv].name}`, note: $t`🔒 ab Land-Stufe ${next.land}` }); continue; }
     tabs[2].push({
       // Upgrade ersetzt alle Fahrzeuge, kostet aber fix pro Stufe – mehr Fahrzeuge machen es nicht teurer
       icon: line.icon, name: next.name, price: next.price, info: next.info, can: true,
@@ -1122,7 +1128,7 @@ function shopList() {
     });
   }
   if (G.land >= DECOS.filiale.land) { // Händler-Zweigstelle: Lastwagen verkaufen beim nächsten Händler und parken dort
-    const d = DECOS.filiale, n = decoCount('filiale'), full = n >= d.max, busy = !!G.carry;
+    const d = DECOS.filiale, n = decoCount('filiale'), full = n >= filMax(), busy = !!G.carry;
     tabs[2].push({ icon: d.icon, name: d.name, price: d.price + n * 25000, info: d.info, can: !full && !busy, neu: !n,
       desc: $t`Du stellst sie hin, wo du willst – auch auf leere Bauplätze. Sie bekommt eine eigene Strasse, und deine Lastwagen verkaufen beim nächsten Händler`,
       note: full ? $t`✅ Schon gekauft` : busy ? $t`Stell zuerst ${DECOS[G.carry].name} ab` : n ? $t`Hast du schon ${n}×` : '',
@@ -3111,6 +3117,45 @@ const BIZ = {
     for (let i = 0; i < 5; i++) { const bx = x - 42 + i * 21, by = y - 30 - (i % 2) * 14; line(neon, 1.5, bx, y - 4, bx, by, bx + 9, by - 9); ellipse(bx + 9, by - 9, 2.4, 2.4, neon); }
     emblem(x, y - 74, t); sign(x, y - 52, bname(t));
   },
+  skiort(x, y, t) { // Holz-Chalet mit Schnee auf dem Dach und Eiszapfen
+    house(x, y, 100, 50, '#9a6a3e', '#7a4a2a', 30);
+    ctx.fillStyle = '#fbfdff'; ctx.beginPath(); ctx.moveTo(x - 62, y - 46); ctx.lineTo(x + 62, y - 46); ctx.lineTo(x + 46, y - 82); ctx.lineTo(x - 46, y - 82); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#dfeaf5'; for (let i = 0; i < 9; i++) { const ix = x - 56 + i * 14; ctx.beginPath(); ctx.moveTo(ix, y - 46); ctx.lineTo(ix + 5, y - 46); ctx.lineTo(ix + 2.5, y - 38 - (i % 3) * 3); ctx.fill(); } // Eiszapfen
+    for (const wx of [-40, 22]) win(x + wx, y - 36, 18, 16, t.working); door(x, y, 18, 30, '#5a3a1e');
+    emblem(x, y - 90, t); sign(x, y - 60, bname(t));
+  },
+  raumfahrt(x, y, t) { // Montagehalle mit grossem Tor und Kuppel, auf dem Dach eine Schüssel-Antenne
+    ellipse(x + 6, y, 62, 9, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#e8eaee'; ctx.fillRect(x - 56, y - 58, 112, 58); ctx.fillStyle = '#c8ccd4'; ctx.fillRect(x - 56, y - 62, 112, 6);
+    ctx.fillStyle = '#3a4a6a'; ctx.fillRect(x - 20, y - 50, 40, 50); ctx.fillStyle = '#5a6a8a'; for (let yy = y - 46; yy < y; yy += 8) ctx.fillRect(x - 18, yy, 36, 2); // Rolltor
+    ctx.fillStyle = '#2a3a7a'; ctx.fillRect(x - 50, y - 46, 22, 6); ctx.fillRect(x + 28, y - 46, 22, 6); // blaue Streifen
+    ctx.save(); ctx.translate(x + 38, y - 72); ctx.rotate(-0.5 + Math.sin(time * 0.4 + t.id) * 0.3); ctx.fillStyle = '#f4f4f4'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 6, 0, 0, Math.PI); ctx.fill(); line('#888', 1.5, 0, 2, 0, -8); ctx.restore();
+    line('#999', 2, x + 38, y - 62, x + 38, y - 70);
+    emblem(x - 34, y - 70, t); sign(x, y - 60, bname(t));
+  },
+  forschung(x, y, t) { // runde Halle wie der Globus am CERN, aus Holzrippen
+    ellipse(x + 6, y, 60, 9, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = '#8a5a30'; ctx.beginPath(); ctx.ellipse(x, y, 50, 64, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = '#6a4220'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = -4; i <= 4; i++) { ctx.moveTo(x + i * 11, y); ctx.quadraticCurveTo(x + i * 6, y - 60, x, y - 64); } for (let j = 1; j < 4; j++) { ctx.moveTo(x - 50 * Math.sqrt(1 - (j / 4) ** 2), y - j * 16); ctx.lineTo(x + 50 * Math.sqrt(1 - (j / 4) ** 2), y - j * 16); } ctx.stroke();
+    const p = t.working ? 0.5 + 0.5 * Math.sin(time * 5 + t.id) : 0; ctx.fillStyle = `rgba(90,180,255,${0.25 + 0.5 * p})`; ctx.beginPath(); ctx.ellipse(x, y - 4, 40, 6, 0, 0, 7); ctx.fill(); // Teilchen-Ring leuchtet
+    door(x, y, 18, 24, '#3a2412');
+    emblem(x, y - 72, t); sign(x, y - 44, bname(t));
+  },
+  kreislauf(x, y, t) { // Halle mit grünem Dach, Solarzellen und grossem Recycling-Pfeil
+    house(x, y, 104, 52, '#e8eee0', '#3f8a3a', 26);
+    ctx.fillStyle = '#24406b'; for (let i = 0; i < 4; i++) ctx.fillRect(x - 44 + i * 22, y - 74, 18, 10); // Solarzellen
+    ctx.save(); ctx.translate(x - 30, y - 28); ctx.rotate(t.working ? time * 1.5 : 0); ctx.strokeStyle = '#2f9a4e'; ctx.lineWidth = 4; for (let i = 0; i < 3; i++) { ctx.rotate(2.09); ctx.beginPath(); ctx.arc(0, 0, 12, 0.2, 1.7); ctx.stroke(); } ctx.restore();
+    door(x + 22, y, 22, 30, '#4a6a3a'); win(x - 4, y - 40, 14, 14, t.working);
+    emblem(x + 40, y - 88, t, 18); sign(x, y - 58, bname(t));
+  },
+  festplatz(x, y, t) { // gestreiftes Festzelt mit Wimpeln
+    ellipse(x + 6, y, 62, 9, 'rgba(0,0,0,.22)');
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#f4f0e6' : '#d52b1e'; ctx.beginPath(); ctx.moveTo(x - 56 + i * 14, y); ctx.lineTo(x - 56 + i * 14, y - 36); ctx.lineTo(x, y - 82); ctx.lineTo(x - 42 + i * 14, y - 36); ctx.lineTo(x - 42 + i * 14, y); ctx.fill(); }
+    ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.lineTo(x, y - 26); ctx.lineTo(x + 10, y); ctx.fill(); // Eingang
+    const c = ['#f2c21a', '#2f6fc4', '#2f9a4e', '#d52b1e']; for (let i = 0; i < 8; i++) { const a = x - 56 + i * 14, h = Math.sin(time * 3 + i) * 1.5; ctx.fillStyle = c[i % 4]; ctx.beginPath(); ctx.moveTo(a, y - 36); ctx.lineTo(a + 14, y - 36); ctx.lineTo(a + 7, y - 28 + h); ctx.fill(); } // Wimpel
+    line('#555', 2, x, y - 82, x, y - 96); ctx.fillStyle = '#d52b1e'; ctx.fillRect(x, y - 96, 12, 8);
+    emblem(x - 30, y - 70, t, 18); sign(x, y - 46, bname(t));
+  },
 };
 for (const [k, d] of Object.entries(THINGS)) if (AREAS[d.area].hub && d.kind === 'factory') DRAW[k] = BIZ[d.area];
 const crateOf = (t, x, y, c) => { if (t.store > 0) crate(x, y, c, Math.min(t.store, 12)); };
@@ -3201,6 +3246,58 @@ DRAW.serverhalle = (x, y, t) => { // Bunker im Fels: Stahltür, daneben blinken 
   crateOf(t, x + 54, y + 4, '#5ad8ff');
 };
 Object.assign(HGT, { kraftwerk: 70, bergwerk: 84, goldwaschplatz: 40, rubinofen: 76, bankschalter: 96, gewaechshaus: 72, saline: 60, quarzgrube: 44, solarpark: 50, serverhalle: 76 });
+DRAW.schneekanone = (x, y, t) => { // Schneekanone auf dem Hügel, sie sprüht Schnee, und der Schneehaufen wächst
+  const g = grown(t);
+  ellipse(x, y - 2, 60, 12, '#f4f8fc'); ctx.fillStyle = '#fbfdff'; ctx.beginPath(); ctx.moveTo(x - 50, y); ctx.lineTo(x - 26, y - 14 - g * 22); ctx.lineTo(x, y); ctx.fill();
+  line('#666', 3, x + 20, y, x + 24, y - 30); ctx.save(); ctx.translate(x + 24, y - 32); ctx.rotate(-0.5); ctx.fillStyle = '#f2c21a'; ctx.fillRect(-26, -10, 30, 20); ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(-26, 0, 9, 0, 7); ctx.fill(); ctx.restore();
+  for (let i = 0; i < 10; i++) { const k = (time * 0.8 + i / 10) % 1; ellipse(x + 2 - k * 50, y - 46 - Math.sin(k * 3) * 20 + k * 30, 2, 2, `rgba(255,255,255,${1 - k})`); }
+  crateOf(t, x + 56, y + 4, '#e8f2fa');
+};
+DRAW.sternwarte = (x, y, t) => { // weisse Kuppel mit offenem Spalt, das Fernrohr schwenkt; Sterne blinken darüber
+  const g = grown(t);
+  ellipse(x, y, 52, 9, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#d8d4cc'; ctx.fillRect(x - 36, y - 34, 72, 34); ctx.fillStyle = '#f4f4f2'; ctx.beginPath(); ctx.arc(x, y - 34, 36, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#1e2a4a'; ctx.fillRect(x - 6, y - 70, 12, 36);
+  ctx.save(); ctx.translate(x, y - 44); ctx.rotate(-1 + Math.sin(time * 0.3 + t.id) * 0.3); ctx.fillStyle = '#888'; ctx.fillRect(0, -3, 34, 6); ctx.restore();
+  door(x - 20, y, 12, 20, '#5a5f66');
+  for (let i = 0; i < 5; i++) if (i < g * 5) { const on = Math.sin(time * 3 + i * 2) > 0; ctx.font = `${on ? 12 : 9}px system-ui`; ctx.textAlign = 'center'; ctx.fillText('✦', x - 40 + i * 20, y - 82 - (i % 2) * 10); }
+  crateOf(t, x + 56, y + 4, '#3a3a7a');
+};
+DRAW.protonenquelle = (x, y, t) => { // rote Wasserstoff-Flasche, ein Rohr führt in den Tunnel; Lichtpunkte flitzen hinein
+  const g = grown(t);
+  ellipse(x, y, 56, 9, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#c8102e'; rrect(x - 40, y - 54, 20, 54, 9); ctx.fill(); ctx.fillStyle = '#666'; ctx.fillRect(x - 34, y - 62, 8, 9);
+  line('#8a9098', 6, x - 26, y - 58, x + 4, y - 58, x + 4, y - 14, x + 30, y - 14);
+  ctx.fillStyle = '#5a5f66'; ctx.beginPath(); ctx.arc(x + 40, y, 22, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#1e222c'; ctx.beginPath(); ctx.arc(x + 40, y, 14, Math.PI, 0); ctx.fill();
+  for (let i = 0; i < 4; i++) { const k = (time * 1.5 + i / 4) % 1; ellipse(x + 4 + k * 30, y - 14, 2.5, 2.5, `rgba(120,200,255,${0.4 + g * 0.6})`); }
+  crateOf(t, x - 62, y + 4, '#78c8ff');
+};
+DRAW.glassammel = (x, y, t) => { // drei Glas-Container: weiss, grün, braun
+  const g = grown(t);
+  ellipse(x, y, 60, 9, 'rgba(0,0,0,.2)');
+  ['#e8e8e8', '#3f8a3a', '#8a5a30'].forEach((c, i) => { const cx = x - 40 + i * 30; ctx.fillStyle = c; rrect(cx - 13, y - 40, 26, 40, 5); ctx.fill(); ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(cx, y - 30, 4, 0, 7); ctx.fill(); });
+  for (let i = 0; i < 6; i++) if (i < g * 6) { ctx.fillStyle = ['#bfe0f5', '#5cae4a', '#a8743a'][i % 3]; ctx.fillRect(x + 38 + (i % 3) * 6, y - 14 - Math.floor(i / 3) * 10, 4, 10); }
+  crateOf(t, x - 64, y + 4, '#5cae4a');
+};
+DRAW.alteisen = (x, y, t) => { // Mulde voll Altmetall, ein Magnet-Kran hebt Eisen heraus
+  const g = grown(t);
+  ellipse(x, y, 60, 9, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#e07a1a'; ctx.beginPath(); ctx.moveTo(x - 50, y - 30); ctx.lineTo(x + 20, y - 30); ctx.lineTo(x + 12, y); ctx.lineTo(x - 42, y); ctx.fill();
+  for (let i = 0; i < 7; i++) if (i < 2 + g * 5) ellipse(x - 40 + i * 9, y - 32 - (i % 2) * 4, 5, 4, i % 2 ? '#8a8e94' : '#b0b4ba');
+  line('#555', 4, x + 40, y, x + 40, y - 76, x - 10, y - 76); const my = y - 70 + Math.sin(time + t.id) * 12; line('#333', 1.5, x - 10, y - 76, x - 10, my); ellipse(x - 10, my + 3, 9, 4, '#333');
+  crateOf(t, x + 56, y + 4, '#8a8e94');
+};
+DRAW.buehne = (x, y, t) => { // Konzertbühne mit Dach, Lautsprechern und farbigen Scheinwerfern; Noten fliegen
+  const g = grown(t);
+  ellipse(x, y, 62, 9, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#3a3a42'; ctx.fillRect(x - 54, y - 14, 108, 14); ctx.fillStyle = '#2a2a30'; ctx.beginPath(); ctx.moveTo(x - 58, y - 64); ctx.quadraticCurveTo(x, y - 90, x + 58, y - 64); ctx.lineTo(x + 58, y - 60); ctx.lineTo(x - 58, y - 60); ctx.fill();
+  line('#555', 3, x - 54, y - 14, x - 54, y - 62); line('#555', 3, x + 54, y - 14, x + 54, y - 62);
+  for (const sx of [-44, 36]) { ctx.fillStyle = '#1a1a1a'; ctx.fillRect(x + sx, y - 42, 12, 28); ellipse(x + sx + 6, y - 32, 4, 4, '#444'); ellipse(x + sx + 6, y - 21, 3, 3, '#444'); }
+  ['#ff4a4a', '#4aa8ff', '#ffd23a'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = 0.25 + 0.2 * Math.sin(time * 4 + i * 2); ctx.beginPath(); ctx.moveTo(x - 20 + i * 20, y - 60); ctx.lineTo(x - 34 + i * 20, y - 14); ctx.lineTo(x - 6 + i * 20, y - 14); ctx.fill(); ctx.globalAlpha = 1; });
+  for (let i = 0; i < 3; i++) if (i < 1 + g * 2) { const k = (time * 0.5 + i / 3) % 1; ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(255,255,255,${1 - k})`; ctx.fillText('♪', x - 10 + i * 12 + Math.sin(k * 6) * 6, y - 66 - k * 30); }
+  crateOf(t, x - 66, y + 4, '#e870b0');
+};
+Object.assign(HGT, { schneekanone: 70, sternwarte: 86, protonenquelle: 66, glassammel: 46, alteisen: 80, buehne: 92 });
 const topOf = t => { const p = pos(t); return p.y - (HGT[t.type] || 110); };
 
 // Werkzeuge am Spieler: Transport immer, Ernte-Werkzeug nur während des Erntens
@@ -3363,10 +3460,10 @@ function box3(P, a0, a1, b, z0, h, top, side) {
   [0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]).sort((p, q) => p[0][1] + p[1][1] - q[0][1] - q[1][1]).forEach(w => poly(w, side));
   poly(hi, top);
 }
-// Spediteur-Fahrzeug: Lastenrad, Lieferwagen, Lastwagen, Sattelschlepper, Lastzug (2 Ladeflächen) oder E-Lastwagen (je nach Stufe), in Fahrtrichtung k.h
+// Spediteur-Fahrzeug: Lastenrad, Lieferwagen, Lastwagen, Sattelschlepper, Lastzug (2 Ladeflächen), E-, Wasserstoff- oder selbstfahrender Lastwagen (je nach Stufe), in Fahrtrichtung k.h
 function drawTruck(k) {
-  const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1, 1, 1, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
-  const L = [0, 18, 18, 30, 40, 48, 40][lv], col = ['', '#e39b1c', '#f2f2f2', '#d23b2b', '#2f6fc4', '#38a35b', '#1fa39a'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e', '#2559a0', '#26794a', '#167a73'][lv];
+  const lv = G.tools.spedition, s = [0, 0.55, 0.8, 1, 1, 1, 1, 1, 1][lv], P = proj(k.x, k.y, s, k.h), { ux, uy } = P, box = (...a) => box3(P, ...a);
+  const L = [0, 18, 18, 30, 40, 48, 40, 44, 48][lv], col = ['', '#e39b1c', '#f2f2f2', '#d23b2b', '#2f6fc4', '#38a35b', '#1fa39a', '#5ab4e8', '#6b4fa3'][lv], dark = ['', '#b8741a', '#c8c8c8', '#a12a1e', '#2559a0', '#26794a', '#167a73', '#3a8cc0', '#4f3a80'][lv]; // 7 Wasserstoff (hellblau), 8 selbstfahrend (violett)
   if (lv === 1) return drawCargoBike(k, P, s);
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); for (const [a, b] of [[-L - 6, 15], [34, 15], [34, -15], [-L - 6, -15]]) ctx.lineTo(...P(a, b)); ctx.fill();
   const whl = (a, b) => { const [cx, cy] = P(a, b, 7); wheelE(cx, cy, 7 * s, ux, uy); };

@@ -576,3 +576,85 @@ Object.assign(TR.tools, {
     ["AI assistant", "An AI assistant sorts the data by itself and sends it wherever it's needed. You still check that everything is right! WORKS AUTOMATICALLY!"],
   ]],
 });
+
+// New business centres (land levels 210–300)
+Object.assign(TR.ui, {
+  "🔒 ab Land-Stufe {}": "🔒 from land level {}",
+  "Neu im Laden: {}": "New in the shop: {}",
+  "Holt {} Waren auf einmal – unter 🔧 Werkzeuge 🚚": "Picks up {} goods at once – under 🔧 Tools 🚚",
+  "Jetzt bis {} Händler-Zweigstellen!": "Now up to {} branch stores!",
+  "Noch kürzere Wege für deine Lastwagen 🚛": "Even shorter trips for your trucks 🚛",
+  "Bahnhof": "Railway station", "Universität": "University", "Eisstadion": "Ice rink", "Hallenbad": "Indoor pool", "Konzerthaus": "Concert hall", "Aussichtsturm": "Lookout tower",
+});
+Object.assign(TR.areas, { skiort: 'Winter sports resort', raumfahrt: 'Space centre', forschung: 'Research centre', kreislauf: 'Recycling park', festplatz: 'Fairground' });
+Object.assign(TR.items, {
+  schnee: 'Artificial snow', ski: 'Skis', iglu: 'Igloo night', schlitten: 'Davos sledge', winterferien: 'Winter holiday',
+  sternfoto: 'Star photos', wasserstoff: 'Hydrogen', satellit: 'Satellite', rakete: 'Rocket', mondbasis: 'Moon station',
+  protonen: 'Protons', magnet: 'Super magnet', teilchen: 'Particle discovery', webseite: 'Website', formel: 'Einstein formula',
+  altglas: 'Old glass', altmetall: 'Scrap metal', flaschen: 'Glass bottles', velo: 'Bicycle', ebike: 'E-bike', glaskunst: 'Glass art',
+  musik: 'Music', zirkus: 'Circus show', film: 'Film', feuerwerk: 'Fireworks', fest300: 'Three-hundred party',
+});
+Object.assign(TR.things, {
+  schneekanone: ["Snow cannon", "A snow cannon blows fine water droplets into the cold air. If it is colder than about minus 3 °C, they freeze in flight into tiny ice balls: artificial snow! It is harder than real snow and lasts longer on the slope. Many ski resorts make snow so you can ski even when little snow falls."],
+  skifabrik: ["Ski factory", "A ski is like a sandwich: a wooden core inside, layers of glass fibre around it, a smooth base underneath and sharp steel edges on the sides – they let you scrape round the bend even on ice. In Malters in canton Lucerne, Stöckli has been making skis by hand for over 80 years, and World Cup races are even won on them."],
+  iglubau: ["Igloo village", "In some ski resorts, for example in Zermatt or Davos, you can spend a winter night in an igloo! The walls are made of firm snow, and snow keeps the warmth in well: outside it may be minus 20 °C, inside only about 0 °C. You sleep on furs in a thick sleeping bag."],
+  schlittenbau: ["Sledge workshop", "The Davos sledge is made of ash wood with steel runners. In 1883 the world's first international sledge race took place in Davos – from Davos all the way to Klosters. You steer with your feet: to go left, you brake a little in the snow with your left shoe."],
+  grandhotel: ["Grand hotel in the snow", "Long ago guests only came to the mountains in summer. In 1864 the hotelier Johannes Badrutt in St. Moritz made a bet with English guests: come back in winter – if you don't like it, I'll pay for your journey! They came, sat in the sun above the snow and stayed until Easter. That's how winter holidays in the Alps began."],
+  sternwarte: ["Observatory", "On the Jungfraujoch, at 3571 metres, stands the Sphinx observatory. So high up the air is thin, dry and clear – so you see the stars much more sharply than in the valley. A telescope collects very faint light with a big mirror, and a camera turns it into photos of stars and galaxies."],
+  wasserstoffwerk: ["Hydrogen plant", "Water is made of hydrogen and oxygen (H₂O). If you send electricity through water, it splits: hydrogen bubbles at one wire, oxygen at the other. This is called electrolysis. Hydrogen is the lightest gas in the world. Very cold and liquid, together with oxygen, it is the fuel for big rockets."],
+  satellitenwerk: ["Satellite works", "A satellite circles the Earth without falling down: it flies sideways so fast that it keeps falling past the Earth. The CHEOPS satellite was built under the lead of the University of Bern and has been in space since 2019. It looks for planets around other stars: when one passes in front of its star, it gets a tiny bit darker there."],
+  raketenwerft: ["Rocket yard", "A rocket pushes hot gas out of its bottom – that pushes it upwards, like a balloon you let go of. Many rockets use liquid hydrogen and oxygen as fuel. The nose of the European Ariane rockets, which protects the satellite during launch, is built in Emmen near Lucerne."],
+  mondstation: ["Moon station", "When the first people landed on the Moon in 1969, the very first experiment they set up was a sail made of aluminium foil – even before the American flag! It came from the University of Bern and caught tiny particles from the Sun. Today researchers are planning stations on the Moon where robots help out. Claude Nicollier was the first Swiss person in space."],
+  protonenquelle: ["Proton source", "At CERN near Geneva, the biggest research machine in the world starts with a small red gas bottle full of hydrogen! An electric current tears the electron off every hydrogen atom. What's left is the tiny nucleus, a proton. Protons are so small that millions would fit on a pinhead – side by side, not on top of each other."],
+  magnetwerk: ["Super magnet works", "The magnets at CERN are superconducting: cooled to minus 271 °C – colder than outer space! – the current flows without any resistance. Then they become so strong that they force the fast protons onto their circular path. Over 1200 of these giant magnets lie one after another in the tunnel."],
+  beschleuniger: ["Particle accelerator", "The big ring at CERN is 27 kilometres long and lies 100 metres underground, half in Switzerland, half in France. Inside, protons race almost as fast as light – over 11,000 laps per second! Then they crash into each other, and huge cameras watch what comes out. That's how the Higgs particle was found in 2012."],
+  webbuero: ["Web inventor's office", "The World Wide Web was invented at CERN in 1989! The researcher Tim Berners-Lee wanted scientists all over the world to share their results easily. He invented web pages with links you can click. In 1991 the very first website went online – and CERN gave the invention to the whole world as a present."],
+  einsteinhaus: ["Einstein House", "Albert Einstein worked at the patent office in Bern and lived on the Kramgasse, right by the Zytglogge. There he thought about light, time and clocks. In 1905 he wrote his famous formula E = mc²: a tiny bit of mass contains a huge amount of energy. Thanks to it we understand today why the Sun shines."],
+  glassammel: ["Glass collection point", "In Switzerland people take empty bottles and jars to the collection point and drop them in sorted by colour: white, green and brown. Almost all glass is collected this way. Glass can be melted down again and again without getting worse – an old bottle becomes a new one."],
+  alteisen: ["Scrap metal skip", "Old bikes, pans, tins and aluminium cans go into the metal skip. A strong magnet pulls out the iron, aluminium is sorted separately. Melting aluminium needs much less electricity than making it new from rock. That's why Switzerland collects almost all aluminium drink cans again."],
+  glashuette: ["Glassworks", "In the glassworks the shards are washed and melted at about 1500 °C until they glow like honey made of fire. A drop of liquid glass falls into a mould, and air blows it up into a bottle. With old shards the furnace needs less energy than with fresh sand."],
+  velowerk: ["Bicycle works", "In Switzerland a bike is called a 'Velo', from the French 'vélocipède' – fast foot! The frame is welded together from tubes, and the chain runs over gears: big at the front and small at the back means fast, but hard work. A bike needs no fuel, only your legs – and makes no noise."],
+  ebikewerk: ["E-bike works", "An e-bike has a small electric motor and a battery. The motor only helps when you pedal yourself – so you can get up steep hills without getting all sweaty. In Huttwil in canton Bern, the company Flyer was already building e-bikes in 1995, when hardly anyone had heard of them."],
+  glasi: ["Glass-blowing workshop", "At the Glasi Hergiswil on Lake Lucerne you can watch glass being blown. The glassblower takes a glowing lump out of the furnace with a long pipe and blows into it like into a balloon. He keeps turning the pipe so nothing droops. That's how vases, balls and glasses are made."],
+  buehne: ["Concert stage", "Since 1967, famous musicians from all over the world have played at the Montreux Jazz Festival on Lake Geneva every summer. On stage the sound is captured by microphones and amplified by huge loudspeakers. Sound is really air shaking back and forth very fast – sometimes you can feel it in your tummy!"],
+  zirkuszelt: ["Circus tent", "Circus Knie is the Swiss national circus and has travelled from town to town with its big tent every summer since 1919. The tent goes up in a single day: masts, ropes, canvas and rows of seats for over 2000 people. In the ring, acrobats, clowns and horses show their tricks."],
+  filmfestival: ["Film festival", "Every August the Piazza Grande in Locarno becomes the biggest open-air cinema in Europe: a giant screen, and over 8000 people watch films under the starry sky. A film is really a series of photos – 24 per second. That's so fast that your eye sees it as movement."],
+  feuerwerkfabrik: ["Fireworks factory", "The colours in fireworks come from metal salts: strontium glows red, copper blue, barium green – and ordinary table salt yellow! Every rocket contains black powder that shoots it up, and at the top the stars burst. Only light fireworks with grown-ups – and on 1 August the whole sky is colourful."],
+  bundesfeier: ["Three-hundred party", "Three hundred land levels – that calls for a party like on 1 August! On the national day Switzerland remembers the alliance of 1291 on the Rütli meadow. Bonfires burn on the mountains, children carry paper lanterns, and in the evening the fireworks bang. Your party has it all: winter holiday, moon station, Einstein formula, e-bike, film – and fireworks!"],
+});
+Object.assign(TR.tools, {
+  piste: ["Slope equipment", [
+    ["Hands", "Scraping snow together with your hands? Brrr – after two snowballs your fingers are ice cold!"],
+    ["Snow shovel", "A wide shovel made of light aluminium. You can shift lots of snow at once – but always lift with your legs, not your back!"],
+    ["Piste groomer", "A piste groomer drives on wide tracks so it doesn't sink into the snow. At the front it pushes snow with a blade, at the back a tiller smooths the slope into fine grooves – it looks like corduroy."],
+    ["Snowmaking system", "A computer measures temperature and humidity and switches the snow cannons on by itself when it is cold enough. The snow is blown straight onto the slopes. MAKES SNOW AUTOMATICALLY!"],
+  ]],
+  sterne: ["Stargazing equipment", [
+    ["Hands", "Counting stars by hand? You get to 100 and forget where you started!"],
+    ["Binoculars", "Binoculars have two small telescopes. With them you can already see the craters on the Moon and Jupiter's four biggest moons."],
+    ["Reflecting telescope", "A big curved mirror collects the faint starlight and directs it into the camera. The bigger the mirror, the more you see."],
+    ["Space telescope", "A telescope in space, high above the air: no clouds, no flickering. It takes photos day and night and radios the pictures to Earth. TAKES PHOTOS AUTOMATICALLY!"],
+  ]],
+  forscher: ["Research equipment", [
+    ["Hands", "You can't touch protons – they're far too small! So you wait until the bottle hisses by itself …"],
+    ["Safety goggles and helmet", "In the tunnel everyone wears a helmet and safety goggles. And a small oxygen mask for emergencies is always there too."],
+    ["Particle detector", "A detector is a giant camera as big as a house. It takes 40 million pictures per second and notices where every particle flies."],
+    ["Control room", "In the control room researchers watch lots of screens. Computers steer the protons through the ring by themselves. RUNS AUTOMATICALLY!"],
+  ]],
+  recycling: ["Recycling equipment", [
+    ["Hands", "Carrying glass and cans by hand? Watch out for the shards – better not!"],
+    ["Collection bag", "A sturdy bag with three compartments: white, green and brown glass. So everything is already sorted before you get to the collection point."],
+    ["Refuse truck", "The refuse truck lifts the big skips with a gripper arm and empties them into the back. A press squashes everything together to make more room."],
+    ["Sorting plant", "Conveyor belts, magnets and cameras sort glass and metal in a flash. A puff of air blows each piece into the right container. SORTS AUTOMATICALLY!"],
+  ]],
+  fest: ["Event technology", [
+    ["Hands", "Clapping and singing is nice – but nobody at the back of the crowd can hear you."],
+    ["Megaphone", "A megaphone is a funnel with an amplifier: you speak into it and your voice becomes much louder."],
+    ["Mixing desk", "On the mixing desk every microphone has its own slider. The sound engineer turns the singing up or the drums down until everything sounds nice together."],
+    ["Light show computer", "A computer controls light, sound and screen to the beat of the music – hundreds of spotlights at once. RUNS AUTOMATICALLY!"],
+  ]],
+});
+TR.tools.spedition[1].push(
+  ['Hydrogen truck', 'This truck fills up with hydrogen. In a fuel cell the hydrogen combines with oxygen from the air – this makes electricity for the motor, and only water vapour comes out of the exhaust! Switzerland was one of the first countries to have a whole fleet of these trucks.'],
+  ['Self-driving truck', 'Cameras, radar and lasers look all around, and a computer steers, brakes and accelerates. It never gets tired and always keeps enough distance. Still, for safety a person rides along who can step in at any time.'],
+);
