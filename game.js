@@ -1315,7 +1315,7 @@ function openPlan() {
     said.add(THINGS[k].item);
     const it = THINGS[k].item, top = Math.min(...out.map(e => e.y1)), c = out.find(e => e.color !== '#bbb')?.color || '#bbb';
     const x = posn[k].x + NW + 6; // zweizeilig: Produktion / → Abnahme, sonst ragt es unter das nächste Kästchen
-    labels += `<text x="${x}" y="${top - (cnt[k] ? 20 : 6)}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${rateTxt(it)}<tspan x="${x}" dy="14">→ ${r(dem[it] || 0)}/min</tspan>` : ITEMS[it].icon}</text>`;
+    labels += `<text data-fit="${GX - 10}" x="${x}" y="${top - (cnt[k] ? 20 : 6)}" font-size="12" font-weight="700" fill="${c}" stroke="#fbf4e4" stroke-width="4" paint-order="stroke">${cnt[k] ? `Σ ${ITEMS[it].icon} ${rateTxt(it)}<tspan x="${x}" dy="14">→ ${r(dem[it] || 0)}/min</tspan>` : ITEMS[it].icon}</text>`;
   }
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
@@ -1372,7 +1372,7 @@ function openPlan() {
     const awayF = types.filter(f => cnt[f] && !vis.includes(f) && THINGS[f].in?.[d.item]), away = [...new Set(awayF.map(f => THINGS[f].icon))].join(''); // ponytail: nur gebaute Abnehmer, sonst zu viele Symbole (Mehl)
     const sell = !types.some(f => THINGS[f].in?.[d.item] && cnt[f]) ? `→ 💰${on ? ' ' + (d.kind === 'factory' && G.tools.spedition ? '🚚' : '🎒') : ''}` : '';
     nodes += `<g data-k="${k}" style="cursor:pointer" opacity="${on ? 1 : 0.45}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="12" fill="${on ? '#fff' : '#eee'}" stroke="${warn ? '#d23b2b' : on ? '#a8743f' : '#bbb'}" stroke-width="${warn ? 3 : 2}" ${on ? '' : 'stroke-dasharray="5 4"'}/>
-      <text x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
+      <text data-fit="${NW - 20}" x="${p.x + 10}" y="${p.y + 24}" font-size="15" font-weight="800">${d.icon} ${d.name}${cnt[k] ? ' ×' + cnt[k] : ''}</text>
       <text x="${p.x + 10}" y="${p.y + 43}" font-size="12" fill="#555">${rate}</text>
       <text x="${p.x + 10}" y="${p.y + 61}" font-size="12" font-weight="700" fill="#3e7bc4">${sell}${sell ? ' ' : ''}<tspan fill="#a8743f">1 ${ITEMS[d.item].icon} = ${ITEMS[d.item].price} ${$t`Fr.`}</tspan></text>
       <text data-info="${k}" x="${p.x + NW - 18}" y="${p.y + NH - 8}" font-size="16">ℹ️</text>
@@ -1390,6 +1390,8 @@ function openPlan() {
   const body = planView === 'cockpit' ? cockpit(types, cats, cnt, sup, dem, u) + tipsHtml
     : `${legend}<div style="overflow:auto">${svg}</div>${tipsHtml}<small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`;
   modal($('#plan'), `${$t`📊 Dein Analyse-Cockpit`} ${moneyTag()}`, body, head);
+  // Zu breite Labels (lange Namen, «voll»-Rate) auf ihren Platz stauchen, damit nichts überlappt
+  $('#plan').querySelectorAll('[data-fit]').forEach(t => { const b = t.getBBox(), f = +t.dataset.fit / b.width; if (f < 1) t.setAttribute('transform', `translate(${b.x},${b.y + b.height / 2}) scale(${f}) translate(${-b.x},${-b.y - b.height / 2})`); });
   const el = $('#plan'), chain = (k, next, set = new Set()) => { for (const m of next(k)) if (!set.has(m)) { set.add(m); chain(m, next, set); } return set; };
   el.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { planView = b.dataset.view; openPlan(); });
   el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { planView = 'ketten'; planCat = b.dataset.go; openPlan(); });
