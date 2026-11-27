@@ -172,6 +172,7 @@ var TR = {
     'Kauf mehr {}.': 'Compra di più: {}.', 'Niemand macht {} – kauf {}!': 'Nessuno fa {} – compra: {}!',
     '🟠 <b>Mehr {} als gebraucht</b> ({} statt {}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine {}.': '🟠 <b>Più {} del necessario</b> ({} invece di {}/min). Prendi il resto e vendilo – o costruisci ancora: {}.',
     '🏗️ <b>Baue eine {}</b> ({} Fr.): macht {} → {}. Das bringt mehr Geld, als {} direkt zu verkaufen.': '🏗️ <b>Costruisci: {}</b> ({} fr.): fa {} → {}. Rende di più che vendere direttamente {}.',
+    'Im Laden unter 🏭 Gebäude → {} {}.': 'Nel negozio sotto 🏭 Edifici → {} {}.',
     '✋ <b>{} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: {}.': '✋ <b>{} si raccoglie a mano</b> – devi portarlo tu alla lavorazione. Va da solo con: {}.',
     '{} Fr. im Laden': '{} fr. nel negozio',
     'passt': 'va bene', 'zu wenig': 'troppo poco', 'zu viel': 'troppo', 'noch nicht gebaut': 'non ancora costruito',

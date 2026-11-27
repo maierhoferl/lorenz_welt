@@ -172,6 +172,7 @@ var TR = {
     'Kauf mehr {}.': 'Buy more: {}.', 'Niemand macht {} – kauf {}!': 'Nobody makes {} – buy: {}!',
     '🟠 <b>Mehr {} als gebraucht</b> ({} statt {}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine {}.': '🟠 <b>More {} than needed</b> ({} instead of {}/min). Pick up the rest and sell it – or build another {}.',
     '🏗️ <b>Baue eine {}</b> ({} Fr.): macht {} → {}. Das bringt mehr Geld, als {} direkt zu verkaufen.': '🏗️ <b>Build a {}</b> ({} CHF): turns {} → {}. That earns more than selling {} directly.',
+    'Im Laden unter 🏭 Gebäude → {} {}.': 'In the shop under 🏭 Buildings → {} {}.',
     '✋ <b>{} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: {}.': '✋ <b>{} is harvested by hand</b> – you have to carry it to processing yourself. It works automatically with: {}.',
     '{} Fr. im Laden': '{} CHF in the shop',
     'passt': 'just right', 'zu wenig': 'too little', 'zu viel': 'too much', 'noch nicht gebaut': 'not built yet',

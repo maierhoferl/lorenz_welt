@@ -1316,7 +1316,10 @@ function openPlan() {
   edges += labels;
   // Tipps: alles, was gerade Geld kostet oder bringen würde – bewertet als ≈ Fr. in den nächsten M Minuten
   const tips = [], M = 5, eur = it => ITEMS[it].price, perMin = d => d.n / d.time * 60, nm = it => `${ITEMS[it].icon} ${ITEMS[it].name}`;
-  const tip = (v, html) => tips.push({ v: Math.max(1, Math.round(v)), html });
+  const tip = (v, html, go) => tips.push({ v: Math.max(1, Math.round(v)), html, go }); // go: Klick springt dorthin, wo man es tut
+  const toAt = t => () => { const p = pos(t); G.px = p.x; G.py = p.y + T * 0.5; harvest = null; }; // ponytail: Figur hinbeamen statt hinlaufen
+  const toShop = (tab, k) => () => { shopTab = tab; if (k && tab === 1) shopCat = catOf(k); openShop(); };
+  const toBuy = k => toShop(THINGS[k].kind === 'grow' ? 0 : 1, k), toSell = toAt(fixedE('haendler'));
   const unitVal = f => eur(THINGS[f].item) * THINGS[f].n / Object.values(THINGS[f].in).reduce((a, b) => a + b); // Wert je Zutat nach Verarbeitung
   const ready = f => Object.keys(THINGS[f].in).every(i => sup[i] > 0); // nur vorschlagen, wenn ALLE Zutaten schon hergestellt werden
   const bestUser = (it, built, fed) => types.filter(f => THINGS[f].in?.[it] && (!built || cnt[f]) && ready(f) && (!fed || u[f] >= 0.9)).sort((a, b) => unitVal(b) - unitVal(a))[0]; // fed: hat genug von den anderen Zutaten
@@ -1327,38 +1330,38 @@ function openPlan() {
     if (ts.length && surplus(it)) { // nur Überschuss lässt sich abholen
       const n = ts.reduce((a, t) => a + t[fld], 0), full = ts.filter(t => t[fld] + d.n > cap).length, v = n * eur(it) + full * perMin(d) * eur(it) * M;
       blocked += v;
-      tip(v, (full ? $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} (bei ${full} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.` : $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} – und verkauf es beim Händler.`));
+      tip(v, (full ? $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} (bei ${full} ist das Lager voll, dort steht die Arbeit!) – und verkauf es beim Händler.` : $t`📦 <b>Hole ${n} ${nm(it)} ab</b> – liegt bei ${ts.length}× ${d.name} – und verkauf es beim Händler.`), toAt(ts.find(t => t[fld] + d.n > cap) || ts[0]));
     }
     const ripe = G.things.filter(t => t.type === k && t.ripe && !isAuto(t)).length;
-    if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, $t`✨ <b>${ripe}× ${d.name} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`); }
+    if (ripe) { const v = ripe * (d.n * eur(it) + perMin(d) * eur(it) * M); blocked += v; tip(v, $t`✨ <b>${ripe}× ${d.name} reif – ernte ${ripe * d.n} ${nm(it)}!</b> Solange du nicht erntest, wächst nichts nach.`, toAt(G.things.find(t => t.type === k && t.ripe && !isAuto(t)))); }
   }
   for (const [it, n] of Object.entries(G.inv)) {
     const f = G.things.find(t => THINGS[t.type].in?.[it] && ready(t.type) && (t.inS[it] || 0) < THINGS[t.type].in[it] * 4);
-    if (f) tip(n * unitVal(f.type), $t`🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`);
-    else tip(n * eur(it), $t`💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`);
+    if (f) tip(n * unitVal(f.type), $t`🧺 <b>Bring ${n} ${nm(it)} aus deiner Tasche zur ${THINGS[f.type].name}</b> – dort wird etwas Wertvolleres daraus.`, toAt(f));
+    else tip(n * eur(it), $t`💰 <b>Verkauf ${n} ${nm(it)} beim Händler</b> (${n * eur(it)} Fr.).`, toSell);
   }
-  if (bagCount() >= bagCap()) tip(blocked + 1, $t`🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`);
+  if (bagCount() >= bagCap()) tip(blocked + 1, $t`🎒 <b>Deine Tasche ist voll!</b> Leere sie zuerst – sonst kannst du nichts ernten oder abholen.`, toSell);
   for (const it in ITEMS) {
     const s = sup[it] || 0, dm = dem[it] || 0, makes = makers(it).map(k => THINGS[k].name).join(' / ');
     // Hersteller hungern selbst (u < 0.9)? Dann bringen mehr davon nichts – der Tipp steht weiter oben in der Kette
     if (dm && s < dm * 0.9 && !(s && makers(it).filter(k => cnt[k]).every(k => (u[k] ?? 1) < 0.9))) {
       const f = bestUser(it, true);
-      tip((dm - s) * (f ? unitVal(f) : eur(it)) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`));
+      tip((dm - s) * (f ? unitVal(f) : eur(it)) * M, $t`🔴 <b>Zu wenig ${nm(it)}</b>: gebraucht ${r(dm)}/min, hergestellt ${r(s)}/min.` + ' ' + (s ? $t`Kauf mehr ${makes}.` : $t`Niemand macht ${ITEMS[it].name} – kauf ${makes}!`), makers(it).length && toBuy(makers(it)[0]));
     }
     if (!s) continue;
     const bu = bestUser(it, true, true), best = bestUser(it, false);
-    if (dm && bu && s > dm * 1.1) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`);
-    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.`);
+    if (dm && bu && s > dm * 1.1) tip((s - dm) * Math.max(1, unitVal(bu) - eur(it)) * M, $t`🟠 <b>Mehr ${nm(it)} als gebraucht</b> (${r(s)} statt ${r(dm)}/min). Hol den Rest ab und verkauf ihn – oder baue noch eine ${THINGS[bu].name}.`, toBuy(bu));
+    if (!dm && best && unitVal(best) > eur(it)) tip(s * (unitVal(best) - eur(it)) * M, $t`🏗️ <b>Baue eine ${THINGS[best].name}</b> (${THINGS[best].price} Fr.): macht ${nm(it)} → ${nm(THINGS[best].item)}. Das bringt mehr Geld, als ${ITEMS[it].name} direkt zu verkaufen.` + ' ' + $t`Im Laden unter 🏭 Gebäude → ${ITEMS[catOf(best)].icon} ${ITEMS[catOf(best)].name}.`, toBuy(best));
     const manual = makers(it).filter(k => cnt[k] && THINGS[k].kind === 'grow' && !toolLv(THINGS[k].tool).auto);
-    if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`);
+    if (dm && manual.length) tip(s * eur(it) * M * 0.5, $t`✋ <b>${ITEMS[it].name} wird von Hand geerntet</b> – du musst es selbst zur Verarbeitung bringen. Automatisch geht es mit: ${[...new Set(manual.map(k => TOOLS[THINGS[k].tool].levels.find(l => l.auto).name))].join(', ')}.`, toShop(2));
   }
   // Transport: alles über dem Bedarf geht zum Händler – bei voller Produktion, damit man vor dem Engpass gewarnt wird.
   // ponytail: Fahrzeug-Leistung = cap pro Takt; lange Fahrwege machen es langsamer, das schätzen wir nicht.
   const sellIt = Object.keys(cap).filter(it => cap[it] > (dem[it] || 0) * 1.1), sellN = sellIt.reduce((a, it) => a + cap[it] - (dem[it] || 0), 0);
   const sellV = sellIt.reduce((a, it) => a + (cap[it] - (dem[it] || 0)) * eur(it), 0), lvS = G.tools.spedition && toolLv('spedition');
   const truckN = lvS ? truckCount() * lvS.cap / lvS.every * 60 : 0;
-  if (sellN >= 1 && !lvS) tip(sellV * M * 0.3, $t`🚚 <b>Kein Spediteur</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen – die musst du alle selbst zum Händler tragen. Ein Spediteur aus dem Laden macht das für dich.`);
-  if (lvS && sellN > truckN * 1.05) tip(sellV * (1 - truckN / sellN) * M, $t`⚠️ <b>Zu wenig Transport</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen, ${truckCount()}× ${lvS.name} schafft nur ≈ ${r(truckN)}/min. Kauf im Laden noch ein Fahrzeug oder ein grösseres – sonst werden die Lager voll und die Arbeit steht.`);
+  if (sellN >= 1 && !lvS) tip(sellV * M * 0.3, $t`🚚 <b>Kein Spediteur</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen – die musst du alle selbst zum Händler tragen. Ein Spediteur aus dem Laden macht das für dich.`, toShop(2));
+  if (lvS && sellN > truckN * 1.05) tip(sellV * (1 - truckN / sellN) * M, $t`⚠️ <b>Zu wenig Transport</b>: deine Gebäude machen bis ${r(sellN)} Waren/min zum Verkaufen, ${truckCount()}× ${lvS.name} schafft nur ≈ ${r(truckN)}/min. Kauf im Laden noch ein Fahrzeug oder ein grösseres – sonst werden die Lager voll und die Arbeit steht.`, toShop(2));
   tips.sort((a, b) => b.v - a.v);
   for (const k of vis) {
     const p = posn[k], d = THINGS[k], on = cnt[k] > 0, warn = G.things.some(t => t.type === k && t.warn);
@@ -1382,7 +1385,7 @@ function openPlan() {
   const views = `<div class="tabs">${[['cockpit', $t`📈 Cockpit`], ['ketten', $t`🔗 Ketten`]].map(([v, n]) => `<button data-view="${v}" class="${v === planView ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   const head = views + (planView === 'ketten' ? catTabs(cats, planCat, 'cat') : '');
   const legend = `<div class="legend"><span style="color:#3d8b2f">━ ${$t`passt`}</span><span style="color:#d23b2b">━ ${$t`zu wenig`}</span><span style="color:#e39b1c">━ ${$t`zu viel`}</span><span style="color:#3e7bc4">→ 💰 ${$t`verkauft`} (🎒 ${$t`du`}, 🚚 ${$t`Spediteur`})</span><span style="color:#3e7bc4">⇢▢ ${$t`von anderem Reiter`}</span><span style="color:#3e7bc4">▢⇢ ${$t`zu anderem Reiter`}</span><span style="opacity:.5">▢ ${$t`nicht gebaut`}</span></div>`;
-  const tipsHtml = `<h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small>`;
+  const tipsHtml = `<h3>${$t`Was jetzt am meisten bringt`}</h3><ol class="probs">${tips.map((t, i) => `<li${t.go ? ` data-tip="${i}" style="cursor:pointer"` : ''}><b class="rk">${i + 1}</b><span>${t.html}</span><span class="imp" title="${$t`geschätzter Nutzen in den nächsten ${M} Minuten`}"><i style="width:${Math.max(6, t.v / tips[0].v * 100)}%"></i>≈ ${t.v} ${$t`Fr.`}</span></li>`).join('') || `<li>${$t`✅ Alles läuft rund!`}</li>`}</ol><small>${$t`≈ Fr. = geschätzter Nutzen in den nächsten ${M} Minuten.`} </small>`;
   const body = planView === 'cockpit' ? cockpit(types, cats, cnt, sup, dem, u) + tipsHtml
     : `${legend}<div style="overflow:auto">${svg}</div>${tipsHtml}<small>${$t`Tipp: Tippe auf ein Kästchen – die ganze Kette leuchtet auf. ℹ️ erklärt, wie es funktioniert.`}</small>`;
   modal($('#plan'), `${$t`📊 Dein Analyse-Cockpit`} ${moneyTag()}`, body, head);
@@ -1393,6 +1396,7 @@ function openPlan() {
   el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { planView = 'ketten'; planCat = b.dataset.go; openPlan(); });
   el.querySelectorAll('.chart').forEach(c => c.querySelectorAll('.hit').forEach(r => r.onpointerenter = r.onclick = () => { c.querySelector('.val').textContent = r.dataset.v; })); // Antippen/Hovern: Wert oben anzeigen
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { planCat = b.dataset.cat; openPlan(); });
+  el.querySelectorAll('[data-tip]').forEach(li => li.onclick = () => { el.hidden = true; tips[li.dataset.tip].go(); });
   centerTab(el);
   let focus = null; // Antippen: Zulieferer und Abnehmer bleiben hell, der Rest wird blass
   el.querySelectorAll('[data-k]').forEach(g => g.onclick = e => {
