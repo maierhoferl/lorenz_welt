@@ -28,7 +28,7 @@ function shade(hex, f) {
 }
 let loopOn = false;
 // Dialog auf → Cursor ins erste sichtbare Eingabefeld
-const focusInput = el => [...el.querySelectorAll('input:not([type=hidden]),textarea')].find(i => i.offsetParent)?.focus();
+const focusInput = el => [...el.querySelectorAll('input:not([type=hidden]):not([type=search]),textarea')].find(i => i.offsetParent)?.focus();
 function show(id) {
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
   focusInput($('#' + id));
@@ -1166,30 +1166,39 @@ setInterval(() => { // Laden/Cockpit offen: Kontostand und Kaufen-Knöpfe 1×/s 
     el.querySelectorAll('[data-buy]').forEach(b => b.disabled = !('can' in b.dataset) || G.money < +b.dataset.price);
   }
 }, 1000);
+// Suche: Gross/Klein und Akzente egal (kase → Käse), alle Wörter müssen vorkommen – in Name, Rezept oder Hinweis
+const norm = s => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+let shopQ = '';
 function openShop() {
   const tabs = shopList(), names = [$t`🌱 Tiere & Pflanzen`, $t`🏭 Gebäude`, $t`🔧 Werkzeuge`, $t`🗺️ Land`, $t`🏔️ Deko`];
-  let L = tabs[shopTab], head = `<div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  let L = tabs[shopTab], head = `<div class="find"><input type="search" placeholder="${$t`🔍 Suchen, z. B. Milch`}" autocomplete="off"></div><div class="tabs">${names.map((n, i) => `<button data-tab="${i}" class="${i === shopTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   if (shopTab === 1) { // Gebäude: ein Reiter pro Rohstoff wie im Produktions-Plan, innerhalb nach Verarbeitungsstufe
     const cats = Object.keys(ITEMS).filter(c => L.some(it => it.cat === c));
     if (!cats.includes(shopCat)) shopCat = cats.includes(planCat) ? planCat : cats.find(c => L.some(it => it.cat === c && it.neu)) || cats[0];
     head += catTabs(cats, shopCat, 'cat', c => L.some(it => it.cat === c && it.neu));
     L = L.filter(it => it.cat === shopCat).sort((a, b) => a.depth - b.depth || a.price - b.price);
   }
-  const body = `<div class="cards">${L.map((it, i) => `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
+  modal($('#shop'), `${$t`🛒 Laden`} ${moneyTag()}`, '', head);
+  const el = $('#shop'), body = el.querySelector('.body'), q = el.querySelector('.find input');
+  const draw = () => { // nur die Karten neu – das Suchfeld bleibt, damit Fokus und Handy-Tastatur nicht weg sind
+    const w = norm(shopQ).split(/\s+/).filter(Boolean);
+    const R = w.length ? tabs.flat().filter(it => { const h = norm(`${it.name} ${it.desc} ${it.note || ''}`); return w.every(x => h.includes(x)); }) : L;
+    el.querySelectorAll('.tabs').forEach(t => t.hidden = !!w.length);
+    body.innerHTML = R.length ? `<div class="cards">${R.map((it, i) => `<div class="card"><div class="ic">${it.icon}${it.neu ? `<span class="neu">${$t`Neu`}</span>` : ''}</div><b>${it.name}</b><small>${it.desc}</small>${it.note ? `<small>${it.note}</small>` : ''}
     <div class="more" hidden>${it.info}</div>
-    <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" data-price="${it.price}" ${it.can ? 'data-can' : ''} ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>`;
-  modal($('#shop'), `${$t`🛒 Laden`} ${moneyTag()}`, body, head);
-  const el = $('#shop');
+    <div class="row">${it.price ? `<span class="price">${it.price} ${$t`Fr.`}</span>` : '<span class="price"></span>'}<button class="i" data-info="${i}">ℹ️</button>${it.buy ? `<button class="k" data-buy="${i}" data-price="${it.price}" ${it.can ? 'data-can' : ''} ${!it.can || G.money < it.price ? 'disabled' : ''}>${$t`Kaufen`}</button>` : ''}</div></div>`).join('')}</div>` : `<p class="nodata">${$t`Nichts gefunden 🤷`}</p>`;
+    body.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const m = b.closest('.card').querySelector('.more'); m.hidden = !m.hidden; });
+    body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
+      const it = R[+b.dataset.buy];
+      if (G.money < it.price) { AU.sfx('no'); return; }
+      G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud();
+      if (!$('#shop').hidden) { const y = el.querySelector('.body').scrollTop; openShop(); el.querySelector('.body').scrollTop = y; } // Scrollposition behalten
+    });
+  };
+  q.value = shopQ; q.oninput = () => { shopQ = q.value; body.scrollTop = 0; draw(); };
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = +b.dataset.tab; openShop(); });
   el.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { shopCat = b.dataset.cat; openShop(); });
-  centerTab(el);
-  el.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const m = b.closest('.card').querySelector('.more'); m.hidden = !m.hidden; });
-  el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
-    const it = L[+b.dataset.buy];
-    if (G.money < it.price) { AU.sfx('no'); return; }
-    G.money -= it.price; it.buy(); AU.sfx('buy'); save(); hud();
-    if (!$('#shop').hidden) { const y = el.querySelector('.body').scrollTop; openShop(); el.querySelector('.body').scrollTop = y; } // Scrollposition behalten
-  });
+  draw(); centerTab(el);
 }
 
 // Cockpit: Kennzahlen jetzt, Verlauf über die Spielminuten, Auslastung je Rohstoff-Reiter
